@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canvas with Blocked Top Edge</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #111; color: #fff; font-family: sans-serif; }
+        canvas { display: block; background: #000; }
+        
+        /* The UI overlay */
+        #ui {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            pointer-events: none; /* Let clicks pass through to canvas if needed */
+        }
+        
+        button {
+            pointer-events: auto;
+            padding: 12px 24px;
+            font-size: 18px;
+            cursor: pointer;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 6px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui">
+        <h1>Fullscreen Canvas Demo</h1>
+        <p>Click below to enter Fullscreen & Lock Cursor.</p>
+        <p>Your cursor will be <b>physically blocked</b> from the top 60px.</p>
+        <button id="startBtn">Go Fullscreen</button>
+    </div>
+
+    <canvas id="myCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('myCanvas');
+        const ctx = canvas.getContext('2d');
+        const btn = document.getElementById('startBtn');
+        const ui = document.getElementById('ui');
+
+        // Virtual Cursor Position
+        let cursorX = window.innerWidth / 2;
+        let cursorY = window.innerHeight / 2;
+        let isLocked = false;
+
+        // Resize canvas to fill screen
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // --- 1. ACTIVATION SEQUENCE ---
+        btn.addEventListener('click', async () => {
+            try {
+                // Step A: Request Fullscreen
+                await document.documentElement.requestFullscreen();
+                
+                // Step B: Request Pointer Lock (Must be async/chained after fullscreen)
+                // Small delay helps ensure browser is ready
+                setTimeout(() => {
+                    canvas.requestPointerLock();
+                }, 100);
+                
+            } catch (err) {
+                console.error("Failed to enable:", err);
+            }
+        });
+
+        // --- 2. HANDLE LOCK STATE ---
+        document.addEventListener('pointerlockchange', () => {
+            if (document.pointerLockElement === canvas) {
+                isLocked = true;
+                ui.style.display = 'none'; // Hide UI
+                
+                // Reset cursor to center roughly
+                cursorX = canvas.width / 2;
+                cursorY = canvas.height / 2;
+                
+                // Start the render loop
+                requestAnimationFrame(drawLoop);
+            } else {
+                isLocked = false;
+                ui.style.display = 'block'; // Show UI again
+            }
+        });
+
+        // --- 3. TRACK MOUSE MOVEMENT ---
+        document.addEventListener('mousemove', (e) => {
+            if (!isLocked) return;
+
+            // Update virtual position
+            cursorX += e.movementX;
+            cursorY += e.movementY;
+
+            // --- 🚨 THE BLOCKING LOGIC 🚨 ---
+            // Clamp X to screen width
+            cursorX = Math.max(0, Math.min(canvas.width, cursorX));
+
+            // Clamp Y: FORCE it to stay 60px away from top!
+            // Browser trigger zone is usually top ~10px. 60px is safe.
+            cursorY = Math.max(10, Math.min(canvas.height, cursorY));
+        });
+
+        // --- 4. RENDER LOOP (Draw your canvas + Fake Cursor) ---
+        function drawLoop() {
+            if (!isLocked) return;
+
+            // A. Clear Canvas
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // B. Draw "Forbidden Zone" (Visual feedback, optional)
+            ctx.fillStyle = '#220000';
+            ctx.fillRect(0, 0, canvas.width, 60);
+            ctx.fillStyle = 'red';
+            ctx.font = '12px sans-serif';
+            ctx.fillText("Protected Zone (Browser UI won't trigger)", 20, 35);
+
+            // C. Draw Content (e.g., a painting line or game)
+            // ... your normal canvas drawing code goes here ...
+
+            // D. Draw FAKE CURSOR on top
+            drawCursor(cursorX, cursorY);
+
+            requestAnimationFrame(drawLoop);
+        }
+
+        function drawCursor(x, y) {
+            ctx.beginPath();
+            ctx.arc(x, y, 5, 0, Math.PI * 2);
+            ctx.fillStyle = 'cyan';
+            ctx.fill();
+            
+            // Optional: Draw crosshair
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x + 10, y + 10); // Simple pointer shape
+            ctx.stroke();
+        }
+    </script>
+</body>
+</html>

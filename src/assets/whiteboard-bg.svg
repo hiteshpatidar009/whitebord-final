@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1464 964" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <style>
+      .bg-pattern { fill: #f5f5f5; }
+      .logo-circle { fill: none; stroke: #e8e8e8; stroke-width: 2; opacity: 0.3; }
+      .text-watermark { font-family: Arial, sans-serif; font-size: 120px; font-weight: bold; fill: #e8e8e8; opacity: 0.15; }
+    </style>
+  </defs>
+  
+  <rect class="bg-pattern" width="1464" height="964"/>
+  
+  <!-- Logo circles pattern -->
+  <circle class="logo-circle" cx="250" cy="220" r="150"/>
+  <circle class="logo-circle" cx="250" cy="220" r="120"/>
+  <circle class="logo-circle" cx="250" cy="220" r="90"/>
+  
+  <circle class="logo-circle" cx="732" cy="220" r="150"/>
+  <circle class="logo-circle" cx="732" cy="220" r="120"/>
+  <circle class="logo-circle" cx="732" cy="220" r="90"/>
+  
+  <circle class="logo-circle" cx="1214" cy="220" r="150"/>
+  <circle class="logo-circle" cx="1214" cy="220" r="120"/>
+  <circle class="logo-circle" cx="1214" cy="220" r="90"/>
+  
+  <!-- Watermark text -->
+  <text class="text-watermark" x="732" y="520" text-anchor="middle">ANIRBAN'S ACADEMY</text>
+</svg>

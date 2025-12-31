@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contextual Whiteboard + Resize</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+    
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #f3f4f6; user-select: none; }
+        
+        .whiteboard {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+            cursor: text;
+        }
+
+        .text-item-container {
+            position: absolute;
+            min-width: 50px;
+            padding: 8px;
+            border: 1px solid transparent;
+            transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s;
+            border-radius: 4px;
+        }
+
+        .text-item-container:hover {
+            border-color: rgba(59, 130, 246, 0.3);
+        }
+
+        /* Active State */
+        .text-item-container.active {
+            border: 1px solid #3b82f6;
+            background: white;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            z-index: 50;
+        }
+
+        .drag-handle {
+            position: absolute;
+            top: -24px;
+            left: -1px;
+            background: #3b82f6;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px 4px 0 0;
+            font-size: 11px;
+            cursor: grab;
+            display: none;
+            align-items: center;
+            gap: 4px;
+            font-weight: 600;
+        }
+
+        .text-item-container.active .drag-handle {
+            display: flex;
+        }
+
+        /* Contextual Toolbar */
+        .floating-toolbar {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            margin-top: 8px;
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            display: none;
+            padding: 4px;
+            gap: 4px;
+            white-space: nowrap;
+            z-index: 60;
+            align-items: center;
+        }
+
+        .text-item-container.active .floating-toolbar {
+            display: flex;
+        }
+
+        .editable-content {
+            outline: none;
+            min-height: 1.5em;
+            white-space: pre-wrap;
+            word-break: break-word;
+            cursor: text;
+            line-height: 1.4;
+        }
+    </style>
+</head>
+<body>
+
+<div id="root"></div>
+
+<script type="text/babel">
+    const { useState, useRef, useEffect } = React;
+
+    const App = () => {
+        // Initial Items now include 'fontSize'
+        const [items, setItems] = useState([
+            { id: 1, x: 100, y: 100, fontSize: 20, html: '<b>Double click</b> anywhere to add text.' },
+            { id: 2, x: 100, y: 200, fontSize: 24, html: 'Click me to resize or format!' }
+        ]);
+
+        const [activeId, setActiveId] = useState(null);
+        const [dragId, setDragId] = useState(null);
+        const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+
+        // --- HANDLERS ---
+
+        // 1. Create New Text
+        const handleBoardDblClick = (e) => {
+            if (e.target.classList.contains('whiteboard')) {
+                const newId = Date.now();
+                setItems([...items, { 
+                    id: newId, 
+                    x: e.clientX, 
+                    y: e.clientY, 
+                    fontSize: 20, // Default Size
+                    html: 'New Text' 
+                }]);
+                setActiveId(newId);
+            }
+        };
+
+        // 2. Format Text (Bold/Italic/Underline)
+        const applyFormat = (command) => {
+            document.execCommand(command, false, null);
+        };
+
+        // 3. Change Font Size
+        const updateFontSize = (id, delta) => {
+            setItems(prev => prev.map(item => {
+                if (item.id === id) {
+                    const newSize = Math.max(12, Math.min(72, item.fontSize + delta)); // Min 12px, Max 72px
+                    return { ...item, fontSize: newSize };
+                }
+                return item;
+            }));
+        };
+
+        // 4. Update Content
+        const handleContentBlur = (id, e) => {
+            const newHtml = e.target.innerHTML;
+            setItems(prev => prev.map(item => 
+                item.id === id ? { ...item, html: newHtml } : item
+            ));
+        };
+
+        // 5. Drag Logic
+        const handleDragStart = (e, id, currentX, currentY) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setDragId(id);
+            setDragOffset({ x: e.clientX - currentX, y: e.clientY - currentY });
+        };
+
+        const handleMouseMove = (e) => {
+            if (dragId !== null) {
+                setItems(prev => prev.map(item => {
+                    if (item.id === dragId) {
+                        return { ...item, x: e.clientX - dragOffset.x, y: e.clientY - dragOffset.y };
+                    }
+                    return item;
+                }));
+            }
+        };
+
+        const handleMouseUp = () => {
+            setDragId(null);
+        };
+
+        const handleBoardMouseDown = (e) => {
+            if (e.target.classList.contains('whiteboard')) {
+                setActiveId(null);
+            }
+        };
+
+        return (
+            <div 
+                className="whiteboard bg-gray-50"
+                onDoubleClick={handleBoardDblClick}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                onMouseDown={handleBoardMouseDown}
+            >
+                {items.map(item => (
+                    <div
+                        key={item.id}
+                        className={`text-item-container ${activeId === item.id ? 'active' : ''}`}
+                        style={{ left: item.x, top: item.y }}
+                        onClick={(e) => { e.stopPropagation(); setActiveId(item.id); }}
+                    >
+                        {/* Drag Handle */}
+                        <div 
+                            className="drag-handle"
+                            onMouseDown={(e) => handleDragStart(e, item.id, item.x, item.y)}
+                        >
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 9l0 6"/><path d="M9 9l0 6"/><path d="M13 9l0 6"/><path d="M17 9l0 6"/></svg>
+                            <span>Move</span>
+                        </div>
+
+                        {/* Editable Content */}
+                        <div
+                            className="editable-content font-sans text-gray-800"
+                            style={{ fontSize: `${item.fontSize}px` }} // Dynamic Font Size
+                            contentEditable={true}
+                            suppressContentEditableWarning={true}
+                            onBlur={(e) => handleContentBlur(item.id, e)}
+                            dangerouslySetInnerHTML={{ __html: item.html }}
+                            onMouseDown={(e) => e.stopPropagation()} 
+                        />
+
+                        {/* Contextual Toolbar */}
+                        <div className="floating-toolbar" onMouseDown={(e) => e.preventDefault()}>
+                            
+                            {/* Format Buttons */}
+                            <button className="p-1.5 hover:bg-gray-100 rounded text-gray-700" title="Bold" onClick={() => applyFormat('bold')}>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/><path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/></svg>
+                            </button>
+                            <button className="p-1.5 hover:bg-gray-100 rounded text-gray-700" title="Italic" onClick={() => applyFormat('italic')}>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="4" x2="10" y2="4"/><line x1="14" y1="20" x2="5" y2="20"/><line x1="15" y1="4" x2="9" y2="20"/></svg>
+                            </button>
+                            <button className="p-1.5 hover:bg-gray-100 rounded text-gray-700" title="Underline" onClick={() => applyFormat('underline')}>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3v7a6 6 0 0 0 6 6 6 6 0 0 0 6-6V3"/><line x1="4" y1="21" x2="20" y2="21"/></svg>
+                            </button>
+
+                            <div className="w-px h-4 bg-gray-200 mx-1"></div>
+
+                            {/* Size Buttons */}
+                            <button className="p-1.5 hover:bg-gray-100 rounded text-gray-700 flex items-center justify-center w-8" title="Decrease Size" onClick={() => updateFontSize(item.id, -2)}>
+                                <span className="text-xs font-bold">A-</span>
+                            </button>
+                            <span className="text-xs text-gray-400 w-6 text-center select-none">{item.fontSize}</span>
+                            <button className="p-1.5 hover:bg-gray-100 rounded text-gray-700 flex items-center justify-center w-8" title="Increase Size" onClick={() => updateFontSize(item.id, 2)}>
+                                <span className="text-sm font-bold">A+</span>
+                            </button>
+
+                            <div className="w-px h-4 bg-gray-200 mx-1"></div>
+
+                            {/* Delete Button */}
+                            <button className="p-1.5 hover:bg-red-50 text-red-500 rounded" title="Delete" onClick={() => setItems(prev => prev.filter(i => i.id !== item.id))}>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        );
+    };
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+</script>
+
+</body>
+</html>

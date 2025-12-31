@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Layered Whiteboard</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #f0f0f0;
+            font-family: sans-serif;
+        }
+
+        /* --- TOOLBAR --- */
+        .toolbar {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            padding: 10px 20px;
+            border-radius: 50px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            z-index: 100;
+        }
+
+        button {
+            padding: 10px 15px;
+            border: 2px solid #ddd;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.2s;
+        }
+
+        button:hover { background: #f9f9f9; }
+        
+        button.active {
+            background-color: #e6f7ff;
+            border-color: #1890ff;
+            color: #1890ff;
+        }
+
+        /* Slider */
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            border-left: 1px solid #ddd;
+            padding-left: 15px;
+        }
+
+        /* --- CANVAS LAYERS --- */
+        /* We stack canvases on top of each other */
+        .canvas-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            cursor: crosshair;
+            touch-action: none; /* Prevents scrolling on mobile */
+        }
+
+        /* Layer Order */
+        #layer-highlighter { z-index: 1; } /* Bottom */
+        #layer-pen { z-index: 2; }         /* Top */
+
+    </style>
+</head>
+<body>
+
+    <div class="toolbar">
+        <button id="btn-pen" class="active" onclick="setTool('pen')">Pen</button>
+        <button id="btn-highlighter" onclick="setTool('highlighter')">Highlighter</button>
+        
+        <button id="btn-h-eraser" onclick="setTool('h-eraser')">H-Eraser</button>
+        
+        <button id="btn-eraser" onclick="setTool('eraser')">Eraser</button>
+
+        <div class="slider-container">
+            <label for="size">Size:</label>
+            <input type="range" id="size" min="2" max="50" value="5">
+            <span id="size-val">5px</span>
+        </div>
+    </div>
+
+    <div class="canvas-container">
+        <canvas id="layer-highlighter"></canvas>
+        <canvas id="layer-pen"></canvas>
+    </div>
+
+<script>
+    // 1. Setup Elements
+    const canvasPen = document.getElementById('layer-pen');
+    const canvasHighlighter = document.getElementById('layer-highlighter');
+    
+    // We get contexts for both layers
+    const ctxPen = canvasPen.getContext('2d');
+    const ctxHighlighter = canvasHighlighter.getContext('2d');
+
+    const sizeInput = document.getElementById('size');
+    const sizeVal = document.getElementById('size-val');
+    const buttons = document.querySelectorAll('button');
+
+    // 2. State
+    let isDrawing = false;
+    let currentTool = 'pen';
+    let brushSize = 5;
+    let lastX = 0;
+    let lastY = 0;
+
+    // 3. Resize Handling
+    function resize() {
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        
+        // Resize both canvases
+        canvasPen.width = w;
+        canvasPen.height = h;
+        canvasHighlighter.width = w;
+        canvasHighlighter.height = h;
+
+        // Reset Styles after resize (Canvas clears on resize)
+        setContextStyles();
+    }
+    window.addEventListener('resize', resize);
+    resize(); // Initial sizing
+
+    // 4. Tool Logic
+    function setTool(tool) {
+        currentTool = tool;
+        
+        // Update UI
+        buttons.forEach(btn => btn.classList.remove('active'));
+        document.getElementById(`btn-${tool}`).classList.add('active');
+
+        setContextStyles();
+    }
+
+    sizeInput.addEventListener('input', (e) => {
+        brushSize = e.target.value;
+        sizeVal.innerText = brushSize + 'px';
+    });
+
+    function setContextStyles() {
+        // Defaults
+        ctxPen.lineCap = 'round';
+        ctxPen.lineJoin = 'round';
+        ctxHighlighter.lineCap = 'round';
+        ctxHighlighter.lineJoin = 'round';
+
+        // Reset Composite Operations (Stop erasing mode)
+        ctxPen.globalCompositeOperation = 'source-over';
+        ctxHighlighter.globalCompositeOperation = 'source-over';
+    }
+
+    // 5. Drawing Logic
+    function getPos(e) {
+        const rect = canvasPen.getBoundingClientRect(); // Pen canvas is on top, use its rect
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        return {
+            x: clientX - rect.left,
+            y: clientY - rect.top
+        };
+    }
+
+    function start(e) {
+        e.preventDefault();
+        isDrawing = true;
+        const pos = getPos(e);
+        lastX = pos.x;
+        lastY = pos.y;
+    }
+
+    function move(e) {
+        if (!isDrawing) return;
+        e.preventDefault();
+        
+        const pos = getPos(e);
+        draw(pos.x, pos.y);
+        lastX = pos.x;
+        lastY = pos.y;
+    }
+
+    function stop() {
+        isDrawing = false;
+        ctxPen.beginPath(); // Reset paths
+        ctxHighlighter.beginPath();
+    }
+
+    function draw(x, y) {
+        // A. PEN TOOL
+        if (currentTool === 'pen') {
+            ctxPen.beginPath();
+            ctxPen.moveTo(lastX, lastY);
+            ctxPen.lineTo(x, y);
+            ctxPen.strokeStyle = 'black';
+            ctxPen.lineWidth = brushSize;
+            ctxPen.globalAlpha = 1; 
+            ctxPen.stroke();
+        } 
+        
+        // B. HIGHLIGHTER TOOL
+        else if (currentTool === 'highlighter') {
+            ctxHighlighter.beginPath();
+            ctxHighlighter.moveTo(lastX, lastY);
+            ctxHighlighter.lineTo(x, y);
+            ctxHighlighter.strokeStyle = '#ffff00'; // Yellow
+            ctxHighlighter.lineWidth = brushSize * 2; // Highlighter usually thicker
+            ctxHighlighter.globalAlpha = 0.5; // Transparent
+            ctxHighlighter.stroke();
+        }
+
+        // C. HIGHLIGHTER ERASER (Only erases Layer 1)
+        else if (currentTool === 'h-eraser') {
+            ctxHighlighter.globalCompositeOperation = 'destination-out';
+            ctxHighlighter.beginPath();
+            ctxHighlighter.arc(x, y, brushSize, 0, Math.PI * 2);
+            ctxHighlighter.fill();
+            ctxHighlighter.globalCompositeOperation = 'source-over'; // Reset immediately
+        }
+
+        // D. NORMAL ERASER (Erases Layer 1 AND Layer 2)
+        else if (currentTool === 'eraser') {
+            // Erase Pen Layer
+            ctxPen.globalCompositeOperation = 'destination-out';
+            ctxPen.beginPath();
+            ctxPen.arc(x, y, brushSize, 0, Math.PI * 2);
+            ctxPen.fill();
+            ctxPen.globalCompositeOperation = 'source-over';
+
+            // Erase Highlighter Layer
+            ctxHighlighter.globalCompositeOperation = 'destination-out';
+            ctxHighlighter.beginPath();
+            ctxHighlighter.arc(x, y, brushSize, 0, Math.PI * 2);
+            ctxHighlighter.fill();
+            ctxHighlighter.globalCompositeOperation = 'source-over';
+        }
+    }
+
+    // 6. Event Listeners (Attached to the TOP canvas)
+    canvasPen.addEventListener('mousedown', start);
+    canvasPen.addEventListener('mousemove', move);
+    canvasPen.addEventListener('mouseup', stop);
+    canvasPen.addEventListener('mouseout', stop);
+
+    // Touch support
+    canvasPen.addEventListener('touchstart', start);
+    canvasPen.addEventListener('touchmove', move);
+    canvasPen.addEventListener('touchend', stop);
+
+</script>
+</body>
+</html>

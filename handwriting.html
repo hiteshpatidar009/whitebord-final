@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Handwriting Polish – Word Level</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<style>
+  body {
+    margin: 0;
+    background: #f2f2f2;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    font-family: system-ui, sans-serif;
+  }
+  canvas {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+    touch-action: none;
+  }
+  .hint {
+    position: absolute;
+    bottom: 16px;
+    font-size: 14px;
+    color: #555;
+  }
+</style>
+</head>
+<body>
+
+<canvas id="canvas" width="900" height="450"></canvas>
+<div class="hint">✍️ Write naturally — letters auto-connect & spacing normalizes</div>
+
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+let drawing = false;
+let points = [];
+let strokes = [];
+
+ctx.lineCap = "round";
+ctx.lineJoin = "round";
+
+// ---------- POINTER EVENTS ----------
+canvas.addEventListener("pointerdown", e => {
+  drawing = true;
+  points = [];
+  addPoint(e);
+});
+
+canvas.addEventListener("pointermove", e => {
+  if (!drawing) return;
+  addPoint(e);
+  drawTemp(points);
+});
+
+canvas.addEventListener("pointerup", () => {
+  drawing = false;
+  if (points.length > 3) {
+    const polished = polishStroke(points);
+    mergeOrPush(polished);
+  }
+  redraw();
+});
+
+// ---------- POINT CAPTURE ----------
+function addPoint(e) {
+  const r = canvas.getBoundingClientRect();
+  points.push({ x: e.clientX - r.left, y: e.clientY - r.top });
+}
+
+// ---------- CORE POLISH PIPELINE ----------
+function polishStroke(raw) {
+  let pts = simplify(raw, 2);
+
+  if (isAlmostStraight(pts)) {
+    return straighten(pts);
+  }
+
+  pts = catmullRom(pts);
+  pts = chaikin(pts, 2);
+  return pts;
+}
+
+// ---------- AUTO CONNECT + SPACING ----------
+function mergeOrPush(newStroke) {
+  if (strokes.length === 0) {
+    strokes.push(newStroke);
+    return;
+  }
+
+  const last = strokes[strokes.length - 1];
+  const d = distance(last[last.length - 1], newStroke[0]);
+
+  if (d < 18) {
+    // normalize spacing by pulling closer
+    const offset = normalizeSpacing(last[last.length - 1], newStroke[0]);
+    const shifted = newStroke.map(p => ({
+      x: p.x - offset.x,
+      y: p.y - offset.y
+    }));
+    strokes[strokes.length - 1] = last.concat(shifted);
+  } else {
+    strokes.push(newStroke);
+  }
+}
+
+function normalizeSpacing(a, b) {
+  return {
+    x: (b.x - a.x) * 0.6,
+    y: (b.y - a.y) * 0.6
+  };
+}
+
+// ---------- DRAW ----------
+function drawTemp(pts) {
+  redraw();
+  ctx.strokeStyle = "rgba(0,0,0,0.25)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  pts.forEach(p => ctx.lineTo(p.x, p.y));
+  ctx.stroke();
+}
+
+function redraw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.strokeStyle = "#000";
+  ctx.lineWidth = 4;
+
+  strokes.forEach(s => {
+    ctx.beginPath();
+    ctx.moveTo(s[0].x, s[0].y);
+    s.forEach(p => ctx.lineTo(p.x, p.y));
+    ctx.stroke();
+  });
+}
+
+// ---------- HELPERS ----------
+function distance(a, b) {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+function simplify(points, tolerance) {
+  const out = [points[0]];
+  for (let i = 1; i < points.length; i++) {
+    if (distance(points[i], out[out.length - 1]) > tolerance) {
+      out.push(points[i]);
+    }
+  }
+  return out;
+}
+
+function isAlmostStraight(pts) {
+  const s = pts[0], e = pts[pts.length - 1];
+  let max = 0;
+  pts.forEach(p => {
+    const d = distanceToLine(p, s, e);
+    if (d > max) max = d;
+  });
+  return max < 6;
+}
+
+function straighten(pts) {
+  return [pts[0], pts[pts.length - 1]];
+}
+
+function distanceToLine(p, a, b) {
+  const A = p.x - a.x, B = p.y - a.y;
+  const C = b.x - a.x, D = b.y - a.y;
+  const dot = A * C + B * D;
+  const len = C * C + D * D;
+  const t = Math.max(0, Math.min(1, dot / len));
+  const x = a.x + t * C;
+  const y = a.y + t * D;
+  return Math.hypot(p.x - x, p.y - y);
+}
+
+function catmullRom(points) {
+  const res = [];
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[i - 1] || points[i];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[i + 2] || p2;
+
+    for (let t = 0; t <= 1; t += 0.25) {
+      const t2 = t * t, t3 = t2 * t;
+      res.push({
+        x: 0.5 * ((2*p1.x) + (-p0.x+p2.x)*t + (2*p0.x-5*p1.x+4*p2.x-p3.x)*t2 + (-p0.x+3*p1.x-3*p2.x+p3.x)*t3),
+        y: 0.5 * ((2*p1.y) + (-p0.y+p2.y)*t + (2*p0.y-5*p1.y+4*p2.y-p3.y)*t2 + (-p0.y+3*p1.y-3*p2.y+p3.y)*t3)
+      });
+    }
+  }
+  return res;
+}
+
+function chaikin(points, it) {
+  let pts = points;
+  for (let k = 0; k < it; k++) {
+    const out = [];
+    for (let i = 0; i < pts.length - 1; i++) {
+      const a = pts[i], b = pts[i + 1];
+      out.push({ x: 0.75*a.x + 0.25*b.x, y: 0.75*a.y + 0.25*b.y });
+      out.push({ x: 0.25*a.x + 0.75*b.x, y: 0.25*a.y + 0.75*b.y });
+    }
+    pts = out;
+  }
+  return pts;
+}
+</script>
+
+</body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "project_type": "react",
+  "ai_config": {
+    "handwriting_recognizer": {
+      "model": "gemini-2.5-flash",
+      "temperature": 0.1,
+      "maxTokens": 1000,
+      "system_prompt": "You are a handwriting recognition expert. Analyze the image containing handwritten text and output ONLY the text content. Do not add any conversational filler. If the text is illegible, output an empty string."
+    },
+    "shape_detector": {
+      "model": "gemini-2.5-flash",
+      "temperature": 0.1,
+      "maxTokens": 1000,
+      "system_prompt": "You are a geometric shape detector. Analyze the image of a hand-drawn shape and identify if it is a 'circle', 'rectangle', 'triangle', or 'line'. Output ONLY the shape name in lowercase. If it's none of these, output 'unknown'."
+    }
+  }
+}

@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Anatomy Viewer</title>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', sans-serif; background-color: #1a1a2e; color: white; }
+        
+        /* 3D Canvas */
+        canvas { display: block; width: 100vw; height: 100vh; }
+
+        /* UI Overlay */
+        #ui-layer {
+            position: absolute; top: 20px; left: 20px;
+            pointer-events: none;
+        }
+
+        h1 { margin: 0; font-size: 24px; text-transform: uppercase; letter-spacing: 2px; }
+        p { color: #a0a0a0; font-size: 14px; }
+
+        /* Selection Panel */
+        #info-panel {
+            position: absolute; right: 20px; top: 20px; width: 300px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 20px;
+            border-radius: 12px;
+            transform: translateX(120%);
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        #info-panel.active { transform: translateX(0); }
+
+        #part-name { font-size: 28px; font-weight: bold; margin: 0 0 10px 0; color: #4cc9f0; }
+        #part-desc { font-size: 16px; line-height: 1.5; color: #e0e0e0; }
+
+        /* Loading Indicator */
+        #loader {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 20px; color: #4cc9f0;
+            background: rgba(0,0,0,0.8); padding: 20px; border-radius: 8px;
+        }
+    </style>
+    
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <div id="ui-layer">
+        <h1>Anatomy Explorer</h1>
+        <p>Left Click to Select • Right Click to Pan • Scroll to Zoom</p>
+    </div>
+
+    <div id="loader">Loading modelglb.glb...</div>
+
+    <div id="info-panel">
+        <h2 id="part-name">Selection</h2>
+        <div id="part-desc">Select a body part to view details.</div>
+    </div>
+
+<script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+    // --- 1. SCENE SETUP ---
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x1a1a2e); // Dark Blue Background
+    scene.fog = new THREE.Fog(0x1a1a2e, 10, 50);
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 1.5, 4);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    // Tone mapping makes colors look more realistic
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1;
+    document.body.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+
+    // --- 2. LIGHTING ---
+    const ambientLight = new THREE.AmbientLight(0x404040, 2); 
+    scene.add(ambientLight);
+
+    const mainLight = new THREE.DirectionalLight(0xffffff, 2);
+    mainLight.position.set(5, 10, 7);
+    mainLight.castShadow = true;
+    scene.add(mainLight);
+
+    const fillLight = new THREE.DirectionalLight(0x4cc9f0, 1); // Blue rim light
+    fillLight.position.set(-5, 0, -5);
+    scene.add(fillLight);
+
+    // --- 3. LOAD THE MODEL ---
+    const loader = new GLTFLoader();
+    
+    // Materials for interaction
+    const materialSelected = new THREE.MeshStandardMaterial({ 
+        color: 0x4cc9f0, emissive: 0x111111, roughness: 0.2, metalness: 0.5 
+    });
+    
+    // Store original materials to restore them after deselecting
+    const originalMaterials = new Map(); 
+
+    loader.load('modelglb.glb', function (gltf) {
+        const model = gltf.scene;
+        
+        // 4. PROCESS THE MODEL PARTS
+        model.traverse((child) => {
+            if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+                
+                // Save the original material so we can revert back to it later
+                originalMaterials.set(child.uuid, child.material);
+
+                // Add data for the UI panel (based on object name from Blender)
+                child.userData.description = getMedicalDescription(child.name);
+            }
+        });
+
+        // Auto-Center the model
+        const box = new THREE.Box3().setFromObject(model);
+        const center = box.getCenter(new THREE.Vector3());
+        model.position.sub(center); // Centers model at 0,0,0
+        
+        scene.add(model);
+        document.getElementById('loader').style.display = 'none';
+
+    }, 
+    // Progress callback
+    function (xhr) {
+        console.log((xhr.loaded / xhr.total * 100) + '% loaded');
+    }, 
+    // Error callback
+    function (error) {
+        console.error(error);
+        document.getElementById('loader').innerText = "Error: modelglb.glb not found or blocked by CORS.";
+    });
+
+    // --- 5. INTERACTION (Raycasting) ---
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    let selectedObject = null;
+
+    window.addEventListener('click', onMouseClick);
+    window.addEventListener('mousemove', onMouseMove);
+
+    function onMouseMove(event) {
+        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObjects(scene.children, true);
+        
+        if(intersects.length > 0) {
+            document.body.style.cursor = 'pointer';
+        } else {
+            document.body.style.cursor = 'default';
+        }
+    }
+
+    function onMouseClick(event) {
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObjects(scene.children, true);
+
+        if (intersects.length > 0) {
+            // Find the first actual mesh (ignore helper lines etc)
+            const hit = intersects.find(i => i.object.isMesh);
+            if(hit) selectPart(hit.object);
+        } else {
+            deselectPart();
+        }
+    }
+
+    function selectPart(object) {
+        // If we clicked a new part, reset the old one first
+        if (selectedObject && selectedObject !== object) {
+            if (originalMaterials.has(selectedObject.uuid)) {
+                selectedObject.material = originalMaterials.get(selectedObject.uuid);
+            }
+        }
+
+        selectedObject = object;
+        
+        // Highlight the selected part
+        object.material = materialSelected;
+
+        // Update Info Panel
+        const panel = document.getElementById('info-panel');
+        document.getElementById('part-name').innerText = object.name || "Unknown Part";
+        document.getElementById('part-desc').innerText = getMedicalDescription(object.name);
+        panel.classList.add('active');
+    }
+
+    function deselectPart() {
+        if (selectedObject) {
+            if (originalMaterials.has(selectedObject.uuid)) {
+                selectedObject.material = originalMaterials.get(selectedObject.uuid);
+            }
+            selectedObject = null;
+        }
+        document.getElementById('info-panel').classList.remove('active');
+    }
+
+    // --- 6. DATA MAPPING ---
+    // This function maps your Blender Object Names to descriptions.
+    // Make sure your objects in Blender are named simply (e.g., "Skull", "Heart")
+    function getMedicalDescription(name) {
+        const db = {
+            // Add your specific model part names here
+            "Skull": "Bone structure protecting the brain.",
+            "Cranium": "The upper part of the skull.",
+            "Jaw": "Mandible bone used for chewing.",
+            "Ribs": "Protection for lungs and heart.",
+            "Heart": "Muscular organ pumping blood.",
+            "Lungs": "Organs for respiration.",
+            "Femur": "The thigh bone, longest in the body.",
+            "Tibia": "Shin bone.",
+            // ... add more mappings as needed
+        };
+        
+        // If name exists in DB, return description. Otherwise return generic text.
+        return db[name] || `Detailed view of the ${name}. Anatomy data pending.`;
+    }
+
+    // --- 7. ANIMATION LOOP ---
+    function animate() {
+        requestAnimationFrame(animate);
+        controls.update();
+        renderer.render(scene, camera);
+    }
+    animate();
+
+    // Handle Resize
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+</script>
+</body>
+</html>
