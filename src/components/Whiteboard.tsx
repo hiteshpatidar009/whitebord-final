@@ -1,14 +1,14 @@
 
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { Stage, Layer, Line, Image as KonvaImage, Rect, Circle, RegularPolygon, Transformer } from 'react-konva';
+import { Stage, Layer, Line, Image as KonvaImage, Rect, Circle, RegularPolygon, Transformer, Text as KonvaText } from 'react-konva';
 import Konva from 'konva';
 import useImage from 'use-image';
 import { useWhiteboardStore } from '../store/useWhiteboardStore';
 import type { Stroke, WhiteboardItem } from '../types';
 import { strokesToImage, getBoundingBox } from '../utils/canvasUtils';
 import { FONT_STACKS } from './TextToolbar';
-import { TextEditor } from './TextEditor';
+
 import { transcribeHandwriting } from '../services/geminiService';
 
 
@@ -127,14 +127,12 @@ export const Whiteboard: React.FC = () => {
     selectedId,
     setSelectedId,
     backgroundImage,
-    setTextSelection
   } = useWhiteboardStore();
 
   const stageRef = useRef<Konva.Stage>(null);
   const transformerRef = useRef<Konva.Transformer>(null);
-  const [activeTextId, setActiveTextId] = useState<string | null>(null);
-  const [textDragId, setTextDragId] = useState<string | null>(null);
-  const [textDragOffset, setTextDragOffset] = useState({ x: 0, y: 0 });
+  const [editingTextId, setEditingTextId] = useState<string | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   // Drawing state refs
   const isDrawing = useRef(false);
@@ -178,7 +176,7 @@ export const Whiteboard: React.FC = () => {
   useEffect(() => {
     if (!transformerRef.current) return;
 
-    if (selectedId && activeTextId !== selectedId) {
+    if (selectedId && editingTextId !== selectedId) {
       const stage = stageRef.current;
       const node = stage?.findOne('#' + selectedId);
       
@@ -216,7 +214,7 @@ export const Whiteboard: React.FC = () => {
       transformerRef.current.nodes([]);
       transformerRef.current.getLayer()?.batchDraw();
     }
-  }, [selectedId, items, activeTextId]);
+  }, [selectedId, items, editingTextId]);
 
   useEffect(() => {
     const handleContextMenu = (e: MouseEvent) => {
@@ -312,8 +310,10 @@ export const Whiteboard: React.FC = () => {
         ctx.stroke();
       });
       
+      // Convert canvas to base64 properly
       const dataUrl = canvas.toDataURL('image/png');
-      const text = await transcribeHandwriting(dataUrl);
+      const base64Data = dataUrl.split(',')[1]; // Extract base64 part only
+      const text = await transcribeHandwriting(base64Data);
       
       if (text && text !== "No handwriting detected") {
         // Remove original handwriting strokes
@@ -469,7 +469,6 @@ export const Whiteboard: React.FC = () => {
 
     if (clickedOnEmpty) {
         setSelectedId(null);
-        setActiveTextId(null);
     }
     
     // Early return for pan tool - let stage handle dragging
@@ -481,40 +480,31 @@ export const Whiteboard: React.FC = () => {
     if (!pos) return;
 
     if (tool === 'text') {
-      const now = Date.now();
-      const isDoubleClick = now - lastRightClickTime.current < 300;
-      
-      if (isDoubleClick) {
-          const newId = uuidv4();
-          addItem({
-            type: 'text',
-            id: newId,
-            x: pos.x,
-            y: pos.y,
-            text: '',
-            fontSize: size,
-            fontFamily: FONT_STACKS[textOptions.fontFamily] || textOptions.fontFamily,
-            fontStyle: `${textOptions.isBold ? 'bold ' : ''}${textOptions.isItalic ? 'italic' : ''}`.trim(),
-            textDecoration: textOptions.isUnderline ? 'underline' : '',
-            fill: color, // Store color at creation time - never changes
-            lineHeight: 1.5
-          });
-          setSelectedId(newId);
-          setActiveTextId(newId);
-          saveHistory();
-          lastRightClickTime.current = 0;
-          return;
-      }
-      lastRightClickTime.current = now;
-
-      if (!clickedOnEmpty) {
-          const targetId = e.target.id();
-          if (targetId) {
-            setSelectedId(targetId);
-            setActiveTextId(targetId);
-          }
+      if (clickedOnEmpty) {
+        // Create new text at click position
+        const newId = uuidv4();
+        addItem({
+          type: 'text',
+          id: newId,
+          x: pos.x,
+          y: pos.y,
+          text: 'Type here...',
+          fontSize: size,
+          fontFamily: FONT_STACKS[textOptions.fontFamily] || textOptions.fontFamily,
+          fontStyle: `${textOptions.isBold ? 'bold ' : ''}${textOptions.isItalic ? 'italic' : ''}`.trim(),
+          textDecoration: textOptions.isUnderline ? 'underline' : '',
+          fill: color,
+          lineHeight: 1.5
+        });
+        setSelectedId(newId);
+        startTextEditing(newId);
+        saveHistory();
       } else {
-          setActiveTextId(null);
+        // Select existing text
+        const targetId = e.target.id();
+        if (targetId) {
+          setSelectedId(targetId);
+        }
       }
       return; 
     }
@@ -745,44 +735,60 @@ const getCursorStyle = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const handleTextDragStart = (e: React.PointerEvent | React.MouseEvent, id: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    const item = items.find(i => i.id === id);
-    if (!item || item.type !== 'text') return;
-    
-    setTextDragId(id);
-    
-    // Store the initial offset between pointer and text position
-    const textScreenX = item.x * stageScale + stagePos.x;
-    const textScreenY = item.y * stageScale + stagePos.y;
-    
-    setTextDragOffset({ 
-      x: e.clientX - textScreenX, 
-      y: e.clientY - textScreenY 
-    });
-  };
 
-  const handleGlobalMouseMove = (e: React.PointerEvent | React.MouseEvent) => {
-    if (!textDragId) return;
-    
-    const item = items.find(i => i.id === textDragId);
-    if (!item || item.type !== 'text') return;
-    
-    // Calculate new world position directly from pointer position
-    const newWorldX = (e.clientX - textDragOffset.x - stagePos.x) / stageScale;
-    const newWorldY = (e.clientY - textDragOffset.y - stagePos.y) / stageScale;
-    
-    // Update position immediately - no debounce, no timeout
-    updateItem(textDragId, { x: newWorldX, y: newWorldY });
-  };
 
-  const handleGlobalMouseUp = () => {
-    if (textDragId) {
-      setTextDragId(null);
-      setTextDragOffset({ x: 0, y: 0 });
+  // Text editing functions
+  const startTextEditing = (textId: string) => {
+    const textItem = items.find(i => i.id === textId && i.type === 'text');
+    if (!textItem) return;
+
+    setEditingTextId(textId);
+    
+    // Create temporary textarea
+    const textarea = document.createElement('textarea');
+    textarea.value = textItem.text === 'Type here...' ? '' : textItem.text;
+    textarea.style.position = 'absolute';
+    textarea.style.left = `${textItem.x * stageScale + stagePos.x}px`;
+    textarea.style.top = `${textItem.y * stageScale + stagePos.y}px`;
+    textarea.style.fontSize = `${textItem.fontSize * stageScale}px`;
+    textarea.style.fontFamily = textItem.fontFamily;
+    textarea.style.color = textItem.fill;
+    textarea.style.background = 'rgba(255,255,255,0.9)';
+    textarea.style.border = '2px solid #0099ff';
+    textarea.style.outline = 'none';
+    textarea.style.resize = 'none';
+    textarea.style.zIndex = '1000';
+    textarea.style.minWidth = '100px';
+    textarea.style.minHeight = '30px';
+    
+    const finishEditing = () => {
+      const newText = textarea.value.trim() || 'Type here...';
+      updateItem(textId, { text: newText });
+      document.body.removeChild(textarea);
+      setEditingTextId(null);
       saveHistory();
+    };
+    
+    textarea.addEventListener('blur', finishEditing);
+    textarea.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        finishEditing();
+      }
+      if (e.key === 'Escape') {
+        finishEditing();
+      }
+    });
+    
+    document.body.appendChild(textarea);
+    textareaRef.current = textarea;
+    textarea.focus();
+    textarea.select();
+  };
+
+  const handleTextDoubleClick = (textId: string) => {
+    if (tool === 'text') {
+      startTextEditing(textId);
     }
   };
 
@@ -845,8 +851,44 @@ const getCursorStyle = () => {
   };
 
   const renderLayer3Item = (item: WhiteboardItem) => {
-    // Text objects are rendered as DOM elements outside canvas - completely skip them
-    if (item.type === 'image' || item.type === 'text') return null;
+    if (item.type === 'image') return null;
+    
+    // Render text as Konva.Text
+    if (item.type === 'text') {
+      return (
+        <KonvaText
+          key={item.id}
+          id={item.id}
+          x={item.x}
+          y={item.y}
+          text={item.text}
+          fontSize={item.fontSize}
+          fontFamily={item.fontFamily}
+          fontStyle={item.fontStyle}
+          textDecoration={item.textDecoration}
+          fill={item.fill}
+          lineHeight={item.lineHeight}
+          width={item.width}
+          draggable={tool === 'select'}
+          onClick={() => {
+            if (tool === 'select' || tool === 'text') {
+              setSelectedId(item.id);
+            }
+          }}
+          onTap={() => {
+            if (tool === 'select' || tool === 'text') {
+              setSelectedId(item.id);
+            }
+          }}
+          onDblClick={() => handleTextDoubleClick(item.id)}
+          onDblTap={() => handleTextDoubleClick(item.id)}
+          onTransformEnd={(e: any) => handleTransformEnd(e, item)}
+          onDragStart={handleItemDragStart}
+          onDragMove={handleItemDragMove}
+          onDragEnd={(e: any) => handleItemDragEnd(e, item)}
+        />
+      );
+    }
     
     const commonProps = {
       key: item.id,
@@ -895,9 +937,6 @@ const getCursorStyle = () => {
   return (
     <div 
       className="fixed inset-0 w-screen h-screen overflow-hidden" 
-      onPointerMove={handleGlobalMouseMove}
-      onPointerUp={handleGlobalMouseUp}
-      onPointerLeave={handleGlobalMouseUp}
       style={{
         backgroundImage: `url(${backgroundImage})`,
         backgroundAttachment: 'fixed',
@@ -966,24 +1005,12 @@ const getCursorStyle = () => {
           <Transformer ref={transformerRef} />
         </Layer>
       </Stage>
-      {/* Text objects rendered outside canvas to avoid pixel-based erasing */}
-      {items.map((item) => {
-        if (item.type !== 'text') return null;
-        return (
-          <TextEditor 
-            key={item.id} 
-            item={item} 
-            stageScale={stageScale} 
-            stagePos={stagePos} 
-            isActive={activeTextId === item.id} 
-            tool={tool} 
-            onActivate={(id) => { setActiveTextId(id); setSelectedId(id); }} 
-            onUpdate={(id, updates) => { updateItem(id, updates); saveHistory(); }} 
-            onDelete={(id) => { removeItem(id); saveHistory(); }} 
-            onDragStart={handleTextDragStart} 
-          />
-        );
-      })}
+
     </div>
   );
 };
+
+
+
+
+

@@ -5,12 +5,12 @@ const getAIClient = () => {
   return new GoogleGenAI({ apiKey: process.env.API_KEY as string });
 };
 
-export const transcribeHandwriting = async (base64Image: string): Promise<string> => {
+export const transcribeHandwriting = async (base64Data: string): Promise<string> => {
   try {
     const ai = getAIClient();
     
-    // Clean up base64 string
-    const base64Data = base64Image.split(',')[1] || base64Image;
+    // Ensure we have clean base64 data (no data URL prefix)
+    const cleanBase64 = base64Data.replace(/^data:image\/[a-z]+;base64,/, '');
 
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
@@ -19,7 +19,7 @@ export const transcribeHandwriting = async (base64Image: string): Promise<string
           {
             inlineData: {
               mimeType: 'image/png',
-              data: base64Data,
+              data: cleanBase64,
             },
           },
           {
