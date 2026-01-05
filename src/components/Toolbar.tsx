@@ -20,6 +20,12 @@ export const Toolbar: React.FC = () => {
     setTool(toolId);
     
     if (toolId === 'text') {
+      // Close any existing text editor first
+      const existingContainer = document.querySelector('[data-text-editor]');
+      if (existingContainer) {
+        document.body.removeChild(existingContainer);
+      }
+      
       const newId = uuidv4();
       addItem({
         type: 'text',
@@ -36,6 +42,14 @@ export const Toolbar: React.FC = () => {
       });
       setSelectedId(newId);
       saveHistory();
+      
+      // Start editing immediately
+      setTimeout(() => {
+        const startTextEditing = (window as any).startTextEditing;
+        if (startTextEditing) {
+          startTextEditing(newId);
+        }
+      }, 100);
     }
   };
   

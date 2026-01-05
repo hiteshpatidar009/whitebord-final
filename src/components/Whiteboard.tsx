@@ -83,11 +83,157 @@ const isClosedShape = (pts: { x: number; y: number }[]) => {
 
 // --- COMPONENTS ---
 
-// Helper: Extract plain text from HTML
-const stripHtmlTags = (html: string): string => {
+// Helper: Parse HTML and create text segments with formatting
+const parseHtmlToSegments = (html: string) => {
   const div = document.createElement('div');
   div.innerHTML = html;
-  return div.innerText || div.textContent || '';
+  
+  const segments: Array<{
+    text: string;
+    bold?: boolean;
+    italic?: boolean;
+    underline?: boolean;
+    color?: string;
+  }> = [];
+  
+  const traverse = (node: Node, inheritedStyle: any = {}) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      const text = node.textContent || '';
+      if (text) {
+        segments.push({ text, ...inheritedStyle });
+      }
+    } else if (node.nodeType === Node.ELEMENT_NODE) {
+      const element = node as HTMLElement;
+      const tagName = element.tagName.toLowerCase();
+      const style = { ...inheritedStyle };
+      
+      // Apply formatting based on tags
+      if (tagName === 'b' || tagName === 'strong') {
+        style.bold = true;
+      } else if (tagName === 'i' || tagName === 'em') {
+        style.italic = true;
+      } else if (tagName === 'u') {
+        style.underline = true;
+      } else if (tagName === 'font') {
+        const color = element.getAttribute('color');
+        if (color) style.color = color;
+      }
+      
+      // Traverse children with inherited style
+      element.childNodes.forEach(child => traverse(child, style));
+    }
+  };
+  
+  div.childNodes.forEach(node => traverse(node));
+  return segments;
+};
+
+// Rich Text Component for Konva
+const RichText: React.FC<{
+  id: string;
+  x: number;
+  y: number;
+  text: string;
+  fontSize: number;
+  fontFamily: string;
+  fill: string;
+  width?: number;
+  draggable?: boolean;
+  onClick?: () => void;
+  onTap?: () => void;
+  onDblClick?: () => void;
+  onDblTap?: () => void;
+  onTransformEnd?: (e: any) => void;
+  onDragStart?: (e: any) => void;
+  onDragMove?: (e: any) => void;
+  onDragEnd?: (e: any) => void;
+}> = (props) => {
+  // Parse HTML and render multiple text elements for different formatting
+  const segments = parseHtmlToSegments(props.text);
+  
+  if (segments.length === 0) {
+    // Fallback to plain text
+    return (
+      <KonvaText
+        id={props.id}
+        x={props.x}
+        y={props.y}
+        text={props.text}
+        fontSize={props.fontSize}
+        fontFamily={props.fontFamily}
+        fill={props.fill}
+        width={props.width}
+        draggable={props.draggable}
+        onClick={props.onClick}
+        onTap={props.onTap}
+        onDblClick={props.onDblClick}
+        onDblTap={props.onDblTap}
+        onTransformEnd={props.onTransformEnd}
+        onDragStart={props.onDragStart}
+        onDragMove={props.onDragMove}
+        onDragEnd={props.onDragEnd}
+      />
+    );
+  }
+  
+  let currentX = 0;
+  let currentY = 0;
+  const lineHeight = props.fontSize * 1.2;
+  
+  return (
+    <React.Fragment>
+      {segments.map((segment, index) => {
+        const fontStyle = `${segment.bold ? 'bold ' : ''}${segment.italic ? 'italic' : ''}`.trim();
+        const textDecoration = segment.underline ? 'underline' : '';
+        const fill = segment.color || props.fill;
+        
+        // Handle line breaks
+        const lines = segment.text.split('\n');
+        
+        return lines.map((line, lineIndex) => {
+          if (lineIndex > 0) {
+            currentX = 0;
+            currentY += lineHeight;
+          }
+          
+          const textElement = (
+            <KonvaText
+              key={`${index}-${lineIndex}`}
+              id={lineIndex === 0 && index === 0 ? props.id : undefined}
+              x={props.x + currentX}
+              y={props.y + currentY}
+              text={line}
+              fontSize={props.fontSize}
+              fontFamily={props.fontFamily}
+              fontStyle={fontStyle}
+              textDecoration={textDecoration}
+              fill={fill}
+              draggable={lineIndex === 0 && index === 0 ? props.draggable : false}
+              onClick={props.onClick}
+              onTap={props.onTap}
+              onDblClick={props.onDblClick}
+              onDblTap={props.onDblTap}
+              onTransformEnd={lineIndex === 0 && index === 0 ? props.onTransformEnd : undefined}
+              onDragStart={lineIndex === 0 && index === 0 ? props.onDragStart : undefined}
+              onDragMove={lineIndex === 0 && index === 0 ? props.onDragMove : undefined}
+              onDragEnd={lineIndex === 0 && index === 0 ? props.onDragEnd : undefined}
+            />
+          );
+          
+          // Update position for next segment (approximate width calculation)
+          const ctx = document.createElement('canvas').getContext('2d');
+          if (ctx) {
+            ctx.font = `${fontStyle} ${props.fontSize}px ${props.fontFamily}`;
+            currentX += ctx.measureText(line).width;
+          } else {
+            currentX += line.length * props.fontSize * 0.6;
+          }
+          
+          return textElement;
+        });
+      })}
+    </React.Fragment>
+  );
 };
 
 // URLImage component for loading images
@@ -197,38 +343,48 @@ export const Whiteboard: React.FC = () => {
 
     if (selectedId && editingTextId !== selectedId) {
       const stage = stageRef.current;
-      const node = stage?.findOne('#' + selectedId);
+      if (!stage) return;
       
-      if (node && stage) {
-        const nodes = [node];
-        
-        // Find overlapping erasers to move together
-        const selectedRect = node.getClientRect();
-        
-        items.forEach(item => {
+      // Handle multiple selected items
+      const selectedIds = selectedId.split(',');
+      const nodes: Konva.Node[] = [];
+      
+      selectedIds.forEach(id => {
+        const node = stage.findOne('#' + id);
+        if (node) {
+          nodes.push(node);
+          
+          // Find overlapping erasers for each selected item
+          const selectedRect = node.getClientRect();
+          items.forEach(item => {
             if (item.type === 'stroke' && (item.tool === 'eraser' || item.tool === 'highlighter-eraser')) {
-                const eraserNode = stage.findOne('#' + item.id);
-                if (eraserNode) {
-                    const eraserRect = eraserNode.getClientRect();
-                    
-                    // Simple AABB intersection check
-                    if (
-                        selectedRect.x < eraserRect.x + eraserRect.width &&
-                        selectedRect.x + selectedRect.width > eraserRect.x &&
-                        selectedRect.y < eraserRect.y + eraserRect.height &&
-                        selectedRect.y + selectedRect.height > eraserRect.y
-                    ) {
-                        nodes.push(eraserNode);
-                    }
+              const eraserNode = stage.findOne('#' + item.id);
+              if (eraserNode) {
+                const eraserRect = eraserNode.getClientRect();
+                if (
+                  selectedRect.x < eraserRect.x + eraserRect.width &&
+                  selectedRect.x + selectedRect.width > eraserRect.x &&
+                  selectedRect.y < eraserRect.y + eraserRect.height &&
+                  selectedRect.y + selectedRect.height > eraserRect.y
+                ) {
+                  nodes.push(eraserNode);
                 }
+              }
             }
-        });
+          });
+        }
+      });
 
+      if (nodes.length > 0) {
         transformerRef.current.nodes(nodes);
         
-        // Configure transformer for text items
-        const selectedItem = items.find(i => i.id === selectedId);
-        if (selectedItem?.type === 'text') {
+        // Configure transformer based on selection
+        const hasText = selectedIds.some(id => {
+          const item = items.find(i => i.id === id);
+          return item?.type === 'text';
+        });
+        
+        if (hasText && selectedIds.length === 1) {
           transformerRef.current.enabledAnchors(['top-left', 'top-right', 'bottom-left', 'bottom-right', 'middle-left', 'middle-right']);
           transformerRef.current.rotateEnabled(false);
         } else {
@@ -521,6 +677,15 @@ export const Whiteboard: React.FC = () => {
         if (targetId) {
           setSelectedId(targetId);
         }
+      } else {
+        // Close any existing text editor when clicking on empty space
+        const existingContainer = document.querySelector('[data-text-editor]');
+        if (existingContainer) {
+          document.body.removeChild(existingContainer);
+          setEditingTextId(null);
+        }
+        // Clear selection when clicking on empty space
+        setSelectedId(null);
       }
       return; 
     }
@@ -543,7 +708,35 @@ export const Whiteboard: React.FC = () => {
        return;
     }
 
-    if (tool === 'select') return;
+    if (tool === 'select') {
+      if (!clickedOnEmpty) {
+        const targetId = e.target.id();
+        if (targetId) {
+          // Check if Ctrl/Cmd is held for multi-selection
+          const isMultiSelect = (e.evt as MouseEvent).ctrlKey || (e.evt as MouseEvent).metaKey;
+          
+          if (isMultiSelect) {
+            // Toggle selection of clicked item
+            const currentSelected = selectedId ? selectedId.split(',') : [];
+            if (currentSelected.includes(targetId)) {
+              // Remove from selection
+              const newSelected = currentSelected.filter(id => id !== targetId);
+              setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
+            } else {
+              // Add to selection
+              setSelectedId([...currentSelected, targetId].join(','));
+            }
+          } else {
+            // Single selection
+            setSelectedId(targetId);
+          }
+        }
+      } else {
+        // Clear selection when clicking empty space
+        setSelectedId(null);
+      }
+      return;
+    }
     if (isRightClick) return;
 
     isDrawing.current = true;
@@ -776,17 +969,23 @@ const getCursorStyle = () => {
     container.style.display = 'flex';
     container.style.flexDirection = 'column';
     container.style.gap = '4px';
+    container.style.minWidth = '300px';
+    container.style.resize = 'both';
+    container.style.overflow = 'hidden';
+    container.style.background = '#fff';
+    container.style.border = '2px solid #0099ff';
+    container.style.borderRadius = '8px';
+    container.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
 
     // Create toolbar
     const toolbar = document.createElement('div');
     toolbar.style.display = 'flex';
     toolbar.style.gap = '4px';
-    toolbar.style.background = '#fff';
-    toolbar.style.padding = '4px';
-    toolbar.style.borderRadius = '4px';
-    toolbar.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
-    toolbar.style.border = '1px solid #ccc';
+    toolbar.style.background = '#f8f9fa';
+    toolbar.style.padding = '8px';
+    toolbar.style.borderBottom = '1px solid #dee2e6';
     toolbar.style.cursor = 'move';
+    toolbar.style.flexWrap = 'wrap';
     
     // Make toolbar draggable
     let isDragging = false;
@@ -813,52 +1012,90 @@ const getCursorStyle = () => {
       isDragging = false;
     };
 
+    // Helper function to apply formatting to selected text
+    const applyFormatToSelection = (command: string) => {
+      const selection = window.getSelection();
+      if (selection && selection.rangeCount > 0 && !selection.isCollapsed) {
+        document.execCommand(command, false);
+      }
+      editableDiv.focus();
+    };
+
     // Bold button
     const boldBtn = document.createElement('button');
     boldBtn.innerHTML = '<b>B</b>';
-    boldBtn.style.width = '24px';
-    boldBtn.style.height = '24px';
-    boldBtn.style.border = '1px solid #eee';
+    boldBtn.style.width = '28px';
+    boldBtn.style.height = '28px';
+    boldBtn.style.border = '1px solid #dee2e6';
+    boldBtn.style.borderRadius = '4px';
     boldBtn.style.cursor = 'pointer';
-    boldBtn.style.background = (textItem as any).fontStyle?.includes('bold') ? '#eee' : '#fff';
+    boldBtn.style.background = '#fff';
+    boldBtn.style.fontSize = '14px';
+    boldBtn.style.fontWeight = 'bold';
+    boldBtn.title = 'Bold (Ctrl+B)';
     boldBtn.onmousedown = (e) => e.preventDefault();
     boldBtn.onclick = (e) => {
       e.stopPropagation();
-      const currentItem = items.find(i => i.id === textId);
-      if (!currentItem || currentItem.type !== 'text') return;
-      const isBold = currentItem.fontStyle?.includes('bold');
-      const currentStyle = currentItem.fontStyle || '';
-      const newStyle = isBold 
-        ? currentStyle.replace(/\bbold\b/g, '').replace(/\s+/g, ' ').trim()
-        : `bold ${currentStyle}`.trim();
-      updateItem(textId, { fontStyle: newStyle });
-      textarea.style.fontWeight = isBold ? 'normal' : 'bold';
-      boldBtn.style.background = isBold ? '#fff' : '#eee';
-      textarea.focus();
+      applyFormatToSelection('bold');
     };
 
     // Italic button
     const italicBtn = document.createElement('button');
     italicBtn.innerHTML = '<i>I</i>';
-    italicBtn.style.width = '24px';
-    italicBtn.style.height = '24px';
-    italicBtn.style.border = '1px solid #eee';
+    italicBtn.style.width = '28px';
+    italicBtn.style.height = '28px';
+    italicBtn.style.border = '1px solid #dee2e6';
+    italicBtn.style.borderRadius = '4px';
     italicBtn.style.cursor = 'pointer';
-    italicBtn.style.background = (textItem as any).fontStyle?.includes('italic') ? '#eee' : '#fff';
+    italicBtn.style.background = '#fff';
+    italicBtn.style.fontSize = '14px';
+    italicBtn.style.fontStyle = 'italic';
+    italicBtn.title = 'Italic (Ctrl+I)';
     italicBtn.onmousedown = (e) => e.preventDefault();
     italicBtn.onclick = (e) => {
       e.stopPropagation();
-      const currentItem = items.find(i => i.id === textId);
-      if (!currentItem || currentItem.type !== 'text') return;
-      const isItalic = currentItem.fontStyle?.includes('italic');
-      const currentStyle = currentItem.fontStyle || '';
-      const newStyle = isItalic 
-        ? currentStyle.replace(/\bitalic\b/g, '').replace(/\s+/g, ' ').trim()
-        : `${currentStyle} italic`.trim();
-      updateItem(textId, { fontStyle: newStyle });
-      textarea.style.fontStyle = isItalic ? 'normal' : 'italic';
-      italicBtn.style.background = isItalic ? '#fff' : '#eee';
-      textarea.focus();
+      applyFormatToSelection('italic');
+    };
+
+    // Underline button
+    const underlineBtn = document.createElement('button');
+    underlineBtn.innerHTML = '<u>U</u>';
+    underlineBtn.style.width = '28px';
+    underlineBtn.style.height = '28px';
+    underlineBtn.style.border = '1px solid #dee2e6';
+    underlineBtn.style.borderRadius = '4px';
+    underlineBtn.style.cursor = 'pointer';
+    underlineBtn.style.background = '#fff';
+    underlineBtn.style.fontSize = '14px';
+    underlineBtn.style.textDecoration = 'underline';
+    underlineBtn.title = 'Underline (Ctrl+U)';
+    underlineBtn.onmousedown = (e) => e.preventDefault();
+    underlineBtn.onclick = (e) => {
+      e.stopPropagation();
+      applyFormatToSelection('underline');
+    };
+
+    // Text color picker
+    const colorPicker = document.createElement('input');
+    colorPicker.type = 'color';
+    colorPicker.value = (textItem as any).fill || '#000000';
+    colorPicker.style.width = '28px';
+    colorPicker.style.height = '28px';
+    colorPicker.style.border = '1px solid #dee2e6';
+    colorPicker.style.borderRadius = '4px';
+    colorPicker.style.cursor = 'pointer';
+    colorPicker.style.padding = '0';
+    colorPicker.title = 'Text Color';
+    colorPicker.onmousedown = (e) => e.stopPropagation();
+    colorPicker.onchange = () => {
+      const selection = window.getSelection();
+      if (selection && selection.rangeCount > 0 && !selection.isCollapsed) {
+        document.execCommand('foreColor', false, colorPicker.value);
+      } else {
+        editableDiv.style.color = colorPicker.value;
+        updateItem(textId, { fill: colorPicker.value });
+      }
+      editableDiv.focus();
     };
 
     // Font selector
@@ -872,53 +1109,83 @@ const getCursorStyle = () => {
     });
     fontSelect.style.fontSize = '12px';
     fontSelect.style.cursor = 'pointer';
+    fontSelect.style.padding = '4px';
+    fontSelect.style.border = '1px solid #dee2e6';
+    fontSelect.style.borderRadius = '4px';
     fontSelect.onmousedown = (e) => e.stopPropagation();
     fontSelect.onchange = () => {
       const newFont = FONT_STACKS[fontSelect.value] || fontSelect.value;
+      editableDiv.style.fontFamily = newFont;
       updateItem(textId, { fontFamily: newFont });
-      textarea.style.fontFamily = newFont;
+      editableDiv.focus();
     };
 
     // Font size selector
     const sizeInput = document.createElement('input');
     sizeInput.type = 'number';
     sizeInput.value = (textItem as any).fontSize.toString();
-    sizeInput.style.width = '40px';
+    sizeInput.style.width = '50px';
     sizeInput.style.fontSize = '12px';
+    sizeInput.style.padding = '4px';
+    sizeInput.style.border = '1px solid #dee2e6';
+    sizeInput.style.borderRadius = '4px';
     sizeInput.onmousedown = (e) => e.stopPropagation();
     sizeInput.oninput = () => {
       const newSize = parseInt(sizeInput.value);
       if (newSize > 0) {
+        editableDiv.style.fontSize = `${newSize}px`;
         updateItem(textId, { fontSize: newSize });
-        textarea.style.fontSize = `${newSize * stageScale}px`;
       }
     };
 
     toolbar.appendChild(boldBtn);
     toolbar.appendChild(italicBtn);
+    toolbar.appendChild(underlineBtn);
+    toolbar.appendChild(colorPicker);
     toolbar.appendChild(fontSelect);
     toolbar.appendChild(sizeInput);
 
-    // Create temporary textarea
-    const textarea = document.createElement('textarea');
-    textarea.value = (textItem as any).text === 'Type here...' ? '' : (textItem as any).text;
-    textarea.placeholder = 'Type here...';
-    textarea.style.fontSize = `${(textItem as any).fontSize * stageScale}px`;
-    textarea.style.fontFamily = (textItem as any).fontFamily;
-    textarea.style.fontWeight = (textItem as any).fontStyle?.includes('bold') ? 'bold' : 'normal';
-    textarea.style.fontStyle = (textItem as any).fontStyle?.includes('italic') ? 'italic' : 'normal';
-    textarea.style.color = (textItem as any).fill;
-    textarea.style.background = 'rgba(255,255,255,0.9)';
-    textarea.style.border = '2px solid #0099ff';
-    textarea.style.outline = 'none';
-    textarea.style.resize = 'none';
-    textarea.style.minWidth = '150px';
-    textarea.style.minHeight = '50px';
-    textarea.style.width = '100%';
-    textarea.style.boxSizing = 'border-box';
+    // Create editable div instead of textarea for rich text support
+    const editableDiv = document.createElement('div');
+    editableDiv.contentEditable = 'true';
+    editableDiv.innerHTML = (textItem as any).text === 'Type here...' ? '' : (textItem as any).text;
+    editableDiv.style.fontSize = `${(textItem as any).fontSize}px`;
+    editableDiv.style.fontFamily = (textItem as any).fontFamily;
+    editableDiv.style.color = (textItem as any).fill;
+    editableDiv.style.background = 'transparent';
+    editableDiv.style.border = 'none';
+    editableDiv.style.outline = 'none';
+    editableDiv.style.minWidth = '280px';
+    editableDiv.style.minHeight = '100px';
+    editableDiv.style.maxHeight = '400px';
+    editableDiv.style.overflowY = 'auto';
+    editableDiv.style.padding = '12px';
+    editableDiv.style.lineHeight = '1.4';
+    editableDiv.style.wordWrap = 'break-word';
+    editableDiv.style.whiteSpace = 'pre-wrap';
+    
+    // Add placeholder behavior
+    if (!editableDiv.innerHTML.trim()) {
+      editableDiv.innerHTML = '<span style="color: #999;">Type here...</span>';
+    }
+    
+    editableDiv.onfocus = () => {
+      if (editableDiv.innerHTML === '<span style="color: #999;">Type here...</span>') {
+        editableDiv.innerHTML = '';
+      }
+    };
+    
+    editableDiv.onblur = () => {
+      if (!editableDiv.innerHTML.trim()) {
+        editableDiv.innerHTML = '<span style="color: #999;">Type here...</span>';
+      }
+    };
     
     const finishEditing = () => {
-      const newText = textarea.value.trim() || 'Type here...';
+      let newText = editableDiv.innerHTML;
+      if (newText === '<span style="color: #999;">Type here...</span>' || !newText.trim()) {
+        newText = 'Type here...';
+      }
       updateItem(textId, { text: newText });
       if (container.parentNode) {
         document.body.removeChild(container);
@@ -942,7 +1209,8 @@ const getCursorStyle = () => {
       document.addEventListener('click', handleClickOutside);
     }, 100);
 
-    textarea.addEventListener('keydown', (e) => {
+    // Handle keyboard shortcuts
+    editableDiv.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         finishEditing();
@@ -950,15 +1218,36 @@ const getCursorStyle = () => {
       if (e.key === 'Escape') {
         finishEditing();
       }
+      // Handle formatting shortcuts
+      if (e.ctrlKey) {
+        if (e.key === 'b') {
+          e.preventDefault();
+          applyFormatToSelection('bold');
+        } else if (e.key === 'i') {
+          e.preventDefault();
+          applyFormatToSelection('italic');
+        } else if (e.key === 'u') {
+          e.preventDefault();
+          applyFormatToSelection('underline');
+        }
+      }
     });
     
     container.appendChild(toolbar);
-    container.appendChild(textarea);
+    container.appendChild(editableDiv);
     document.body.appendChild(container);
-    textareaRef.current = textarea;
-    textarea.focus();
+    textareaRef.current = editableDiv as any;
+    editableDiv.focus();
+    
+    // Select all text if it's the default placeholder
     if ((textItem as any).text === 'Type here...') {
-        textarea.select();
+      const range = document.createRange();
+      range.selectNodeContents(editableDiv);
+      const selection = window.getSelection();
+      if (selection) {
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
     }
   };
 
@@ -967,6 +1256,30 @@ const getCursorStyle = () => {
       startTextEditing(textId);
     }
   };
+
+  const handleCanvasDoubleClick = (e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
+    // Only handle double-click on existing text items, not empty canvas
+    if (tool === 'text') {
+      const stage = e.target.getStage();
+      const clickedOnEmpty = e.target === stage;
+      
+      if (!clickedOnEmpty) {
+        // Double-click on existing text to edit
+        const targetId = e.target.id();
+        if (targetId) {
+          startTextEditing(targetId);
+        }
+      }
+    }
+  };
+
+  // Expose startTextEditing globally for toolbar access
+  useEffect(() => {
+    (window as any).startTextEditing = startTextEditing;
+    return () => {
+      delete (window as any).startTextEditing;
+    };
+  }, [startTextEditing]);
 
   const linkedErasersRef = useRef<string[]>([]);
   const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
@@ -1029,10 +1342,10 @@ const getCursorStyle = () => {
   const renderLayer3Item = (item: WhiteboardItem) => {
     if (item.type === 'image') return null;
     
-    // Render text as Konva.Text
+    // Render text as Rich Text
     if (item.type === 'text') {
       return (
-        <KonvaText
+        <RichText
           key={item.id}
           id={item.id}
           x={item.x}
@@ -1040,10 +1353,7 @@ const getCursorStyle = () => {
           text={editingTextId === item.id ? '' : item.text}
           fontSize={item.fontSize}
           fontFamily={item.fontFamily}
-          fontStyle={item.fontStyle}
-          textDecoration={item.textDecoration}
           fill={item.fill}
-          lineHeight={item.lineHeight}
           width={item.width}
           draggable={tool === 'select' || tool === 'text'}
           onClick={() => {
@@ -1137,6 +1447,8 @@ const getCursorStyle = () => {
         onTouchMove={handleMouseMove}
         onTouchEnd={handleMouseUp}
         onWheel={handleWheel}
+        onDblClick={handleCanvasDoubleClick}
+        onDblTap={handleCanvasDoubleClick}
         draggable={tool === 'hand'}
         x={stagePos.x}
         y={stagePos.y}
