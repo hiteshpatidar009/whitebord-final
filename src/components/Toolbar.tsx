@@ -12,8 +12,32 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.vers
 
 export const Toolbar: React.FC = () => {
   const { 
-    tool, setTool, color, setColor, size, setSize, undo, redo, saveHistory, clear, addItem, backgroundImage, setBackgroundImage, setPdfPages, setCurrentPdfPage, copy, paste
+    tool, setTool, color, setColor, size, setSize, undo, redo, saveHistory, clear, addItem, backgroundImage, setBackgroundImage, setPdfPages, setCurrentPdfPage, copy, paste,
+    textOptions, setSelectedId
   } = useWhiteboardStore();
+  
+  const handleToolClick = (toolId: ToolType) => {
+    setTool(toolId);
+    
+    if (toolId === 'text') {
+      const newId = uuidv4();
+      addItem({
+        type: 'text',
+        id: newId,
+        x: window.innerWidth / 2 - 50,
+        y: window.innerHeight / 2 - 20,
+        text: 'Type here...',
+        fontSize: size,
+        fontFamily: textOptions.fontFamily,
+        fontStyle: `${textOptions.isBold ? 'bold ' : ''}${textOptions.isItalic ? 'italic' : ''}`.trim(),
+        textDecoration: textOptions.isUnderline ? 'underline' : '',
+        fill: color,
+        lineHeight: 1.5
+      });
+      setSelectedId(newId);
+      saveHistory();
+    }
+  };
   
   const [showBackgroundPicker, setShowBackgroundPicker] = React.useState(false);
   const [uploadedBackgrounds, setUploadedBackgrounds] = React.useState<{id: number, url: string, name: string}[]>([]);
@@ -198,7 +222,7 @@ export const Toolbar: React.FC = () => {
           case 'h': setTool('hand'); e.preventDefault(); break;
           case 'e': setTool('eraser'); e.preventDefault(); break;
           case 's': setTool('shape'); e.preventDefault(); break;
-          case 't': setTool('text'); e.preventDefault(); break;
+          case 't': handleToolClick('text'); e.preventDefault(); break;
           case 'i': setTool('highlighter'); e.preventDefault(); break;
         }
       }
@@ -412,7 +436,7 @@ export const Toolbar: React.FC = () => {
           {tools.map((t) => (
             <button
               key={t.id}
-              onClick={() => setTool(t.id)}
+              onClick={() => handleToolClick(t.id)}
               className={`p-2 rounded-full transition-colors ${
                 tool === t.id 
                   ? 'bg-blue-100 text-blue-600' 
@@ -573,7 +597,7 @@ export const Toolbar: React.FC = () => {
           {tools.map((t) => (
             <button
               key={t.id}
-              onClick={() => setTool(t.id)}
+              onClick={() => handleToolClick(t.id)}
               className={`p-2 rounded-full transition-colors ${
                 tool === t.id 
                   ? 'bg-blue-100 text-blue-600' 
