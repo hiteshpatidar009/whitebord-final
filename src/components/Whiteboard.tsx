@@ -7,7 +7,7 @@ import useImage from 'use-image';
 import { useWhiteboardStore } from '../store/useWhiteboardStore';
 import type { Stroke, WhiteboardItem } from '../types';
 import { strokesToImage, getBoundingBox } from '../utils/canvasUtils';
-import { FONT_STACKS } from './TextToolbar';
+import { FONT_STACKS, FONTS } from './TextToolbar';
 
 import { transcribeHandwriting } from '../services/geminiService';
 
@@ -134,6 +134,18 @@ export const Whiteboard: React.FC = () => {
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
+  const prevItemsLength = useRef(items.length);
+
+  useEffect(() => {
+    if (items.length > prevItemsLength.current) {
+      const lastItem = items[items.length - 1];
+      if (lastItem.type === 'text' && tool === 'text' && lastItem.text === 'Type here...') {
+        startTextEditing(lastItem.id);
+      }
+    }
+    prevItemsLength.current = items.length;
+  }, [items, tool]);
+
   // Drawing state refs
   const isDrawing = useRef(false);
   const currentStrokeId = useRef<string | null>(null);
@@ -156,6 +168,13 @@ export const Whiteboard: React.FC = () => {
     currentStrokeId.current = null;
     currentPointsRef.current = [];
     lastEraserPosRef.current = null;
+    
+    // Clean up any existing text editors when switching tools
+    const existingContainer = document.querySelector('[data-text-editor]');
+    if (existingContainer && tool !== 'text') {
+      document.body.removeChild(existingContainer);
+      setEditingTextId(null);
+    }
     
     // Clean up handwriting-specific state
     if (tool !== 'handwriting') {
@@ -206,6 +225,17 @@ export const Whiteboard: React.FC = () => {
         });
 
         transformerRef.current.nodes(nodes);
+        
+        // Configure transformer for text items
+        const selectedItem = items.find(i => i.id === selectedId);
+        if (selectedItem?.type === 'text') {
+          transformerRef.current.enabledAnchors(['top-left', 'top-right', 'bottom-left', 'bottom-right', 'middle-left', 'middle-right']);
+          transformerRef.current.rotateEnabled(false);
+        } else {
+          transformerRef.current.enabledAnchors(['top-left', 'top-right', 'bottom-left', 'bottom-right', 'middle-left', 'middle-right', 'top-center', 'bottom-center']);
+          transformerRef.current.rotateEnabled(true);
+        }
+        
         transformerRef.current.getLayer()?.batchDraw();
       } else {
         transformerRef.current.nodes([]);
@@ -256,6 +286,11 @@ export const Whiteboard: React.FC = () => {
     return () => {
       if (handwritingTimerRef.current) {
         clearTimeout(handwritingTimerRef.current);
+      }
+      // Clean up any text editors on unmount
+      const existingContainer = document.querySelector('[data-text-editor]');
+      if (existingContainer) {
+        document.body.removeChild(existingContainer);
       }
     };
   }, []);
@@ -480,26 +515,7 @@ export const Whiteboard: React.FC = () => {
     if (!pos) return;
 
     if (tool === 'text') {
-      if (clickedOnEmpty) {
-        // Create new text at click position
-        const newId = uuidv4();
-        addItem({
-          type: 'text',
-          id: newId,
-          x: pos.x,
-          y: pos.y,
-          text: 'Type here...',
-          fontSize: size,
-          fontFamily: FONT_STACKS[textOptions.fontFamily] || textOptions.fontFamily,
-          fontStyle: `${textOptions.isBold ? 'bold ' : ''}${textOptions.isItalic ? 'italic' : ''}`.trim(),
-          textDecoration: textOptions.isUnderline ? 'underline' : '',
-          fill: color,
-          lineHeight: 1.5
-        });
-        setSelectedId(newId);
-        startTextEditing(newId);
-        saveHistory();
-      } else {
+      if (!clickedOnEmpty) {
         // Select existing text
         const targetId = e.target.id();
         if (targetId) {
@@ -739,37 +755,193 @@ const getCursorStyle = () => {
 
   // Text editing functions
   const startTextEditing = (textId: string) => {
+    // Clean up any existing editing session first
+    const existingContainer = document.querySelector('[data-text-editor]');
+    if (existingContainer) {
+      document.body.removeChild(existingContainer);
+    }
+    
     const textItem = items.find(i => i.id === textId && i.type === 'text');
-    if (!textItem) return;
+    if (!textItem || textItem.type !== 'text') return;
 
     setEditingTextId(textId);
     
+    // Create container
+    const container = document.createElement('div');
+    container.setAttribute('data-text-editor', 'true');
+    container.style.position = 'absolute';
+    container.style.left = `${textItem.x * stageScale + stagePos.x}px`;
+    container.style.top = `${textItem.y * stageScale + stagePos.y}px`;
+    container.style.zIndex = '1000';
+    container.style.display = 'flex';
+    container.style.flexDirection = 'column';
+    container.style.gap = '4px';
+
+    // Create toolbar
+    const toolbar = document.createElement('div');
+    toolbar.style.display = 'flex';
+    toolbar.style.gap = '4px';
+    toolbar.style.background = '#fff';
+    toolbar.style.padding = '4px';
+    toolbar.style.borderRadius = '4px';
+    toolbar.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
+    toolbar.style.border = '1px solid #ccc';
+    toolbar.style.cursor = 'move';
+    
+    // Make toolbar draggable
+    let isDragging = false;
+    let dragOffset = { x: 0, y: 0 };
+    
+    toolbar.onmousedown = (e) => {
+      if (e.target === toolbar || (e.target as HTMLElement).parentElement === toolbar) {
+        isDragging = true;
+        const rect = container.getBoundingClientRect();
+        dragOffset.x = e.clientX - rect.left;
+        dragOffset.y = e.clientY - rect.top;
+        e.preventDefault();
+      }
+    };
+    
+    document.onmousemove = (e) => {
+      if (isDragging) {
+        container.style.left = `${e.clientX - dragOffset.x}px`;
+        container.style.top = `${e.clientY - dragOffset.y}px`;
+      }
+    };
+    
+    document.onmouseup = () => {
+      isDragging = false;
+    };
+
+    // Bold button
+    const boldBtn = document.createElement('button');
+    boldBtn.innerHTML = '<b>B</b>';
+    boldBtn.style.width = '24px';
+    boldBtn.style.height = '24px';
+    boldBtn.style.border = '1px solid #eee';
+    boldBtn.style.cursor = 'pointer';
+    boldBtn.style.background = (textItem as any).fontStyle?.includes('bold') ? '#eee' : '#fff';
+    boldBtn.onmousedown = (e) => e.preventDefault();
+    boldBtn.onclick = (e) => {
+      e.stopPropagation();
+      const currentItem = items.find(i => i.id === textId);
+      if (!currentItem || currentItem.type !== 'text') return;
+      const isBold = currentItem.fontStyle?.includes('bold');
+      const currentStyle = currentItem.fontStyle || '';
+      const newStyle = isBold 
+        ? currentStyle.replace(/\bbold\b/g, '').replace(/\s+/g, ' ').trim()
+        : `bold ${currentStyle}`.trim();
+      updateItem(textId, { fontStyle: newStyle });
+      textarea.style.fontWeight = isBold ? 'normal' : 'bold';
+      boldBtn.style.background = isBold ? '#fff' : '#eee';
+      textarea.focus();
+    };
+
+    // Italic button
+    const italicBtn = document.createElement('button');
+    italicBtn.innerHTML = '<i>I</i>';
+    italicBtn.style.width = '24px';
+    italicBtn.style.height = '24px';
+    italicBtn.style.border = '1px solid #eee';
+    italicBtn.style.cursor = 'pointer';
+    italicBtn.style.background = (textItem as any).fontStyle?.includes('italic') ? '#eee' : '#fff';
+    italicBtn.onmousedown = (e) => e.preventDefault();
+    italicBtn.onclick = (e) => {
+      e.stopPropagation();
+      const currentItem = items.find(i => i.id === textId);
+      if (!currentItem || currentItem.type !== 'text') return;
+      const isItalic = currentItem.fontStyle?.includes('italic');
+      const currentStyle = currentItem.fontStyle || '';
+      const newStyle = isItalic 
+        ? currentStyle.replace(/\bitalic\b/g, '').replace(/\s+/g, ' ').trim()
+        : `${currentStyle} italic`.trim();
+      updateItem(textId, { fontStyle: newStyle });
+      textarea.style.fontStyle = isItalic ? 'normal' : 'italic';
+      italicBtn.style.background = isItalic ? '#fff' : '#eee';
+      textarea.focus();
+    };
+
+    // Font selector
+    const fontSelect = document.createElement('select');
+    FONTS.forEach(f => {
+      const opt = document.createElement('option');
+      opt.value = f;
+      opt.innerText = f;
+      if (FONT_STACKS[f] === (textItem as any).fontFamily || f === (textItem as any).fontFamily) opt.selected = true;
+      fontSelect.appendChild(opt);
+    });
+    fontSelect.style.fontSize = '12px';
+    fontSelect.style.cursor = 'pointer';
+    fontSelect.onmousedown = (e) => e.stopPropagation();
+    fontSelect.onchange = () => {
+      const newFont = FONT_STACKS[fontSelect.value] || fontSelect.value;
+      updateItem(textId, { fontFamily: newFont });
+      textarea.style.fontFamily = newFont;
+    };
+
+    // Font size selector
+    const sizeInput = document.createElement('input');
+    sizeInput.type = 'number';
+    sizeInput.value = (textItem as any).fontSize.toString();
+    sizeInput.style.width = '40px';
+    sizeInput.style.fontSize = '12px';
+    sizeInput.onmousedown = (e) => e.stopPropagation();
+    sizeInput.oninput = () => {
+      const newSize = parseInt(sizeInput.value);
+      if (newSize > 0) {
+        updateItem(textId, { fontSize: newSize });
+        textarea.style.fontSize = `${newSize * stageScale}px`;
+      }
+    };
+
+    toolbar.appendChild(boldBtn);
+    toolbar.appendChild(italicBtn);
+    toolbar.appendChild(fontSelect);
+    toolbar.appendChild(sizeInput);
+
     // Create temporary textarea
     const textarea = document.createElement('textarea');
-    textarea.value = textItem.text === 'Type here...' ? '' : textItem.text;
-    textarea.style.position = 'absolute';
-    textarea.style.left = `${textItem.x * stageScale + stagePos.x}px`;
-    textarea.style.top = `${textItem.y * stageScale + stagePos.y}px`;
-    textarea.style.fontSize = `${textItem.fontSize * stageScale}px`;
-    textarea.style.fontFamily = textItem.fontFamily;
-    textarea.style.color = textItem.fill;
+    textarea.value = (textItem as any).text === 'Type here...' ? '' : (textItem as any).text;
+    textarea.placeholder = 'Type here...';
+    textarea.style.fontSize = `${(textItem as any).fontSize * stageScale}px`;
+    textarea.style.fontFamily = (textItem as any).fontFamily;
+    textarea.style.fontWeight = (textItem as any).fontStyle?.includes('bold') ? 'bold' : 'normal';
+    textarea.style.fontStyle = (textItem as any).fontStyle?.includes('italic') ? 'italic' : 'normal';
+    textarea.style.color = (textItem as any).fill;
     textarea.style.background = 'rgba(255,255,255,0.9)';
     textarea.style.border = '2px solid #0099ff';
     textarea.style.outline = 'none';
     textarea.style.resize = 'none';
-    textarea.style.zIndex = '1000';
-    textarea.style.minWidth = '100px';
-    textarea.style.minHeight = '30px';
+    textarea.style.minWidth = '150px';
+    textarea.style.minHeight = '50px';
+    textarea.style.width = '100%';
+    textarea.style.boxSizing = 'border-box';
     
     const finishEditing = () => {
       const newText = textarea.value.trim() || 'Type here...';
       updateItem(textId, { text: newText });
-      document.body.removeChild(textarea);
+      if (container.parentNode) {
+        document.body.removeChild(container);
+      }
+      document.removeEventListener('click', handleClickOutside);
+      document.onmousemove = null;
+      document.onmouseup = null;
       setEditingTextId(null);
       saveHistory();
     };
     
-    textarea.addEventListener('blur', finishEditing);
+    // Close editor when clicking outside
+    const handleClickOutside = (e: MouseEvent) => {
+      if (!container.contains(e.target as Node)) {
+        finishEditing();
+        document.removeEventListener('click', handleClickOutside);
+      }
+    };
+    
+    setTimeout(() => {
+      document.addEventListener('click', handleClickOutside);
+    }, 100);
+
     textarea.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
@@ -780,10 +952,14 @@ const getCursorStyle = () => {
       }
     });
     
-    document.body.appendChild(textarea);
+    container.appendChild(toolbar);
+    container.appendChild(textarea);
+    document.body.appendChild(container);
     textareaRef.current = textarea;
     textarea.focus();
-    textarea.select();
+    if ((textItem as any).text === 'Type here...') {
+        textarea.select();
+    }
   };
 
   const handleTextDoubleClick = (textId: string) => {
@@ -861,7 +1037,7 @@ const getCursorStyle = () => {
           id={item.id}
           x={item.x}
           y={item.y}
-          text={item.text}
+          text={editingTextId === item.id ? '' : item.text}
           fontSize={item.fontSize}
           fontFamily={item.fontFamily}
           fontStyle={item.fontStyle}
@@ -869,7 +1045,7 @@ const getCursorStyle = () => {
           fill={item.fill}
           lineHeight={item.lineHeight}
           width={item.width}
-          draggable={tool === 'select'}
+          draggable={tool === 'select' || tool === 'text'}
           onClick={() => {
             if (tool === 'select' || tool === 'text') {
               setSelectedId(item.id);

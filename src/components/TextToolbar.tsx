@@ -38,6 +38,25 @@ export const TextToolbar: React.FC = () => {
 
   if (tool !== 'text') return null;
 
+  // Create reverse mapping from font stack to font name
+  const FONT_STACK_REVERSE: { [key: string]: string } = {};
+  Object.entries(FONT_STACKS).forEach(([key, value]) => {
+    FONT_STACK_REVERSE[value] = key;
+  });
+
+  // Get the currently selected text item's properties
+  const selectedItem = selectedId ? items.find(i => i.id === selectedId && i.type === 'text') : null;
+  
+  // Use selected item properties if available, otherwise use global defaults
+  const rawFontFamily = selectedItem ? (selectedItem as any).fontFamily : textOptions.fontFamily;
+  const currentFontFamily = FONT_STACK_REVERSE[rawFontFamily] || rawFontFamily;
+  const currentSize = selectedItem ? (selectedItem as any).fontSize : size;
+  const currentColor = selectedItem ? (selectedItem as any).fill : color;
+  const currentFontStyle = selectedItem ? (selectedItem as any).fontStyle || '' : `${textOptions.isBold ? 'bold ' : ''}${textOptions.isItalic ? 'italic' : ''}`.trim();
+  const currentIsBold = currentFontStyle.includes('bold');
+  const currentIsItalic = currentFontStyle.includes('italic');
+  const currentIsUnderline = selectedItem ? (selectedItem as any).textDecoration?.includes('underline') || false : textOptions.isUnderline;
+
   const applyFormat = (command: string) => {
     const editableDiv = document.querySelector('[contentEditable="true"]') as HTMLDivElement;
     if (!editableDiv) return;
@@ -59,10 +78,10 @@ export const TextToolbar: React.FC = () => {
 
   // Helper: Update global defaults and current item
   const updateSelection = (updates: any) => {
-    if (updates.fontSize) setSize(updates.fontSize);
-    if (updates.fill) setColor(updates.fill);
+    if (updates.fontSize !== undefined) setSize(updates.fontSize);
+    if (updates.fill !== undefined) setColor(updates.fill);
 
-    if (updates.fontFamily || updates.isBold !== undefined || updates.isItalic !== undefined || updates.isUnderline !== undefined) {
+    if (updates.fontFamily || updates.fontSize !== undefined || updates.fill !== undefined || updates.isBold !== undefined || updates.isItalic !== undefined || updates.isUnderline !== undefined) {
         setTextOptions(updates);
     }
 
@@ -70,13 +89,13 @@ export const TextToolbar: React.FC = () => {
         const item = items.find(i => i.id === selectedId);
         if (item && item.type === 'text') {
             const payload: any = {};
-            if (updates.fontSize) payload.fontSize = updates.fontSize;
-            if (updates.fill) payload.fill = updates.fill;
+            if (updates.fontSize !== undefined) payload.fontSize = updates.fontSize;
+            if (updates.fill !== undefined) payload.fill = updates.fill;
             if (updates.fontFamily) payload.fontFamily = FONT_STACKS[updates.fontFamily] || updates.fontFamily;
             
             if (updates.isBold !== undefined || updates.isItalic !== undefined) {
-                const isBold = updates.isBold ?? textOptions.isBold;
-                const isItalic = updates.isItalic ?? textOptions.isItalic;
+                const isBold = updates.isBold ?? currentIsBold;
+                const isItalic = updates.isItalic ?? currentIsItalic;
                 payload.fontStyle = `${isBold ? 'bold ' : ''}${isItalic ? 'italic' : ''}`.trim();
             }
             
@@ -97,7 +116,7 @@ export const TextToolbar: React.FC = () => {
   return (
     <div className="fixed top-9 left-1/2 transform -translate-x-1/2 bg-white dark:bg-gray-800 shadow-md rounded-lg px-4 py-2 flex items-center gap-4 z-40 border border-gray-200 dark:border-gray-600 max-w-[95vw] overflow-x-auto">
       <select 
-        value={textOptions.fontFamily} 
+        value={currentFontFamily} 
         onChange={(e) => updateSelection({ fontFamily: e.target.value })}
         className="wb-prevent-blur border rounded px-2 py-1 text-sm cursor-pointer dark:bg-gray-700 dark:text-white dark:border-gray-600"
       >
@@ -107,7 +126,7 @@ export const TextToolbar: React.FC = () => {
       <div className="flex items-center gap-2 border-r border-gray-200 pr-4 dark:border-gray-600">
         <input
             type="color"
-            value={color}
+            value={currentColor}
             onChange={(e) => updateSelection({ fill: e.target.value })}
             className="wb-prevent-blur w-8 h-8 p-0 border-0 rounded cursor-pointer bg-transparent"
             title="Text Color"
@@ -116,22 +135,22 @@ export const TextToolbar: React.FC = () => {
 
       <div className="flex items-center gap-1 border-r border-gray-200 pr-4 dark:border-gray-600">
         <button 
-          onClick={() => applyFormat('bold')}
-          className={`wb-prevent-blur p-1 rounded ${textOptions.isBold ? 'bg-gray-200 dark:bg-gray-600' : 'hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+          onClick={() => updateSelection({ isBold: !currentIsBold })}
+          className={`wb-prevent-blur p-1 rounded ${currentIsBold ? 'bg-gray-200 dark:bg-gray-600' : 'hover:bg-gray-100 dark:hover:bg-gray-700'}`}
           onMouseDown={preventBlur}
         >
           <Bold size={16} />
         </button>
         <button 
-          onClick={() => applyFormat('italic')}
-          className={`wb-prevent-blur p-1 rounded ${textOptions.isItalic ? 'bg-gray-200 dark:bg-gray-600' : 'hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+          onClick={() => updateSelection({ isItalic: !currentIsItalic })}
+          className={`wb-prevent-blur p-1 rounded ${currentIsItalic ? 'bg-gray-200 dark:bg-gray-600' : 'hover:bg-gray-100 dark:hover:bg-gray-700'}`}
           onMouseDown={preventBlur}
         >
           <Italic size={16} />
         </button>
         <button 
-          onClick={() => applyFormat('underline')}
-          className={`wb-prevent-blur p-1 rounded ${textOptions.isUnderline ? 'bg-gray-200 dark:bg-gray-600' : 'hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+          onClick={() => updateSelection({ isUnderline: !currentIsUnderline })}
+          className={`wb-prevent-blur p-1 rounded ${currentIsUnderline ? 'bg-gray-200 dark:bg-gray-600' : 'hover:bg-gray-100 dark:hover:bg-gray-700'}`}
           onMouseDown={preventBlur}
         >
           <Underline size={16} />
@@ -143,11 +162,11 @@ export const TextToolbar: React.FC = () => {
         <input 
           type="range" 
           min="12" max="72" 
-          value={size} 
+          value={currentSize} 
           onChange={(e) => updateSelection({ fontSize: parseInt(e.target.value) })}
           className="wb-prevent-blur w-24 cursor-pointer dark:accent-blue-500"
         />
-        <span className="text-xs w-6 dark:text-gray-300">{size}px</span>
+        <span className="text-xs w-6 dark:text-gray-300">{currentSize}px</span>
       </div>
     </div>
   );
