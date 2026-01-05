@@ -53,11 +53,22 @@ export type ImageObject = {
   src: string;
 };
 
+export type GroupObject = {
+  id: string;
+  items: WhiteboardItem[];  // Store actual items, not just IDs
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation?: number;
+};
+
 export type WhiteboardItem = 
   | ({ type: 'stroke' } & Stroke)
   | ({ type: 'text' } & TextObject)
   | ({ type: 'shape' } & ShapeObject)
-  | ({ type: 'image' } & ImageObject);
+  | ({ type: 'image' } & ImageObject)
+  | ({ type: 'group' } & GroupObject);
 
 export const COLORS = {
   red: '#FF0000',

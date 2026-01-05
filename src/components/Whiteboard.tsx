@@ -139,7 +139,7 @@ const RichText: React.FC<{
   fill: string;
   width?: number;
   draggable?: boolean;
-  onClick?: () => void;
+  onClick?: (e?: any) => void;
   onTap?: () => void;
   onDblClick?: () => void;
   onDblTap?: () => void;
@@ -273,6 +273,8 @@ export const Whiteboard: React.FC = () => {
     selectedId,
     setSelectedId,
     backgroundImage,
+    groupItems,
+    ungroupItems,
   } = useWhiteboardStore();
 
   const stageRef = useRef<Konva.Stage>(null);
@@ -408,8 +410,35 @@ export const Whiteboard: React.FC = () => {
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Group items with Ctrl+G
+      if ((e.ctrlKey || e.metaKey) && e.key === 'g') {
+        e.preventDefault();
+        if (selectedId) {
+          const selectedIds = selectedId.split(',').filter(id => id);
+          if (selectedIds.length > 1) {
+            groupItems(selectedIds);
+            saveHistory();
+          }
+        }
+        return;
+      }
+      
+      // Ungroup items with Ctrl+Shift+G
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'G') {
+        e.preventDefault();
+        if (selectedId) {
+          const item = items.find(i => i.id === selectedId);
+          if (item && item.type === 'group') {
+            ungroupItems(selectedId);
+            saveHistory();
+          }
+        }
+        return;
+      }
+      
       if (e.key === 'Delete' && selectedId) {
-        removeItem(selectedId);
+        const selectedIds = selectedId.split(',');
+        selectedIds.forEach(id => removeItem(id));
         setSelectedId(null);
         saveHistory();
         return;
@@ -435,7 +464,7 @@ export const Whiteboard: React.FC = () => {
       window.removeEventListener('keydown', handleKeyDown);
       document.removeEventListener('contextmenu', handleContextMenu);
     };
-  }, [selectedId, removeItem, setSelectedId, saveHistory]);
+  }, [selectedId, removeItem, setSelectedId, saveHistory, groupItems, ungroupItems, items]);
 
   // Cleanup handwriting timers on unmount
   useEffect(() => {
@@ -658,7 +687,7 @@ export const Whiteboard: React.FC = () => {
     const isTouch = e.evt.type === 'touchstart';
     const isRightClick = !isTouch && (e.evt as MouseEvent).button === 2;
 
-    if (clickedOnEmpty) {
+    if (clickedOnEmpty && tool === 'select') {
         setSelectedId(null);
     }
     
@@ -684,8 +713,10 @@ export const Whiteboard: React.FC = () => {
           document.body.removeChild(existingContainer);
           setEditingTextId(null);
         }
-        // Clear selection when clicking on empty space
-        setSelectedId(null);
+        // Only clear selection with text tool if no selection exists
+        if (!selectedId) {
+          setSelectedId(null);
+        }
       }
       return; 
     }
@@ -693,6 +724,26 @@ export const Whiteboard: React.FC = () => {
     if (tool === 'fill') {
        const shape = e.target;
        if (shape === stage) return;
+       
+       // Apply fill to selected items if any are selected
+       if (selectedId) {
+         const selectedIds = selectedId.split(',');
+         selectedIds.forEach(id => {
+           const item = items.find(i => i.id === id);
+           if (item) {
+             if (item.type === 'shape') {
+               const transparentFill = hexToRgba(color, 0.6);
+               updateItem(id, { fill: transparentFill, opacity: 1 });
+             } else if (item.type === 'text') {
+               updateItem(id, { fill: color });
+             }
+           }
+         });
+         saveHistory();
+         return;
+       }
+       
+       // Apply fill to clicked item if no selection
        const id = shape.id();
        const item = items.find(i => i.id === id);
        if (item) {
@@ -708,34 +759,32 @@ export const Whiteboard: React.FC = () => {
        return;
     }
 
-    if (tool === 'select') {
-      if (!clickedOnEmpty) {
-        const targetId = e.target.id();
-        if (targetId) {
-          // Check if Ctrl/Cmd is held for multi-selection
-          const isMultiSelect = (e.evt as MouseEvent).ctrlKey || (e.evt as MouseEvent).metaKey;
+    // Handle selection for all tools
+    if (!clickedOnEmpty) {
+      const targetId = e.target.id();
+      if (targetId) {
+        const isMultiSelect = (e.evt as MouseEvent).ctrlKey || (e.evt as MouseEvent).metaKey;
+        
+        if (tool === 'select') {
+          const currentSelected = selectedId ? selectedId.split(',') : [];
           
           if (isMultiSelect) {
-            // Toggle selection of clicked item
-            const currentSelected = selectedId ? selectedId.split(',') : [];
+            // Ctrl+click: toggle item
             if (currentSelected.includes(targetId)) {
-              // Remove from selection
               const newSelected = currentSelected.filter(id => id !== targetId);
               setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
             } else {
-              // Add to selection
               setSelectedId([...currentSelected, targetId].join(','));
             }
           } else {
-            // Single selection
-            setSelectedId(targetId);
+            // Normal click: always add to selection
+            if (!currentSelected.includes(targetId)) {
+              setSelectedId([...currentSelected, targetId].join(','));
+            }
           }
+          return;
         }
-      } else {
-        // Clear selection when clicking empty space
-        setSelectedId(null);
       }
-      return;
     }
     if (isRightClick) return;
 
@@ -903,7 +952,55 @@ export const Whiteboard: React.FC = () => {
       rotation: node.rotation(),
     };
 
-    if (item.type === 'text') {
+    if (item.type === 'group') {
+      // For groups, update width and height
+      updatePayload.width = Math.max(5, node.width() * scaleX);
+      updatePayload.height = Math.max(5, node.height() * scaleY);
+      
+      // Also update all child items' positions and sizes proportionally
+      const originalWidth = item.width;
+      const originalHeight = item.height;
+      const scaleRatioX = originalWidth > 0 ? (updatePayload.width / originalWidth) : 1;
+      const scaleRatioY = originalHeight > 0 ? (updatePayload.height / originalHeight) : 1;
+      const deltaX = updatePayload.x - item.x;
+      const deltaY = updatePayload.y - item.y;
+      
+      item.items?.forEach((childItem: WhiteboardItem) => {
+        const childUpdatePayload: any = {};
+        
+        if (childItem.type === 'text' || childItem.type === 'image' || (childItem.type === 'shape' && childItem.shapeType !== 'line' && childItem.shapeType !== 'polygon')) {
+          // Update position relative to group
+          childUpdatePayload.x = item.x + ((childItem.x || 0) - item.x) * scaleRatioX + deltaX;
+          childUpdatePayload.y = item.y + ((childItem.y || 0) - item.y) * scaleRatioY + deltaY;
+          
+          // Update size if applicable
+          if (childItem.type === 'image' || (childItem.type === 'shape' && childItem.shapeType === 'rect')) {
+            childUpdatePayload.width = Math.max(5, (childItem.width || 0) * scaleRatioX);
+            childUpdatePayload.height = Math.max(5, (childItem.height || 0) * scaleRatioY);
+          } else if (childItem.type === 'text') {
+            childUpdatePayload.fontSize = Math.max(10, (childItem.fontSize || 12) * scaleRatioY);
+            childUpdatePayload.width = Math.max(30, (childItem.width || 100) * scaleRatioX);
+          }
+        } else if (childItem.type === 'stroke' || (childItem.type === 'shape' && (childItem.shapeType === 'line' || childItem.shapeType === 'polygon'))) {
+          const newPoints = (childItem.points || []).map((p: number, i: number) => {
+            if (i % 2 === 0) return item.x + (p - item.x) * scaleRatioX + deltaX;
+            return item.y + (p - item.y) * scaleRatioY + deltaY;
+          });
+          childUpdatePayload.points = newPoints;
+          
+          // Update stroke width proportionally
+          if (childItem.type === 'stroke') {
+            childUpdatePayload.size = Math.max(1, (childItem.size || 2) * Math.max(scaleRatioX, scaleRatioY));
+          } else if (childItem.type === 'shape') {
+            childUpdatePayload.strokeWidth = Math.max(1, (childItem.strokeWidth || 2) * Math.max(scaleRatioX, scaleRatioY));
+          }
+        }
+        
+        if (Object.keys(childUpdatePayload).length > 0) {
+          updateItem(childItem.id, childUpdatePayload);
+        }
+      });
+    } else if (item.type === 'text') {
       updatePayload.width = Math.max(30, node.width() * scaleX);
       updatePayload.fontSize = Math.max(10, item.fontSize * scaleY);
     } else if (item.type === 'image' || (item.type === 'shape' && item.shapeType === 'rect')) {
@@ -1267,6 +1364,11 @@ const getCursorStyle = () => {
         // Double-click on existing text to edit
         const targetId = e.target.id();
         if (targetId) {
+          // Ensure the text item stays selected when double-clicking
+          const currentSelected = selectedId ? selectedId.split(',') : [];
+          if (!currentSelected.includes(targetId)) {
+            setSelectedId(targetId);
+          }
           startTextEditing(targetId);
         }
       }
@@ -1328,7 +1430,32 @@ const getCursorStyle = () => {
 
   const handleItemDragEnd = (e: Konva.KonvaEventObject<DragEvent>, item: any) => {
       const node = e.target;
-      updateItem(item.id, { x: node.x(), y: node.y() });
+      const dx = node.x() - (dragStartPosRef.current?.x || node.x());
+      const dy = node.y() - (dragStartPosRef.current?.y || node.y());
+      
+      // Handle group item movement - move all items in the group
+      if (item.type === 'group') {
+        // Update group position
+        updateItem(item.id, { x: node.x(), y: node.y() });
+        
+        // Move all items in the group
+        item.items?.forEach((childItem: WhiteboardItem) => {
+          if (childItem.type === 'text' || childItem.type === 'image' || (childItem.type === 'shape' && childItem.shapeType !== 'line' && childItem.shapeType !== 'polygon')) {
+            updateItem(childItem.id, { 
+              x: (childItem.x || 0) + dx, 
+              y: (childItem.y || 0) + dy 
+            });
+          } else if (childItem.type === 'stroke' || (childItem.type === 'shape' && (childItem.shapeType === 'line' || childItem.shapeType === 'polygon'))) {
+            const newPoints = (childItem.points || []).map((p: number, i: number) => 
+              i % 2 === 0 ? p + dx : p + dy
+            );
+            updateItem(childItem.id, { points: newPoints });
+          }
+        });
+      } else {
+        updateItem(item.id, { x: node.x(), y: node.y() });
+      }
+      
       const stage = node.getStage();
       if (stage) {
           linkedErasersRef.current.forEach(id => {
@@ -1341,6 +1468,57 @@ const getCursorStyle = () => {
 
   const renderLayer3Item = (item: WhiteboardItem) => {
     if (item.type === 'image') return null;
+    
+    // Don't render items that are part of a group
+    const itemIsInGroup = items.some(i => i.type === 'group' && (i as any).items.some((gItem: any) => gItem.id === item.id));
+    if (itemIsInGroup) return null;
+    
+    // Render group items as selectable rectangles
+    if (item.type === 'group') {
+      return (
+        <Rect
+          key={item.id}
+          id={item.id}
+          x={item.x}
+          y={item.y}
+          width={item.width}
+          height={item.height}
+          stroke="#0099ff"
+          strokeWidth={2}
+          fill="transparent"
+          dash={[5, 5]}
+          draggable={tool === 'select'}
+          onClick={(e: any) => {
+            if (tool === 'select') {
+              const isMultiSelect = e.evt?.ctrlKey || e.evt?.metaKey;
+              const currentSelected = selectedId ? selectedId.split(',') : [];
+              
+              if (isMultiSelect) {
+                if (currentSelected.includes(item.id)) {
+                  const newSelected = currentSelected.filter(id => id !== item.id);
+                  setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
+                } else {
+                  setSelectedId([...currentSelected, item.id].join(','));
+                }
+              } else {
+                if (!currentSelected.includes(item.id)) {
+                  setSelectedId([...currentSelected, item.id].join(','));
+                }
+              }
+            }
+          }}
+          onTap={() => {
+            if (tool === 'select') {
+              setSelectedId(item.id);
+            }
+          }}
+          onTransformEnd={(e: any) => handleTransformEnd(e, item)}
+          onDragStart={handleItemDragStart}
+          onDragMove={handleItemDragMove}
+          onDragEnd={(e: any) => handleItemDragEnd(e, item)}
+        />
+      );
+    }
     
     // Render text as Rich Text
     if (item.type === 'text') {
@@ -1356,9 +1534,23 @@ const getCursorStyle = () => {
           fill={item.fill}
           width={item.width}
           draggable={tool === 'select' || tool === 'text'}
-          onClick={() => {
+          onClick={(e: any) => {
             if (tool === 'select' || tool === 'text') {
-              setSelectedId(item.id);
+              const isMultiSelect = e.evt?.ctrlKey || e.evt?.metaKey;
+              const currentSelected = selectedId ? selectedId.split(',') : [];
+              
+              if (isMultiSelect && tool === 'select') {
+                if (currentSelected.includes(item.id)) {
+                  const newSelected = currentSelected.filter(id => id !== item.id);
+                  setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
+                } else {
+                  setSelectedId([...currentSelected, item.id].join(','));
+                }
+              } else {
+                if (!currentSelected.includes(item.id)) {
+                  setSelectedId([...currentSelected, item.id].join(','));
+                }
+              }
             }
           }}
           onTap={() => {
@@ -1380,7 +1572,25 @@ const getCursorStyle = () => {
       key: item.id,
       id: item.id,
       draggable: tool === 'select',
-      onClick: () => (tool === 'select' || tool === 'text') && setSelectedId(item.id),
+      onClick: (e: any) => {
+        if (tool === 'select' || tool === 'text') {
+          const isMultiSelect = e.evt?.ctrlKey || e.evt?.metaKey;
+          const currentSelected = selectedId ? selectedId.split(',') : [];
+          
+          if (isMultiSelect && tool === 'select') {
+            if (currentSelected.includes(item.id)) {
+              const newSelected = currentSelected.filter(id => id !== item.id);
+              setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
+            } else {
+              setSelectedId([...currentSelected, item.id].join(','));
+            }
+          } else {
+            if (!currentSelected.includes(item.id)) {
+              setSelectedId([...currentSelected, item.id].join(','));
+            }
+          }
+        }
+      },
       onTap: () => (tool === 'select' || tool === 'text') && setSelectedId(item.id),
       onTransformEnd: (e: any) => handleTransformEnd(e, item),
       onDragStart: handleItemDragStart,
@@ -1417,6 +1627,7 @@ const getCursorStyle = () => {
       if (item.shapeType === 'rect') return <Rect {...commonProps} x={item.x} y={item.y} width={item.width} height={item.height} stroke={item.stroke} strokeWidth={item.strokeWidth} fill={item.fill || 'transparent'} opacity={item.opacity ?? 1} />;
       if (item.shapeType === 'triangle') return <RegularPolygon {...commonProps} x={item.x + (item.width ?? 50) / 2} y={item.y + (item.height ?? 50) / 2} sides={3} radius={(item.width ?? 50) / 2} stroke={item.stroke} strokeWidth={item.strokeWidth} fill={item.fill || 'transparent'} opacity={item.opacity ?? 1} />;
     }
+
     return null;
   };
 

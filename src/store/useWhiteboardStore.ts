@@ -39,6 +39,8 @@ interface WhiteboardState {
   addItem: (item: WhiteboardItem) => void;
   updateItem: (id: string, updates: Partial<WhiteboardItem>) => void;
   removeItem: (id: string) => void;
+  groupItems: (ids: string[]) => void;
+  ungroupItems: (groupId: string) => void;
   
   undo: () => void;
   redo: () => void;
@@ -111,7 +113,15 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
 
   removeItem: (id) => {
     const { items } = get();
-    set({ items: items.filter((i) => i.id !== id) });
+    // If removing a group, also remove all its items
+    const itemToRemove = items.find(i => i.id === id);
+    if (itemToRemove && itemToRemove.type === 'group') {
+      const groupItem = itemToRemove as any;
+      const childIds = groupItem.items?.map((item: WhiteboardItem) => item.id) || [];
+      set({ items: items.filter(i => i.id !== id && !childIds.includes(i.id)) });
+    } else {
+      set({ items: items.filter((i) => i.id !== id) });
+    }
   },
 
   copy: () => {
@@ -190,6 +200,110 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
         historyStep: newStep,
       });
     }
+  },
+
+  groupItems: (ids: string[]) => {
+    const { items } = get();
+    if (ids.length < 2) return; // Need at least 2 items to group
+    
+    // Get the items to group
+    const itemsToGroup = items.filter(i => ids.includes(i.id));
+    if (itemsToGroup.length === 0) return;
+    
+    // Calculate bounding box for the group
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    
+    itemsToGroup.forEach(item => {
+      if (item.type === 'stroke') {
+        const points = item.points;
+        for (let i = 0; i < points.length; i += 2) {
+          minX = Math.min(minX, points[i]);
+          maxX = Math.max(maxX, points[i]);
+          minY = Math.min(minY, points[i + 1]);
+          maxY = Math.max(maxY, points[i + 1]);
+        }
+      } else if (item.type === 'shape') {
+        if (item.shapeType === 'line' || item.shapeType === 'polygon') {
+          const points = item.points || [];
+          for (let i = 0; i < points.length; i += 2) {
+            minX = Math.min(minX, points[i]);
+            maxX = Math.max(maxX, points[i]);
+            minY = Math.min(minY, points[i + 1]);
+            maxY = Math.max(maxY, points[i + 1]);
+          }
+        } else {
+          minX = Math.min(minX, item.x);
+          minY = Math.min(minY, item.y);
+          maxX = Math.max(maxX, item.x + (item.width || 0));
+          maxY = Math.max(maxY, item.y + (item.height || 0));
+        }
+      } else {
+        minX = Math.min(minX, item.x);
+        minY = Math.min(minY, item.y);
+        maxX = Math.max(maxX, item.x + (item.width || 0));
+        maxY = Math.max(maxY, item.y + (item.height || 0));
+      }
+    });
+    
+    const groupId = uuidv4();
+    const groupItem: WhiteboardItem = {
+      type: 'group',
+      id: groupId,
+      items: itemsToGroup,  // Store actual items
+      x: minX === Infinity ? 0 : minX,
+      y: minY === Infinity ? 0 : minY,
+      width: maxX === -Infinity ? 0 : maxX - minX,
+      height: maxY === -Infinity ? 0 : maxY - minY,
+      rotation: 0,
+    };
+    
+    // Remove individual items and add group
+    const newItems = items.filter(item => !ids.includes(item.id));
+    newItems.push(groupItem);
+    
+    set({ items: newItems, selectedId: groupId });
+  },
+
+  ungroupItems: (groupId: string) => {
+    const { items } = get();
+    const groupItem = items.find(i => i.id === groupId && i.type === 'group') as any;
+    
+    if (!groupItem || !groupItem.items) return;
+    
+    // Get the offset applied to the group
+    const groupX = groupItem.x;
+    const groupY = groupItem.y;
+    const originalGroupX = groupItem.items.length > 0 ? 
+      Math.min(...groupItem.items.map((item: any) => item.x || 0)) : 0;
+    const originalGroupY = groupItem.items.length > 0 ? 
+      Math.min(...groupItem.items.map((item: any) => item.y || 0)) : 0;
+    
+    // Restore individual items with updated positions based on group transformation
+    const restoredItems: WhiteboardItem[] = groupItem.items.map((item: WhiteboardItem) => {
+      if (item.type === 'text' || item.type === 'image' || (item.type === 'shape' && item.shapeType !== 'line' && item.shapeType !== 'polygon')) {
+        return {
+          ...item,
+          x: (item.x || 0) - originalGroupX + groupX,
+          y: (item.y || 0) - originalGroupY + groupY,
+        };
+      } else if (item.type === 'stroke' || (item.type === 'shape' && (item.shapeType === 'line' || item.shapeType === 'polygon'))) {
+        const newPoints = (item.points || []).map((p: number, i: number) => {
+          if (i % 2 === 0) return p - originalGroupX + groupX;
+          return p - originalGroupY + groupY;
+        });
+        return {
+          ...item,
+          points: newPoints,
+        };
+      }
+      return item;
+    });
+    
+    // Remove group and add back individual items
+    const newItems = items.filter(item => item.id !== groupId);
+    newItems.push(...restoredItems);
+    
+    set({ items: newItems, selectedId: null });
   },
 
   reset: () => set({ items: [], history: [[]], historyStep: 0 }),
