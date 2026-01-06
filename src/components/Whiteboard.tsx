@@ -343,7 +343,14 @@ export const Whiteboard: React.FC = () => {
   useEffect(() => {
     if (!transformerRef.current) return;
 
-    if (selectedId && editingTextId !== selectedId) {
+    // Don't show transformer when editing text
+    if (editingTextId) {
+      transformerRef.current.nodes([]);
+      transformerRef.current.getLayer()?.batchDraw();
+      return;
+    }
+
+    if (selectedId) {
       const stage = stageRef.current;
       if (!stage) return;
       
@@ -809,7 +816,7 @@ export const Whiteboard: React.FC = () => {
         tool,
         points: [pos.x, pos.y],
         color: '#000000',
-        size: size,
+        size: size * 1.5,
         isEraser: true,
         isHighlighter: false
       });
@@ -871,7 +878,7 @@ export const Whiteboard: React.FC = () => {
         if (isEraser) {
             cursorRef.current.x(point.x);
             cursorRef.current.y(point.y);
-            cursorRef.current.radius(size / 2);
+            cursorRef.current.radius((size * 2.5) / 2);
             cursorRef.current.getLayer()?.batchDraw();
         }
     }
@@ -1055,6 +1062,7 @@ const getCursorStyle = () => {
     if (!textItem || textItem.type !== 'text') return;
 
     setEditingTextId(textId);
+    setSelectedId(null);
     
     // Create container
     const container = document.createElement('div');
@@ -1066,7 +1074,7 @@ const getCursorStyle = () => {
     container.style.display = 'flex';
     container.style.flexDirection = 'column';
     container.style.gap = '4px';
-    container.style.minWidth = '300px';
+    container.style.width = `${Math.max(300, textItem.width * stageScale)}px`;
     container.style.resize = 'both';
     container.style.overflow = 'hidden';
     container.style.background = '#fff';
@@ -1291,6 +1299,7 @@ const getCursorStyle = () => {
       document.onmousemove = null;
       document.onmouseup = null;
       setEditingTextId(null);
+      setSelectedId(textId);
       saveHistory();
     };
     
@@ -1522,13 +1531,18 @@ const getCursorStyle = () => {
     
     // Render text as Rich Text
     if (item.type === 'text') {
+      // Don't render text on canvas while editing it
+      if (editingTextId === item.id) {
+        return null;
+      }
+
       return (
         <RichText
           key={item.id}
           id={item.id}
           x={item.x}
           y={item.y}
-          text={editingTextId === item.id ? '' : item.text}
+          text={item.text}
           fontSize={item.fontSize}
           fontFamily={item.fontFamily}
           fill={item.fill}
@@ -1611,8 +1625,8 @@ const getCursorStyle = () => {
           stroke={item.color} // Always use the stroke's own color, never current color
           strokeWidth={item.size} // Always use the stroke's own width, never current size
           tension={0.5}
-          lineCap="round"
-          lineJoin="round"
+          lineCap={isEraser ? 'butt' : 'round'}
+          lineJoin={isEraser ? 'miter' : 'round'}
           opacity={isHandwriting ? 0.9 : 1} // Slightly more visible for handwriting
           globalCompositeOperation={isEraser ? 'destination-out' : 'source-over'}
           strokeScaleEnabled={false} // Prevent width scaling with zoom
@@ -1658,6 +1672,12 @@ const getCursorStyle = () => {
         onTouchMove={handleMouseMove}
         onTouchEnd={handleMouseUp}
         onWheel={handleWheel}
+        onClick={(e) => {
+          // Deselect when clicking on empty canvas
+          if (e.target === e.target.getStage()) {
+            setSelectedId(null);
+          }
+        }}
         onDblClick={handleCanvasDoubleClick}
         onDblTap={handleCanvasDoubleClick}
         draggable={tool === 'hand'}
@@ -1688,7 +1708,7 @@ const getCursorStyle = () => {
                return <Line key={item.id + '-hl'} id={item.id} points={item.points} stroke={item.color} strokeWidth={item.size} tension={0.5} lineCap="round" lineJoin="round" opacity={0.4} globalCompositeOperation="source-over" />;
             }
             if (item.tool === 'highlighter-eraser') {
-               return <Line key={item.id + '-hl'} points={item.points} stroke="#000000" strokeWidth={item.size} tension={0.5} lineCap="round" lineJoin="round" globalCompositeOperation="destination-out" />;
+               return <Line key={item.id + '-hl'} points={item.points} stroke="#000000" strokeWidth={item.size} tension={0.5} lineCap="butt" lineJoin="miter" globalCompositeOperation="destination-out" />;
             }
             return null;
           })}

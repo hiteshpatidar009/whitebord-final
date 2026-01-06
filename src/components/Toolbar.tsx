@@ -40,16 +40,7 @@ export const Toolbar: React.FC = () => {
         fill: color,
         lineHeight: 1.5
       });
-      setSelectedId(newId);
       saveHistory();
-      
-      // Start editing immediately
-      setTimeout(() => {
-        const startTextEditing = (window as any).startTextEditing;
-        if (startTextEditing) {
-          startTextEditing(newId);
-        }
-      }, 100);
     }
   };
   
