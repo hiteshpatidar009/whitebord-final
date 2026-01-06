@@ -1088,14 +1088,15 @@ const getCursorStyle = () => {
           {...commonProps}
           listening={!isEraser}
           points={item.points}
-          stroke={item.color} // Always use the stroke's own color, never current color
-          strokeWidth={item.size} // Always use the stroke's own width, never current size
-          tension={0.5}
+          stroke={item.color}
+          strokeWidth={isEraser ? item.size * 2 + 10 : item.size} // Double size + buffer
+          tension={0} // Straight segments for 100% path matching
           lineCap="round"
           lineJoin="round"
-          opacity={isHandwriting ? 0.9 : 1} // Slightly more visible for handwriting
+          opacity={isHandwriting ? 0.9 : 1} 
           globalCompositeOperation={isEraser ? 'destination-out' : 'source-over'}
-          strokeScaleEnabled={false} // Prevent width scaling with zoom
+          perfectDrawEnabled={false}
+          hitStrokeWidth={isEraser ? item.size * 2 + 20 : 0}
         />
       );
     }
@@ -1144,6 +1145,7 @@ const getCursorStyle = () => {
         scaleY={stageScale}
       >
         <Layer>
+          {/* 1. Render Images at the bottom */}
           {items.map((item) => {
             if (item.type !== 'image') return null;
             const commonProps = {
@@ -1157,26 +1159,59 @@ const getCursorStyle = () => {
             return <URLImage {...commonProps} image={item} />;
           })}
         </Layer>
+        
         <Layer>
+          {/* 2. Render Highlighters and Highlighter-specific Eraser */}
           {items.map((item) => {
             if (item.type !== 'stroke') return null;
             if (item.isHighlighter) {
-               if ((item as any)._hidden) return null;
-               return <Line key={item.id + '-hl'} id={item.id} points={item.points} stroke={item.color} strokeWidth={item.size} tension={0.5} lineCap="round" lineJoin="round" opacity={0.4} globalCompositeOperation="source-over" />;
+              if ((item as any)._hidden) return null;
+              return (
+                <Line 
+                  key={item.id + '-hl'} 
+                  id={item.id} 
+                  points={item.points} 
+                  stroke={item.color} 
+                  strokeWidth={item.size} 
+                  tension={0} 
+                  lineCap="round" 
+                  lineJoin="round" 
+                  opacity={0.4} 
+                  globalCompositeOperation="source-over" 
+                  perfectDrawEnabled={false}
+                />
+              );
             }
             if (item.tool === 'highlighter-eraser') {
-               return <Line key={item.id + '-hl'} points={item.points} stroke="#000000" strokeWidth={item.size} tension={0.5} lineCap="round" lineJoin="round" globalCompositeOperation="destination-out" />;
+               return (
+                <Line 
+                  key={item.id + '-hl-eraser'} 
+                  id={item.id}
+                  points={item.points} 
+                  stroke="#000000" 
+                  strokeWidth={item.size * 2 + 10} 
+                  tension={0} 
+                  lineCap="round" 
+                  lineJoin="round" 
+                  globalCompositeOperation="destination-out" 
+                  perfectDrawEnabled={false}
+                />
+               );
             }
             return null;
           })}
         </Layer>
+
         <Layer>
+          {/* 3. Render everything else (Pen, Shapes, Text, Eraser) */}
           {items.map((item) => {
             if (item.type === 'image') return null;
+            if (item.type === 'stroke' && (item.isHighlighter || item.tool === 'highlighter-eraser')) return null;
             return renderLayer3Item(item);
           })}
+          
           {selectionBox && <Rect x={selectionBox.x} y={selectionBox.y} width={selectionBox.width} height={selectionBox.height} stroke="#0099ff" strokeWidth={1} dash={[5, 5]} />}
-          <Line ref={previewLineRef} listening={false} tension={0.5} lineCap="round" lineJoin="round" stroke="#000000" strokeWidth={5} visible={false} />
+          <Line ref={previewLineRef} listening={false} tension={0} lineCap="round" lineJoin="round" stroke={color} strokeWidth={(tool === 'eraser' || tool === 'highlighter-eraser') ? size * 2 + 10 : size} visible={false} />
           <Circle ref={cursorRef} listening={false} radius={size / 2} stroke="#ff1493" strokeWidth={2.5} fill="rgba(255, 20, 147, 0.15)" visible={tool === 'eraser' || tool === 'highlighter-eraser'} opacity={1} />
           <Transformer ref={transformerRef} />
         </Layer>

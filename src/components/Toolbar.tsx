@@ -473,7 +473,7 @@ export const Toolbar: React.FC = () => {
             <input
               type="range"
               min="1"
-              max={tool === 'eraser' ? 150 : tool === 'handwriting' ? 20 : 50}
+              max={(tool === 'eraser' || tool === 'highlighter-eraser') ? 200 : tool === 'handwriting' ? 20 : 50}
               value={tool === 'handwriting' ? Math.min(size, 20) : size}
               onChange={(e) => setSize(parseInt(e.target.value))}
               className="w-20 h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer"
@@ -634,7 +634,7 @@ export const Toolbar: React.FC = () => {
             <input
               type="range"
               min="1"
-              max={tool === 'handwriting' ? 20 : 50}
+              max={(tool === 'eraser' || tool === 'highlighter-eraser') ? 200 : tool === 'handwriting' ? 20 : 50}
               value={tool === 'handwriting' ? Math.min(size, 20) : size}
               onChange={(e) => setSize(parseInt(e.target.value))}
               className="w-8 h-20 bg-gray-200 rounded-lg appearance-none cursor-pointer"
