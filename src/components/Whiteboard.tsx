@@ -1,4 +1,3 @@
-
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { Stage, Layer, Line, Image as KonvaImage, Rect, Circle, RegularPolygon, Transformer, Text as KonvaText } from 'react-konva';
@@ -277,6 +276,8 @@ export const Whiteboard: React.FC = () => {
     ungroupItems,
   } = useWhiteboardStore();
 
+    // Clipboard for copy-paste
+    const clipboardRef = useRef<WhiteboardItem[] | null>(null);
   const stageRef = useRef<Konva.Stage>(null);
   const transformerRef = useRef<Konva.Transformer>(null);
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
@@ -462,6 +463,41 @@ export const Whiteboard: React.FC = () => {
         e.preventDefault();
         return;
       }
+
+        // Copy selected items (Ctrl+C)
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c' && tool === 'select' && selectedId) {
+          e.preventDefault();
+          const selectedIds = selectedId.split(',').filter(id => id);
+          clipboardRef.current = selectedIds
+            .map(id => items.find(i => i.id === id))
+            .filter(Boolean)
+            .map(item => ({ ...item, id: undefined })); // Remove id for duplication
+          return;
+        }
+
+        // Paste copied items (Ctrl+V)
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v' && tool === 'select' && clipboardRef.current && clipboardRef.current.length > 0) {
+          e.preventDefault();
+          const newIds: string[] = [];
+          clipboardRef.current.forEach(item => {
+            const newId = uuidv4();
+            newIds.push(newId);
+            let offsetItem = { ...item, id: newId };
+            if (typeof offsetItem.x === 'number') offsetItem.x += 30;
+            if (typeof offsetItem.y === 'number') offsetItem.y += 30;
+            // Only offset points for items that have them
+            if (
+              (offsetItem.type === 'stroke' || offsetItem.type === 'shape') &&
+              Array.isArray((offsetItem as any).points)
+            ) {
+              offsetItem.points = (offsetItem as any).points.map((p: number, i: number) => p + (i % 2 === 0 ? 30 : 30));
+            }
+            addItem(offsetItem);
+          });
+          setSelectedId(newIds.join(','));
+          saveHistory();
+          return;
+        }
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -816,7 +852,7 @@ export const Whiteboard: React.FC = () => {
         tool,
         points: [pos.x, pos.y],
         color: '#000000',
-        size: size * 1.5,
+        size: size,
         isEraser: true,
         isHighlighter: false
       });
@@ -1623,12 +1659,13 @@ const getCursorStyle = () => {
           listening={!isEraser}
           points={item.points}
           stroke={item.color} // Always use the stroke's own color, never current color
-          strokeWidth={item.size} // Always use the stroke's own width, never current size
-          tension={0.5}
+          strokeWidth={isEraser ? item.size * 2 + 10 : item.size} // Rule 2: Eraser overlap buffer
+          hitStrokeWidth={isEraser ? item.size * 3 : undefined} // Rule 5: Larger hit precision for eraser
+          tension={isEraser ? 0 : 0.5} // Rule 1: Straight segments for eraser, curved for pen
           lineCap={isEraser ? 'butt' : 'round'}
           lineJoin={isEraser ? 'miter' : 'round'}
           opacity={isHandwriting ? 0.9 : 1} // Slightly more visible for handwriting
-          globalCompositeOperation={isEraser ? 'destination-out' : 'source-over'}
+          globalCompositeOperation={isEraser ? 'destination-out' : 'source-over'} // Rule 3: Same-layer compositing
           strokeScaleEnabled={false} // Prevent width scaling with zoom
         />
       );
@@ -1685,6 +1722,7 @@ const getCursorStyle = () => {
         y={stagePos.y}
         scaleX={stageScale}
         scaleY={stageScale}
+        perfectDrawEnabled={false}
       >
         <Layer>
           {items.map((item) => {
@@ -1708,7 +1746,7 @@ const getCursorStyle = () => {
                return <Line key={item.id + '-hl'} id={item.id} points={item.points} stroke={item.color} strokeWidth={item.size} tension={0.5} lineCap="round" lineJoin="round" opacity={0.4} globalCompositeOperation="source-over" />;
             }
             if (item.tool === 'highlighter-eraser') {
-               return <Line key={item.id + '-hl'} points={item.points} stroke="#000000" strokeWidth={item.size} tension={0.5} lineCap="butt" lineJoin="miter" globalCompositeOperation="destination-out" />;
+               return <Line key={item.id + '-hl'} points={item.points} stroke="#000000" strokeWidth={item.size * 2 + 10} hitStrokeWidth={item.size * 3} tension={0} lineCap="butt" lineJoin="miter" globalCompositeOperation="destination-out" />;
             }
             return null;
           })}
