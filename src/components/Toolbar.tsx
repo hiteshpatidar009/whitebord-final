@@ -20,6 +20,12 @@ export const Toolbar: React.FC = () => {
     setTool(toolId);
     
     if (toolId === 'text') {
+      // Close any existing text editor first
+      const existingContainer = document.querySelector('[data-text-editor]');
+      if (existingContainer) {
+        document.body.removeChild(existingContainer);
+      }
+      
       const newId = uuidv4();
       addItem({
         type: 'text',
@@ -34,7 +40,6 @@ export const Toolbar: React.FC = () => {
         fill: color,
         lineHeight: 1.5
       });
-      setSelectedId(newId);
       saveHistory();
     }
   };
