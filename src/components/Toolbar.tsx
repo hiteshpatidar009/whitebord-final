@@ -18,30 +18,31 @@ export const Toolbar: React.FC = () => {
   
   const handleToolClick = (toolId: ToolType) => {
     setTool(toolId);
-    
-    if (toolId === 'text') {
-      // Close any existing text editor first
-      const existingContainer = document.querySelector('[data-text-editor]');
-      if (existingContainer) {
-        document.body.removeChild(existingContainer);
-      }
-      
-      const newId = uuidv4();
-      addItem({
-        type: 'text',
-        id: newId,
-        x: window.innerWidth / 2 - 50,
-        y: window.innerHeight / 2 - 20,
-        text: 'Type here...',
-        fontSize: size,
-        fontFamily: textOptions.fontFamily,
-        fontStyle: `${textOptions.isBold ? 'bold ' : ''}${textOptions.isItalic ? 'italic' : ''}`.trim(),
-        textDecoration: textOptions.isUnderline ? 'underline' : '',
-        fill: color,
-        lineHeight: 1.5
-      });
-      saveHistory();
+  };
+  
+  const handleTextDoubleClick = () => {
+    // Close any existing text editor first
+    const existingContainer = document.querySelector('[data-text-editor]');
+    if (existingContainer) {
+      document.body.removeChild(existingContainer);
     }
+    
+    const newId = uuidv4();
+    addItem({
+      type: 'text',
+      id: newId,
+      x: window.innerWidth / 2 - 50,
+      y: window.innerHeight / 2 - 20,
+      text: 'Type here...',
+      fontSize: size,
+      fontFamily: textOptions.fontFamily,
+      fontStyle: `${textOptions.isBold ? 'bold ' : ''}${textOptions.isItalic ? 'italic' : ''}`.trim(),
+      textDecoration: textOptions.isUnderline ? 'underline' : '',
+      fill: color,
+      lineHeight: 1.5,
+      width: 400
+    });
+    saveHistory();
   };
   
   const [showBackgroundPicker, setShowBackgroundPicker] = React.useState(false);
@@ -442,12 +443,13 @@ export const Toolbar: React.FC = () => {
             <button
               key={t.id}
               onClick={() => handleToolClick(t.id)}
+              onDoubleClick={t.id === 'text' ? handleTextDoubleClick : undefined}
               className={`p-2 rounded-full transition-colors ${
                 tool === t.id 
                   ? 'bg-blue-100 text-blue-600' 
                   : 'hover:bg-gray-100 text-gray-600'
               }`}
-              title={t.label}
+              title={t.id === 'text' ? `${t.label} (Double-click to add text)` : t.label}
             >
               {t.icon}
             </button>
@@ -603,12 +605,13 @@ export const Toolbar: React.FC = () => {
             <button
               key={t.id}
               onClick={() => handleToolClick(t.id)}
+              onDoubleClick={t.id === 'text' ? handleTextDoubleClick : undefined}
               className={`p-2 rounded-full transition-colors ${
                 tool === t.id 
                   ? 'bg-blue-100 text-blue-600' 
                   : 'hover:bg-gray-100 text-gray-600'
               }`}
-              title={t.label}
+              title={t.id === 'text' ? `${t.label} (Double-click to add text)` : t.label}
             >
               {t.icon}
             </button>
