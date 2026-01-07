@@ -236,7 +236,7 @@ const RichText: React.FC<{
 };
 
 // URLImage component for loading images
-const URLImage = ({ image, onClick, onTap, draggable, onTransformEnd }: { image: any, onClick?: (e: any) => void, onTap?: (e: any) => void, draggable?: boolean, onTransformEnd?: (e: any) => void }) => {
+const URLImage = ({ image, onClick, onTap, draggable, onTransformEnd }: { image: any, onClick?: () => void, onTap?: () => void, draggable?: boolean, onTransformEnd?: (e: any) => void }) => {
   const [img] = useImage(image.src);
   return (
     <KonvaImage
@@ -1393,24 +1393,6 @@ const getCursorStyle = () => {
     }
   };
 
-  const handleItemClick = (e: any, itemId: string) => {
-    if (tool === 'select' || tool === 'text') {
-      const isMultiSelect = e.evt?.ctrlKey || e.evt?.metaKey;
-      const currentSelected = selectedId ? selectedId.split(',') : [];
-      
-      if (isMultiSelect && tool === 'select') {
-        if (currentSelected.includes(itemId)) {
-          const newSelected = currentSelected.filter(id => id !== itemId);
-          setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
-        } else {
-          setSelectedId([...currentSelected, itemId].join(','));
-        }
-      } else {
-        setSelectedId(itemId);
-      }
-    }
-  };
-
   const handleTextDoubleClick = (textId: string) => {
     if (tool === 'text') {
       startTextEditing(textId);
@@ -1640,8 +1622,26 @@ const getCursorStyle = () => {
       key: item.id,
       id: item.id,
       draggable: tool === 'select',
-      onClick: (e: any) => handleItemClick(e, item.id),
-      onTap: (e: any) => handleItemClick(e, item.id),
+      onClick: (e: any) => {
+        if (tool === 'select' || tool === 'text') {
+          const isMultiSelect = e.evt?.ctrlKey || e.evt?.metaKey;
+          const currentSelected = selectedId ? selectedId.split(',') : [];
+          
+          if (isMultiSelect && tool === 'select') {
+            if (currentSelected.includes(item.id)) {
+              const newSelected = currentSelected.filter(id => id !== item.id);
+              setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
+            } else {
+              setSelectedId([...currentSelected, item.id].join(','));
+            }
+          } else {
+            if (!currentSelected.includes(item.id)) {
+              setSelectedId([...currentSelected, item.id].join(','));
+            }
+          }
+        }
+      },
+      onTap: () => (tool === 'select' || tool === 'text') && setSelectedId(item.id),
       onTransformEnd: (e: any) => handleTransformEnd(e, item),
       onDragStart: handleItemDragStart,
       onDragMove: handleItemDragMove,
@@ -1731,8 +1731,8 @@ const getCursorStyle = () => {
               key: item.id,
               id: item.id,
               draggable: tool === 'select',
-              onClick: (e: any) => handleItemClick(e, item.id),
-              onTap: (e: any) => handleItemClick(e, item.id),
+              onClick: () => (tool === 'select') && setSelectedId(item.id),
+              onTap: () => (tool === 'select') && setSelectedId(item.id),
               onTransformEnd: (e: any) => handleTransformEnd(e, item),
             };
             return <URLImage {...commonProps} image={item} />;
