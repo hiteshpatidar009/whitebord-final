@@ -472,6 +472,42 @@ export const Whiteboard: React.FC = () => {
         return;
       }
 
+      // Copy selected items with Ctrl+C
+      if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+        e.preventDefault();
+        if (selectedId) {
+          const selectedIds = selectedId.split(',').filter(id => id);
+          const selectedItems = selectedIds.map(id => items.find(item => item.id === id)).filter(Boolean);
+          if (selectedItems.length > 0) {
+            localStorage.setItem('whiteboard-clipboard', JSON.stringify(selectedItems));
+          }
+        }
+        return;
+      }
+      
+      // Paste items with Ctrl+V
+      if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+        e.preventDefault();
+        const clipboardData = localStorage.getItem('whiteboard-clipboard');
+        if (clipboardData) {
+          try {
+            const clipboardItems = JSON.parse(clipboardData);
+            const newItems = clipboardItems.map((item: any) => ({
+              ...item,
+              id: uuidv4(),
+              x: (item.x || 0) + 20,
+              y: (item.y || 0) + 20
+            }));
+            newItems.forEach((item: any) => addItem(item));
+            setSelectedId(newItems.map((item: any) => item.id).join(','));
+            saveHistory();
+          } catch (error) {
+            console.error('Failed to paste items:', error);
+          }
+        }
+        return;
+      }
+
       // Group items with Ctrl+G
       if ((e.ctrlKey || e.metaKey) && e.key === 'g') {
         e.preventDefault();
@@ -554,7 +590,7 @@ export const Whiteboard: React.FC = () => {
       document.removeEventListener('contextmenu', handleContextMenu);
       window.removeEventListener('paste', handlePaste);
     };
-  }, [selectedId, removeItem, setSelectedId, saveHistory, groupItems, ungroupItems, items]);
+  }, [selectedId, removeItem, setSelectedId, saveHistory, groupItems, ungroupItems, items, addItem]);
 
   // Cleanup handwriting timers on unmount
   useEffect(() => {
@@ -774,18 +810,22 @@ export const Whiteboard: React.FC = () => {
     const clickedOnEmpty = e.target === stage;
     const isTouch = e.evt.type === 'touchstart';
     const isRightClick = !isTouch && (e.evt as MouseEvent).button === 2;
+    const pos = stage?.getRelativePointerPosition();
+    if (!pos) return;
 
     if (clickedOnEmpty && tool === 'select') {
-        setSelectedId(null);
+        const isMultiSelect = (e.evt as MouseEvent).ctrlKey || (e.evt as MouseEvent).metaKey;
+        if (!isMultiSelect) {
+          setSelectedId(null);
+        }
+        // Start selection box
+        setSelectionBox({ x: pos.x, y: pos.y, width: 0, height: 0 });
     }
     
     // Early return for pan tool - let stage handle dragging
     if (tool === 'hand') {
       return;
     }
-    
-    const pos = stage?.getRelativePointerPosition();
-    if (!pos) return;
 
     if (tool === 'text') {
       const targetId = e.target.id() || e.target.getParent()?.id();
@@ -849,26 +889,23 @@ export const Whiteboard: React.FC = () => {
     // Handle selection for all tools
     if (!clickedOnEmpty) {
       const targetId = e.target.id() || e.target.getParent()?.id();
-      if (targetId) {
+      if (targetId && tool === 'select') {
         const isMultiSelect = (e.evt as MouseEvent).ctrlKey || (e.evt as MouseEvent).metaKey;
+        const currentSelected = selectedId ? selectedId.split(',') : [];
         
-        if (tool === 'select') {
-          const currentSelected = selectedId ? selectedId.split(',') : [];
-          
-          if (isMultiSelect) {
-            // Ctrl+click: toggle item
-            if (currentSelected.includes(targetId)) {
-              const newSelected = currentSelected.filter(id => id !== targetId);
-              setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
-            } else {
-              setSelectedId([...currentSelected, targetId].join(','));
-            }
+        if (isMultiSelect) {
+          // Ctrl+click: toggle item
+          if (currentSelected.includes(targetId)) {
+            const newSelected = currentSelected.filter(id => id !== targetId);
+            setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
           } else {
-            // Normal click: replace selection
-            setSelectedId(targetId);
+            setSelectedId([...currentSelected, targetId].join(','));
           }
-          return;
+        } else {
+          // Normal click: replace selection
+          setSelectedId(targetId);
         }
+        return;
       }
     }
     if (isRightClick) return;
@@ -949,6 +986,19 @@ export const Whiteboard: React.FC = () => {
     const point = stage?.getRelativePointerPosition();
     if (!point) return;
 
+    // Handle selection box dragging
+    if (selectionBox && tool === 'select') {
+      const newWidth = point.x - selectionBox.x;
+      const newHeight = point.y - selectionBox.y;
+      setSelectionBox({
+        x: selectionBox.x,
+        y: selectionBox.y,
+        width: newWidth,
+        height: newHeight
+      });
+      return;
+    }
+
     // Update cursor for eraser tools
     if (cursorRef.current) {
         const isEraser = tool === 'eraser' || tool === 'highlighter-eraser';
@@ -977,6 +1027,42 @@ export const Whiteboard: React.FC = () => {
   };
 
  const handleMouseUp = () => {
+    // Handle selection box completion
+    if (selectionBox && tool === 'select') {
+      const stage = stageRef.current;
+      if (stage) {
+        const selectedItems: string[] = [];
+        const box = {
+          x: Math.min(selectionBox.x, selectionBox.x + selectionBox.width),
+          y: Math.min(selectionBox.y, selectionBox.y + selectionBox.height),
+          width: Math.abs(selectionBox.width),
+          height: Math.abs(selectionBox.height)
+        };
+        
+        // Find items within selection box
+        items.forEach(item => {
+          const node = stage.findOne('#' + item.id);
+          if (node) {
+            const nodeRect = node.getClientRect();
+            if (
+              nodeRect.x < box.x + box.width &&
+              nodeRect.x + nodeRect.width > box.x &&
+              nodeRect.y < box.y + box.height &&
+              nodeRect.y + nodeRect.height > box.y
+            ) {
+              selectedItems.push(item.id);
+            }
+          }
+        });
+        
+        if (selectedItems.length > 0) {
+          setSelectedId(selectedItems.join(','));
+        }
+      }
+      setSelectionBox(null);
+      return;
+    }
+
     if (!isDrawing.current) return;
     isDrawing.current = false;
     lastEraserPosRef.current = null;
@@ -1675,20 +1761,13 @@ const getCursorStyle = () => {
           draggable={tool === 'select'}
           onClick={(e: any) => {
             if (tool === 'select') {
-              const isMultiSelect = e.evt?.ctrlKey || e.evt?.metaKey;
               const currentSelected = selectedId ? selectedId.split(',') : [];
               
-              if (isMultiSelect) {
-                if (currentSelected.includes(item.id)) {
-                  const newSelected = currentSelected.filter(id => id !== item.id);
-                  setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
-                } else {
-                  setSelectedId([...currentSelected, item.id].join(','));
-                }
+              if (currentSelected.includes(item.id)) {
+                const newSelected = currentSelected.filter(id => id !== item.id);
+                setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
               } else {
-                if (!currentSelected.includes(item.id)) {
-                  setSelectedId([...currentSelected, item.id].join(','));
-                }
+                setSelectedId([...currentSelected, item.id].join(','));
               }
             }
           }}
@@ -1726,26 +1805,22 @@ const getCursorStyle = () => {
           draggable={tool === 'select' || tool === 'text'}
           onClick={(e: any) => {
             if (tool === 'select' || tool === 'text') {
-              const isMultiSelect = e.evt?.ctrlKey || e.evt?.metaKey;
               const currentSelected = selectedId ? selectedId.split(',') : [];
               
-              if (isMultiSelect && tool === 'select') {
-                if (currentSelected.includes(item.id)) {
-                  const newSelected = currentSelected.filter(id => id !== item.id);
-                  setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
-                } else {
-                  setSelectedId([...currentSelected, item.id].join(','));
-                }
+              if (currentSelected.includes(item.id)) {
+                const newSelected = currentSelected.filter(id => id !== item.id);
+                setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
               } else {
-                if (!currentSelected.includes(item.id)) {
-                  setSelectedId([...currentSelected, item.id].join(','));
-                }
+                setSelectedId([...currentSelected, item.id].join(','));
               }
             }
           }}
           onTap={() => {
             if (tool === 'select' || tool === 'text') {
-              setSelectedId(item.id);
+              const currentSelected = selectedId ? selectedId.split(',') : [];
+              if (!currentSelected.includes(item.id)) {
+                setSelectedId([...currentSelected, item.id].join(','));
+              }
             }
           }}
           onDblClick={() => handleTextDoubleClick(item.id)}
@@ -1764,24 +1839,24 @@ const getCursorStyle = () => {
       draggable: tool === 'select',
       onClick: (e: any) => {
         if (tool === 'select' || tool === 'text') {
-          const isMultiSelect = e.evt?.ctrlKey || e.evt?.metaKey;
           const currentSelected = selectedId ? selectedId.split(',') : [];
           
-          if (isMultiSelect && tool === 'select') {
-            if (currentSelected.includes(item.id)) {
-              const newSelected = currentSelected.filter(id => id !== item.id);
-              setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
-            } else {
-              setSelectedId([...currentSelected, item.id].join(','));
-            }
+          if (currentSelected.includes(item.id)) {
+            const newSelected = currentSelected.filter(id => id !== item.id);
+            setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
           } else {
-            if (!currentSelected.includes(item.id)) {
-              setSelectedId([...currentSelected, item.id].join(','));
-            }
+            setSelectedId([...currentSelected, item.id].join(','));
           }
         }
       },
-      onTap: () => (tool === 'select' || tool === 'text') && setSelectedId(item.id),
+      onTap: () => {
+        if (tool === 'select' || tool === 'text') {
+          const currentSelected = selectedId ? selectedId.split(',') : [];
+          if (!currentSelected.includes(item.id)) {
+            setSelectedId([...currentSelected, item.id].join(','));
+          }
+        }
+      },
       onTransformEnd: (e: any) => handleTransformEnd(e, item),
       onDragStart: handleItemDragStart,
       onDragMove: handleItemDragMove,
@@ -1796,17 +1871,17 @@ const getCursorStyle = () => {
       return (
         <Line
           {...commonProps}
-          listening={!isEraser}
+          listening={true}
           points={item.points}
           stroke={item.color}
-          strokeWidth={isEraser ? item.size * 2 + 10 : item.size} // Double size + buffer
-          tension={0} // Straight segments for 100% path matching
+          strokeWidth={isEraser ? item.size * 2 + 10 : item.size}
+          tension={0}
           lineCap="round"
           lineJoin="round"
           opacity={isHandwriting ? 0.9 : 1} 
           globalCompositeOperation={isEraser ? 'destination-out' : 'source-over'}
           perfectDrawEnabled={false}
-          hitStrokeWidth={isEraser ? item.size * 2 + 20 : 0}
+          hitStrokeWidth={isEraser ? item.size * 2 + 20 : Math.max(10, item.size + 5)}
         />
       );
     }
@@ -1871,9 +1946,33 @@ const getCursorStyle = () => {
               key: item.id,
               id: item.id,
               draggable: tool === 'select',
-              onClick: () => (tool === 'select') && setSelectedId(item.id),
-              onTap: () => (tool === 'select') && setSelectedId(item.id),
-              onTransformEnd: (e: any) => handleTransformEnd(e, item),
+              onClick: (e: any) => {
+                if (tool === 'select') {
+                  const currentSelected = selectedId ? selectedId.split(',') : [];
+                  if (currentSelected.includes(item.id)) {
+                    // Deselect if already selected
+                    const newSelected = currentSelected.filter(id => id !== item.id);
+                    setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
+                  } else {
+                    // Add to selection
+                    setSelectedId([...currentSelected, item.id].join(','));
+                  }
+                }
+              },
+              onTap: () => {
+                if (tool === 'select') {
+                  const currentSelected = selectedId ? selectedId.split(',') : [];
+                  if (currentSelected.includes(item.id)) {
+                    // Deselect if already selected
+                    const newSelected = currentSelected.filter(id => id !== item.id);
+                    setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
+                  } else {
+                    // Add to selection
+                    setSelectedId([...currentSelected, item.id].join(','));
+                  }
+                }
+              },
+              onTransformEnd: (e: any) => handleTransformEnd(e, item)
             };
             return <URLImage {...commonProps} image={item} />;
           })}
@@ -1888,7 +1987,37 @@ const getCursorStyle = () => {
               return (
                 <Line 
                   key={item.id + '-hl'} 
-                  id={item.id} 
+                  id={item.id}
+                  draggable={tool === 'select'}
+                  onClick={(e: any) => {
+                    if (tool === 'select') {
+                      const currentSelected = selectedId ? selectedId.split(',') : [];
+                      
+                      if (currentSelected.includes(item.id)) {
+                        const newSelected = currentSelected.filter(id => id !== item.id);
+                        setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
+                      } else {
+                        setSelectedId([...currentSelected, item.id].join(','));
+                      }
+                    }
+                  }}
+                  onTap={() => {
+                    if (tool === 'select') {
+                      const currentSelected = selectedId ? selectedId.split(',') : [];
+                      if (currentSelected.includes(item.id)) {
+                        // Deselect if already selected
+                        const newSelected = currentSelected.filter(id => id !== item.id);
+                        setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
+                      } else {
+                        // Add to selection
+                        setSelectedId([...currentSelected, item.id].join(','));
+                      }
+                    }
+                  }}
+                  onTransformEnd={(e: any) => handleTransformEnd(e, item)}
+                  onDragStart={handleItemDragStart}
+                  onDragMove={handleItemDragMove}
+                  onDragEnd={(e: any) => handleItemDragEnd(e, item)}
                   points={item.points} 
                   stroke={item.color} 
                   strokeWidth={item.size} 
@@ -1898,6 +2027,7 @@ const getCursorStyle = () => {
                   opacity={0.4} 
                   globalCompositeOperation="source-over" 
                   perfectDrawEnabled={false}
+                  hitStrokeWidth={Math.max(10, item.size + 5)}
                 />
               );
             }
