@@ -255,6 +255,7 @@ const URLImage = ({ image, onClick, onTap, draggable, onTransformEnd }: { image:
 };
 
 export const Whiteboard: React.FC = () => {
+
   const {
     tool,
     color,
@@ -275,6 +276,8 @@ export const Whiteboard: React.FC = () => {
     groupItems,
     ungroupItems,
   } = useWhiteboardStore();
+
+
 
     // Clipboard for copy-paste
     const clipboardRef = useRef<WhiteboardItem[] | null>(null);
@@ -360,28 +363,18 @@ export const Whiteboard: React.FC = () => {
       const nodes: Konva.Node[] = [];
       
       selectedIds.forEach(id => {
+        // Only include visible, selectable items (not eraser/highlighter/hidden/cursor)
+        const item = items.find(i => i.id === id);
+        if (!item) return;
+        if (
+          item.type === 'stroke' &&
+          (item.tool === 'eraser' || item.tool === 'highlighter-eraser' || item.isEraser || item.isHighlighter || (item as any)._hidden)
+        ) {
+          return;
+        }
         const node = stage.findOne('#' + id);
         if (node) {
           nodes.push(node);
-          
-          // Find overlapping erasers for each selected item
-          const selectedRect = node.getClientRect();
-          items.forEach(item => {
-            if (item.type === 'stroke' && (item.tool === 'eraser' || item.tool === 'highlighter-eraser')) {
-              const eraserNode = stage.findOne('#' + item.id);
-              if (eraserNode) {
-                const eraserRect = eraserNode.getClientRect();
-                if (
-                  selectedRect.x < eraserRect.x + eraserRect.width &&
-                  selectedRect.x + selectedRect.width > eraserRect.x &&
-                  selectedRect.y < eraserRect.y + eraserRect.height &&
-                  selectedRect.y + selectedRect.height > eraserRect.y
-                ) {
-                  nodes.push(eraserNode);
-                }
-              }
-            }
-          });
         }
       });
 
@@ -742,6 +735,8 @@ export const Whiteboard: React.FC = () => {
     const pos = stage?.getRelativePointerPosition();
     if (!pos) return;
 
+
+
     if (tool === 'text') {
       if (!clickedOnEmpty) {
         // Select existing text
@@ -899,24 +894,26 @@ export const Whiteboard: React.FC = () => {
 
  const handleMouseMove = (e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
     e.evt.preventDefault();
-    
     // Guard: Never process canvas events if target is text
     if ((e.evt.target as HTMLElement)?.dataset?.type === 'text') return;
-    
     const stage = e.target.getStage();
     const point = stage?.getRelativePointerPosition();
     if (!point) return;
 
     // Update cursor for eraser tools
     if (cursorRef.current) {
-        const isEraser = tool === 'eraser' || tool === 'highlighter-eraser';
-        cursorRef.current.visible(isEraser);
-        if (isEraser) {
-            cursorRef.current.x(point.x);
-            cursorRef.current.y(point.y);
-            cursorRef.current.radius((size * 2.5) / 2);
-            cursorRef.current.getLayer()?.batchDraw();
-        }
+      const isEraser = tool === 'eraser' || tool === 'highlighter-eraser';
+      // Always hide first to prevent multiple cursors
+      cursorRef.current.visible(false);
+      if (isEraser) {
+        cursorRef.current.x(point.x);
+        cursorRef.current.y(point.y);
+        cursorRef.current.radius((size * 2.5) / 2);
+        cursorRef.current.visible(true);
+        cursorRef.current.getLayer()?.batchDraw();
+      } else {
+        cursorRef.current.getLayer()?.batchDraw();
+      }
     }
 
     // Only handle drawing if we're actually drawing and not using pan/select tools
@@ -924,24 +921,76 @@ export const Whiteboard: React.FC = () => {
       return;
     }
 
+
+
+    // Drawing logic for pen/highlighter/handwriting
     if (currentStrokeId.current) {
-        const stroke = items.find(i => i.id === currentStrokeId.current) as Stroke;
-        if (stroke) {
-            updateItem(currentStrokeId.current, {
-                points: [...stroke.points, point.x, point.y]
-            });
-        }
+      const stroke = items.find(i => i.id === currentStrokeId.current) as Stroke;
+      if (stroke) {
+        updateItem(currentStrokeId.current, {
+          points: [...stroke.points, point.x, point.y]
+        });
+      }
     }
   };
 
- const handleMouseUp = () => {
+  const handleMouseUp = async () => {
     if (!isDrawing.current) return;
     isDrawing.current = false;
     lastEraserPosRef.current = null;
 
+    // --- FLATTEN AFTER ERASE LOGIC ---
+    if (tool === 'eraser' || tool === 'highlighter-eraser') {
+      // Wait for Konva to finish drawing
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      const stage = stageRef.current;
+      if (stage) {
+        // Save current stage transform
+        const prevScaleX = stage.scaleX();
+        const prevScaleY = stage.scaleY();
+        const prevX = stage.x();
+        const prevY = stage.y();
+
+        // Temporarily reset transform for flattening
+        stage.scale({ x: 1, y: 1 });
+        stage.position({ x: 0, y: 0 });
+        stage.batchDraw();
+
+        // Get the visible canvas as a data URL (at scale 1, position 0)
+        const dataURL = stage.toDataURL({ pixelRatio: 1 });
+
+        // Restore previous transform
+        stage.scale({ x: prevScaleX, y: prevScaleY });
+        stage.position({ x: prevX, y: prevY });
+        stage.batchDraw();
+
+        // Remove all strokes (and eraser strokes) from items
+        const strokesToRemove = items.filter(i => i.type === 'stroke').map(i => i.id);
+        strokesToRemove.forEach(id => removeItem(id));
+        // Remove any previous flattened image (type: 'image', src starts with 'data:image')
+        const prevImages = items.filter(i => i.type === 'image' && typeof i.src === 'string' && i.src.startsWith('data:image'));
+        prevImages.forEach(img => removeItem(img.id));
+        // Add the flattened image as a new item (always at 0,0, full stage size)
+        addItem({
+          type: 'image',
+          id: uuidv4(),
+          x: 0,
+          y: 0,
+          width: stage.width(),
+          height: stage.height(),
+          src: dataURL,
+        });
+        // Reset stage transform so user always sees the new image at default zoom/pan
+        setStagePos({ x: 0, y: 0 });
+        setStageScale(1);
+        saveHistory();
+      }
+      currentStrokeId.current = null;
+      return;
+    }
+
     saveHistory();
     const strokeId = currentStrokeId.current;
-    
     if (!strokeId) return;
 
     // Handle handwriting recognition timer
@@ -1702,10 +1751,23 @@ const getCursorStyle = () => {
         style={{ background: 'transparent', zIndex: 10 }}
         width={stageSize.width}
         height={stageSize.height}
-        onMouseDown={handleMouseDown}
+        onMouseDown={(e) => {
+          handleMouseDown(e);
+          // Hide eraser cursor on tap/click
+          if (cursorRef.current && (tool === 'eraser' || tool === 'highlighter-eraser')) {
+            cursorRef.current.visible(false);
+            cursorRef.current.getLayer()?.batchDraw();
+          }
+        }}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
-        onTouchStart={handleMouseDown}
+        onTouchStart={(e) => {
+          handleMouseDown(e);
+          if (cursorRef.current && (tool === 'eraser' || tool === 'highlighter-eraser')) {
+            cursorRef.current.visible(false);
+            cursorRef.current.getLayer()?.batchDraw();
+          }
+        }}
         onTouchMove={handleMouseMove}
         onTouchEnd={handleMouseUp}
         onWheel={handleWheel}
@@ -1714,9 +1776,28 @@ const getCursorStyle = () => {
           if (e.target === e.target.getStage()) {
             setSelectedId(null);
           }
+          // Hide eraser cursor on tap/click
+          if (cursorRef.current && (tool === 'eraser' || tool === 'highlighter-eraser')) {
+            cursorRef.current.visible(false);
+            cursorRef.current.getLayer()?.batchDraw();
+          }
         }}
-        onDblClick={handleCanvasDoubleClick}
-        onDblTap={handleCanvasDoubleClick}
+        onDblClick={(e) => {
+          handleCanvasDoubleClick(e);
+          // Hide eraser cursor on double click
+          if (cursorRef.current && (tool === 'eraser' || tool === 'highlighter-eraser')) {
+            cursorRef.current.visible(false);
+            cursorRef.current.getLayer()?.batchDraw();
+          }
+        }}
+        onDblTap={(e) => {
+          handleCanvasDoubleClick(e);
+          // Hide eraser cursor on double tap
+          if (cursorRef.current && (tool === 'eraser' || tool === 'highlighter-eraser')) {
+            cursorRef.current.visible(false);
+            cursorRef.current.getLayer()?.batchDraw();
+          }
+        }}
         draggable={tool === 'hand'}
         x={stagePos.x}
         y={stagePos.y}
@@ -1762,7 +1843,6 @@ const getCursorStyle = () => {
           <Transformer ref={transformerRef} />
         </Layer>
       </Stage>
-
     </div>
   );
 };
