@@ -1,7 +1,8 @@
 import type { Stroke } from '../types/index';
 import Konva from 'konva';
 
-export const getBoundingBox = (points: number[]) => {
+// Helper function - not exported, only used internally
+const getBoundingBox = (points: number[]) => {
   let minX = Infinity;
   let minY = Infinity;
   let maxX = -Infinity;
@@ -19,6 +20,7 @@ export const getBoundingBox = (points: number[]) => {
   return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
 };
 
+// This is the exported version
 export const strokesToImage = (strokes: Stroke[], padding = 10): Promise<string> => {
   return new Promise((resolve) => {
     // Create a temporary stage
@@ -80,3 +82,6 @@ export const measureText = (text: string, fontSize: number, fontFamily: string) 
   }
   return 0;
 };
+
+// Export the getBoundingBox function if you need it elsewhere
+export { getBoundingBox };
