@@ -23,6 +23,7 @@ interface WhiteboardState {
   pdfPages: string[];
   currentPdfPage: number | null;
   textSelection: { start: number; end: number } | null;
+  showStopwatch: boolean;
   
   setTool: (tool: ToolType) => void;
   setSelectedId: (id: string | null) => void;
@@ -35,6 +36,7 @@ interface WhiteboardState {
   setBackgroundImage: (image: string) => void;
   setPdfPages: (pages: string[]) => void;
   setCurrentPdfPage: (page: number | null) => void;
+  setShowStopwatch: (show: boolean) => void;
   
   addItem: (item: WhiteboardItem) => void;
   updateItem: (id: string, updates: Partial<WhiteboardItem>) => void;
@@ -72,6 +74,7 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   pdfPages: [],
   currentPdfPage: null,
   textSelection: null,
+  showStopwatch: false,
 
   setTool: (tool) => set({ tool }),
   setSelectedId: (selectedId) => set({ selectedId }),
@@ -83,6 +86,7 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   setStageScale: (stageScale) => set({ stageScale }),
   setPdfPages: (pdfPages) => set({ pdfPages }),
   setCurrentPdfPage: (currentPdfPage) => set({ currentPdfPage }),
+  setShowStopwatch: (showStopwatch) => set({ showStopwatch }),
 
   // --- UPDATED: Cache Busting Logic ---
   setBackgroundImage: (image) => {

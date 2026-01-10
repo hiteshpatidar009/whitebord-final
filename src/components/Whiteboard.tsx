@@ -200,7 +200,12 @@ const RichText: React.FC<{
     );
   }
   
-  const maxWidth = props.width || 400; // Default width for wrapping if not provided
+  // Calculate word count and optimal dimensions
+  const totalText = segments.map(s => s.text).join('');
+  const wordCount = totalText.trim().split(/\s+/).length;
+  const baseWidth = Math.max(200, Math.min(600, wordCount * 8)); // 8px per word as base
+  const maxWidth = props.width || baseWidth;
+  
   let currentX = 0;
   let currentY = 0;
   const lineHeight = props.fontSize * 1.2;

@@ -2,6 +2,7 @@ import { Whiteboard } from './components/Whiteboard';
 import { Toolbar } from './components/Toolbar';
 import { ShapeToolbar } from './components/ShapeToolbar';
 import { PdfViewer } from './components/PdfViewer';
+import FloatingStopwatch from './components/Stopwatch';
 
 
 function App() {
@@ -10,6 +11,7 @@ function App() {
       <Toolbar />
       <ShapeToolbar />
       <PdfViewer />
+      <FloatingStopwatch />
       <Whiteboard />
     </div>
   );
