@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from "react";
-import { RotateCcw, RotateCw, Home } from "lucide-react";
+import { RotateCcw, RotateCw, Home, Lock, Unlock } from "lucide-react";
 
 interface ChromeWidgetProps {
   id: string;
   x: number;
   y: number;
+  locked: boolean;
   onClose: () => void;
   onMove: (x: number, y: number) => void;
+  onToggleLock: () => void;
   isDrawing?: boolean;
 }
 
@@ -15,8 +17,10 @@ const HOME_URL = "https://www.chrome.com";
 const ChromeWidget: React.FC<ChromeWidgetProps> = ({
   x,
   y,
+  locked,
   onClose,
   onMove,
+  onToggleLock,
   isDrawing = false,
 }) => {
   const [url, setUrl] = useState(HOME_URL);
@@ -27,6 +31,7 @@ const ChromeWidget: React.FC<ChromeWidgetProps> = ({
   /* ================= DRAG LOGIC ================= */
 
   const handleMouseDown = (e: React.MouseEvent) => {
+    if (locked) return;
     setIsDragging(true);
     const rect = e.currentTarget.getBoundingClientRect();
     setDragOffset({
@@ -68,42 +73,61 @@ const ChromeWidget: React.FC<ChromeWidgetProps> = ({
 
   return (
     <div
-      className="fixed bg-white rounded-lg shadow-2xl border border-gray-300 overflow-hidden z-50"
+      className="absolute bg-white rounded-lg shadow-2xl border border-gray-300 overflow-hidden"
       style={{
         left: x,
         top: y,
         width: 720,
         height: 420,
+        zIndex: locked ? 5 : 50,
+        pointerEvents: locked ? 'none' : 'auto',
       }}
     >
       {/* HEADER */}
       <div
-        className="bg-gray-100 border-b border-gray-300 px-3 py-2 flex items-center gap-2 cursor-move"
+        className={`border-b border-gray-300 px-3 py-2 flex items-center gap-3 ${locked ? 'bg-gray-200 cursor-default' : 'bg-gray-100 cursor-move'}`}
         onMouseDown={handleMouseDown}
       >
         {/* Window controls */}
-        <div className="flex gap-1">
+        <div className="flex gap-1.5 mr-1">
           <button
             onClick={onClose}
-            className="w-3 h-3 bg-red-500 rounded-full"
+            className="w-3.5 h-3.5 bg-red-500 rounded-full hover:bg-red-600 transition-colors shadow-sm"
+            title="Close Widget"
           />
-          {/* <span className="w-3 h-3 bg-yellow-500 rounded-full" />
-          <span className="w-3 h-3 bg-green-500 rounded-full" /> */}
         </div>
+
+        {/* Lock/Unlock Toggle */}
+        <button
+          onClick={onToggleLock}
+          className={`p-1.5 rounded-md flex items-center justify-center transition-all duration-200 border ${locked
+            ? 'bg-red-50 border-red-200 text-red-600 hover:bg-red-100'
+            : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+            }`}
+          title={locked ? "Widget is Locked (Click to Unlock)" : "Widget is Unlocked (Click to Lock)"}
+        >
+          {locked ? <Lock size={16} strokeWidth={2.5} /> : <Unlock size={16} strokeWidth={2.5} />}
+        </button>
+
+        <div className="w-px h-4 bg-gray-300 mx-1"></div>
 
         {/* Navigation */}
         <button
           onClick={() => setCurrentUrl(currentUrl)}
-          className="p-1 hover:bg-gray-200 rounded"
+          className="p-1.5 hover:bg-white rounded-md text-gray-700 transition-colors"
+          title="Refresh"
+          disabled={locked}
         >
-          <RotateCcw size={14} />
+          <RotateCcw size={16} />
         </button>
 
         <button
           onClick={() => setCurrentUrl(HOME_URL)}
-          className="p-1 hover:bg-gray-200 rounded"
+          className="p-1.5 hover:bg-white rounded-md text-gray-700 transition-colors"
+          title="Home"
+          disabled={locked}
         >
-          <Home size={14} />
+          <Home size={16} />
         </button>
 
         {/* Address Bar */}
@@ -111,8 +135,12 @@ const ChromeWidget: React.FC<ChromeWidgetProps> = ({
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && navigate(url)}
-          className="flex-1 px-3 py-1 text-sm border border-gray-300 rounded-full outline-none"
+          className={`flex-1 px-3 py-1.5 text-sm border rounded-full outline-none transition-all ${locked
+            ? 'bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed'
+            : 'bg-white border-gray-300 text-gray-800 focus:border-blue-400 focus:ring-2 focus:ring-blue-100'
+            }`}
           placeholder="Search or enter URL"
+          readOnly={locked}
         />
       </div>
 
@@ -121,9 +149,9 @@ const ChromeWidget: React.FC<ChromeWidgetProps> = ({
         key={currentUrl}
         src={currentUrl}
         className="w-full"
-        style={{ 
+        style={{
           height: "calc(100% - 44px)",
-          pointerEvents: isDrawing ? 'none' : 'auto'
+          pointerEvents: (isDrawing || locked) ? 'none' : 'auto'
         }}
         sandbox="allow-scripts allow-forms allow-same-origin allow-popups"
         referrerPolicy="no-referrer"

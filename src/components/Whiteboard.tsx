@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Stage, Layer, Line, Image as KonvaImage, Rect, Circle, RegularPolygon, Transformer, Text as KonvaText, Group } from 'react-konva';
 import Konva from 'konva';
 import useImage from 'use-image';
+import { Unlock } from 'lucide-react';
 import { useWhiteboardStore } from '../store/useWhiteboardStore';
 import type { Stroke, WhiteboardItem } from '../types';
 import { strokesToImage, getBoundingBox } from '../utils/canvasUtils';
@@ -71,14 +72,14 @@ const isClosedShape = (pts: { x: number; y: number }[]) => {
   const start = pts[0];
   const end = pts[pts.length - 1];
   const dist = Math.sqrt(getSqDist(start, end));
-  
+
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
   pts.forEach(p => {
     minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
     minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
   });
   const maxDim = Math.max(maxX - minX, maxY - minY);
-  
+
   return dist < Math.max(50, maxDim * 0.2);
 };
 
@@ -88,7 +89,7 @@ const isClosedShape = (pts: { x: number; y: number }[]) => {
 const parseHtmlToSegments = (html: string) => {
   const div = document.createElement('div');
   div.innerHTML = html;
-  
+
   const segments: Array<{
     text: string;
     bold?: boolean;
@@ -96,7 +97,7 @@ const parseHtmlToSegments = (html: string) => {
     underline?: boolean;
     color?: string;
   }> = [];
-  
+
   const traverse = (node: Node, inheritedStyle: any = {}) => {
     if (node.nodeType === Node.TEXT_NODE) {
       const text = node.textContent || '';
@@ -107,7 +108,7 @@ const parseHtmlToSegments = (html: string) => {
       const element = node as HTMLElement;
       const tagName = element.tagName.toLowerCase();
       const style = { ...inheritedStyle };
-      
+
       // Handle line breaks
       if (tagName === 'br') {
         segments.push({ text: '\n', ...inheritedStyle });
@@ -120,7 +121,7 @@ const parseHtmlToSegments = (html: string) => {
         // Only add newline if we don't already have one
         // segments.push({ text: '\n', ...inheritedStyle });
       }
-      
+
       // Apply formatting based on tags
       if (tagName === 'b' || tagName === 'strong') {
         style.bold = true;
@@ -132,7 +133,7 @@ const parseHtmlToSegments = (html: string) => {
         const color = element.getAttribute('color');
         if (color) style.color = color;
       }
-      
+
       // Traverse children with inherited style
       element.childNodes.forEach(child => traverse(child, style));
 
@@ -142,14 +143,14 @@ const parseHtmlToSegments = (html: string) => {
       }
     }
   };
-  
+
   div.childNodes.forEach(node => traverse(node));
-  
+
   // Clean up trailing newlines
   while (segments.length > 0 && segments[segments.length - 1].text === '\n') {
     segments.pop();
   }
-  
+
   return segments;
 };
 
@@ -175,7 +176,7 @@ const RichText: React.FC<{
 }> = (props) => {
   // Parse HTML and render multiple text elements for different formatting
   const segments = parseHtmlToSegments(props.text);
-  
+
   if (segments.length === 0) {
     // Fallback to plain text
     return (
@@ -200,18 +201,18 @@ const RichText: React.FC<{
       />
     );
   }
-  
+
   // Calculate word count and optimal dimensions
   const totalText = segments.map(s => s.text).join('');
   const wordCount = totalText.trim().split(/\s+/).length;
   const baseWidth = Math.max(200, Math.min(600, wordCount * 8)); // 8px per word as base
   const maxWidth = props.width || baseWidth;
-  
+
   let currentX = 0;
   let currentY = 0;
   const lineHeight = props.fontSize * 1.2;
   const renderedElements: React.ReactNode[] = [];
-  
+
   const ctx = document.createElement('canvas').getContext('2d');
   let totalWidth = 0;
   let totalHeight = 0;
@@ -220,14 +221,14 @@ const RichText: React.FC<{
     const fontStyle = `${segment.bold ? 'bold ' : ''}${segment.italic ? 'italic' : ''}`.trim();
     const textDecoration = segment.underline ? 'underline' : '';
     const fill = segment.color || props.fill;
-    
+
     if (ctx) {
       ctx.font = `${fontStyle} ${props.fontSize}px ${props.fontFamily}`;
     }
 
     // Split text into words while preserving spaces/newlines
     const words = segment.text.split(/(\s+)/);
-    
+
     words.forEach((word, wordIndex) => {
       if (word === '\n') {
         currentX = 0;
@@ -266,7 +267,7 @@ const RichText: React.FC<{
       }
     });
   });
-  
+
   return (
     <Group
       id={props.id}
@@ -353,13 +354,13 @@ export const Whiteboard: React.FC = () => {
   // Drawing state refs
   const isDrawing = useRef(false);
   const currentStrokeId = useRef<string | null>(null);
-  const currentPointsRef = useRef<number[]>([]); 
-  const previewLineRef = useRef<Konva.Line>(null); 
+  const currentPointsRef = useRef<number[]>([]);
+  const previewLineRef = useRef<Konva.Line>(null);
   const cursorRef = useRef<Konva.Circle>(null);
   const lastEraserPosRef = useRef<{ x: number; y: number } | null>(null);
   const lastRightClickTime = useRef<number>(0);
   const [selectionBox, setSelectionBox] = useState<{ x: number, y: number, width: number, height: number } | null>(null);
-  const [chromeWidgets, setChromeWidgets] = useState<Array<{ id: string; x: number; y: number }>>([]);
+  const [chromeWidgets, setChromeWidgets] = useState<Array<{ id: string; x: number; y: number; locked: boolean }>>([]);
 
   // Handwriting-specific state
   const handwritingStrokesRef = useRef<string[]>([]);
@@ -373,14 +374,14 @@ export const Whiteboard: React.FC = () => {
     currentStrokeId.current = null;
     currentPointsRef.current = [];
     lastEraserPosRef.current = null;
-    
+
     // Clean up any existing text editors when switching tools
     const existingContainer = document.querySelector('[data-text-editor]');
     if (existingContainer && tool !== 'text') {
       document.body.removeChild(existingContainer);
       setEditingTextId(null);
     }
-    
+
     // Clean up handwriting-specific state
     if (tool !== 'handwriting') {
       isHandwritingActive.current = false;
@@ -389,7 +390,7 @@ export const Whiteboard: React.FC = () => {
         handwritingTimerRef.current = null;
       }
     }
-    
+
     // Hide preview line when switching tools
     if (previewLineRef.current) {
       previewLineRef.current.visible(false);
@@ -410,16 +411,16 @@ export const Whiteboard: React.FC = () => {
     if (selectedId) {
       const stage = stageRef.current;
       if (!stage) return;
-      
+
       // Handle multiple selected items
       const selectedIds = selectedId.split(',');
       const nodes: Konva.Node[] = [];
-      
+
       selectedIds.forEach(id => {
         const node = stage.findOne('#' + id);
         if (node) {
           nodes.push(node);
-          
+
           // Find overlapping erasers for each selected item
           const selectedRect = node.getClientRect();
           items.forEach(item => {
@@ -443,13 +444,13 @@ export const Whiteboard: React.FC = () => {
 
       if (nodes.length > 0) {
         transformerRef.current.nodes(nodes);
-        
+
         // Configure transformer based on selection
         const hasText = selectedIds.some(id => {
           const item = items.find(i => i.id === id);
           return item?.type === 'text';
         });
-        
+
         if (hasText && selectedIds.length === 1) {
           transformerRef.current.enabledAnchors(['top-left', 'top-right', 'bottom-left', 'bottom-right', 'middle-left', 'middle-right']);
           transformerRef.current.rotateEnabled(false);
@@ -457,7 +458,7 @@ export const Whiteboard: React.FC = () => {
           transformerRef.current.enabledAnchors(['top-left', 'top-right', 'bottom-left', 'bottom-right', 'middle-left', 'middle-right', 'top-center', 'bottom-center']);
           transformerRef.current.rotateEnabled(true);
         }
-        
+
         transformerRef.current.getLayer()?.batchDraw();
       } else {
         transformerRef.current.nodes([]);
@@ -491,7 +492,7 @@ export const Whiteboard: React.FC = () => {
         }
         return;
       }
-      
+
       // Paste items with Ctrl+V
       if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
         e.preventDefault();
@@ -527,7 +528,7 @@ export const Whiteboard: React.FC = () => {
         }
         return;
       }
-      
+
       // Ungroup items with Ctrl+Shift+G
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'G') {
         e.preventDefault();
@@ -540,7 +541,7 @@ export const Whiteboard: React.FC = () => {
         }
         return;
       }
-      
+
       if (e.key === 'Delete' && selectedId) {
         const selectedIds = selectedId.split(',');
         selectedIds.forEach(id => removeItem(id));
@@ -552,7 +553,7 @@ export const Whiteboard: React.FC = () => {
         e.preventDefault();
         return;
       }
-      if (e.ctrlKey && e.shiftKey && ( e.key === 'J' || e.key === 'C')) {
+      if (e.ctrlKey && e.shiftKey && (e.key === 'J' || e.key === 'C')) {
         e.preventDefault();
         return;
       }
@@ -571,7 +572,7 @@ export const Whiteboard: React.FC = () => {
       const text = e.clipboardData?.getData('text');
       if (text) {
         e.preventDefault();
-        
+
         // Add new text item from clipboard
         addItem({
           type: 'text',
@@ -618,7 +619,7 @@ export const Whiteboard: React.FC = () => {
   // Handwriting recognition processing
   const processHandwritingStrokes = useCallback(async () => {
     if (handwritingStrokesRef.current.length === 0) return;
-    
+
     try {
       // Create a temporary canvas to render handwriting strokes
       const canvas = document.createElement('canvas');
@@ -626,20 +627,20 @@ export const Whiteboard: React.FC = () => {
       canvas.height = 600;
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
-      
+
       ctx.fillStyle = 'white';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.strokeStyle = '#000000';
       ctx.lineWidth = 3;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
-      
+
       // Find bounding box of all handwriting strokes
       let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-      const strokeItems = handwritingStrokesRef.current.map(id => 
+      const strokeItems = handwritingStrokesRef.current.map(id =>
         items.find(item => item.id === id && item.type === 'stroke')
       ).filter(Boolean) as Stroke[];
-      
+
       strokeItems.forEach(stroke => {
         for (let i = 0; i < stroke.points.length; i += 2) {
           minX = Math.min(minX, stroke.points[i]);
@@ -648,10 +649,10 @@ export const Whiteboard: React.FC = () => {
           maxY = Math.max(maxY, stroke.points[i + 1]);
         }
       });
-      
+
       const offsetX = -minX + 50;
       const offsetY = -minY + 50;
-      
+
       // Draw strokes on canvas
       strokeItems.forEach(stroke => {
         if (stroke.points.length < 4) return;
@@ -662,20 +663,20 @@ export const Whiteboard: React.FC = () => {
         }
         ctx.stroke();
       });
-      
+
       // Convert canvas to base64 properly
       const dataUrl = canvas.toDataURL('image/png');
       const base64Data = dataUrl.split(',')[1]; // Extract base64 part only
       const text = await transcribeHandwriting(base64Data);
-      
+
       if (text && text !== "No handwriting detected") {
         // Remove original handwriting strokes
         handwritingStrokesRef.current.forEach(id => removeItem(id));
-        
+
         // Add recognized text
         const centerX = (minX + maxX) / 2;
         const centerY = (minY + maxY) / 2;
-        
+
         addItem({
           type: 'text',
           id: uuidv4(),
@@ -699,15 +700,15 @@ export const Whiteboard: React.FC = () => {
 
 
   // --- MATH HELPERS for Circle Detection ---
-  const getPathLength = (pts: {x:number, y:number}[]) => {
+  const getPathLength = (pts: { x: number, y: number }[]) => {
     let len = 0;
-    for(let i=1; i<pts.length; i++) {
-      len += Math.sqrt(getSqDist(pts[i-1], pts[i]));
+    for (let i = 1; i < pts.length; i++) {
+      len += Math.sqrt(getSqDist(pts[i - 1], pts[i]));
     }
     return len;
   };
 
-  const getPolygonArea = (pts: {x:number, y:number}[]) => {
+  const getPolygonArea = (pts: { x: number, y: number }[]) => {
     let area = 0;
     for (let i = 0; i < pts.length; i++) {
       const j = (i + 1) % pts.length;
@@ -723,7 +724,7 @@ export const Whiteboard: React.FC = () => {
     const area = getPolygonArea(pts);
     if (area === 0) return false;
     const circularity = (4 * Math.PI * area) / (perimeter * perimeter);
-    return circularity > 0.82; 
+    return circularity > 0.82;
   };
 
   const processShape = (strokeId: string) => {
@@ -739,11 +740,11 @@ export const Whiteboard: React.FC = () => {
     let shapeItem: WhiteboardItem;
 
     if (isCircle(pts)) {
-       const box = getBoundingBox(stroke.points);
-       const center = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
-       const radius = (box.width + box.height) / 4;
+      const box = getBoundingBox(stroke.points);
+      const center = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+      const radius = (box.width + box.height) / 4;
 
-       shapeItem = {
+      shapeItem = {
         type: 'shape',
         id: uuidv4(),
         shapeType: 'circle',
@@ -756,42 +757,42 @@ export const Whiteboard: React.FC = () => {
         opacity: 1,
       } as any;
     } else {
-        const simplified = simplifyDP(pts, 200);
-        const start = pts[0];
-        const end = pts[pts.length - 1];
-        const dist = Math.sqrt(getSqDist(start, end));
-        const box = getBoundingBox(stroke.points);
-        const maxDim = Math.max(box.width, box.height);
-        const closed = dist < Math.max(50, maxDim * 0.2);
+      const simplified = simplifyDP(pts, 200);
+      const start = pts[0];
+      const end = pts[pts.length - 1];
+      const dist = Math.sqrt(getSqDist(start, end));
+      const box = getBoundingBox(stroke.points);
+      const maxDim = Math.max(box.width, box.height);
+      const closed = dist < Math.max(50, maxDim * 0.2);
 
-        if (simplified.length < 2) return;
+      if (simplified.length < 2) return;
 
-        const flatPoints: number[] = [];
-        simplified.forEach(p => flatPoints.push(p.x, p.y));
+      const flatPoints: number[] = [];
+      simplified.forEach(p => flatPoints.push(p.x, p.y));
 
-        if (closed) {
-            shapeItem = {
-                type: 'shape',
-                id: uuidv4(),
-                shapeType: 'polygon',
-                points: flatPoints,
-                stroke: stroke.color,
-                strokeWidth: stroke.size,
-                opacity: 1,
-                closed: true
-            } as any;
-        } else {
-            shapeItem = {
-                type: 'shape',
-                id: uuidv4(),
-                shapeType: 'line',
-                points: flatPoints,
-                stroke: stroke.color,
-                strokeWidth: stroke.size,
-                opacity: 1,
-                closed: false
-            } as any;
-        }
+      if (closed) {
+        shapeItem = {
+          type: 'shape',
+          id: uuidv4(),
+          shapeType: 'polygon',
+          points: flatPoints,
+          stroke: stroke.color,
+          strokeWidth: stroke.size,
+          opacity: 1,
+          closed: true
+        } as any;
+      } else {
+        shapeItem = {
+          type: 'shape',
+          id: uuidv4(),
+          shapeType: 'line',
+          points: flatPoints,
+          stroke: stroke.color,
+          strokeWidth: stroke.size,
+          opacity: 1,
+          closed: false
+        } as any;
+      }
     }
 
     if (shapeItem) {
@@ -821,14 +822,14 @@ export const Whiteboard: React.FC = () => {
     if (!pos) return;
 
     if (clickedOnEmpty && tool === 'select') {
-        const isMultiSelect = (e.evt as MouseEvent).ctrlKey || (e.evt as MouseEvent).metaKey;
-        if (!isMultiSelect) {
-          setSelectedId(null);
-        }
-        // Start selection box
-        setSelectionBox({ x: pos.x, y: pos.y, width: 0, height: 0 });
+      const isMultiSelect = (e.evt as MouseEvent).ctrlKey || (e.evt as MouseEvent).metaKey;
+      if (!isMultiSelect) {
+        setSelectedId(null);
+      }
+      // Start selection box
+      setSelectionBox({ x: pos.x, y: pos.y, width: 0, height: 0 });
     }
-    
+
     // Early return for pan tool - let stage handle dragging
     if (tool === 'hand') {
       return;
@@ -837,7 +838,7 @@ export const Whiteboard: React.FC = () => {
     if (tool === 'text') {
       const targetId = e.target.id() || e.target.getParent()?.id();
       const clickedItem = items.find(i => i.id === targetId);
-      
+
       if (clickedItem?.type === 'text') {
         // Select existing text
         setSelectedId(targetId!);
@@ -848,49 +849,49 @@ export const Whiteboard: React.FC = () => {
           document.body.removeChild(existingContainer);
           setEditingTextId(null);
         }
-        
+
         // Clear selection if clicking empty space
         setSelectedId(null);
       }
-      return; 
+      return;
     }
 
     if (tool === 'fill') {
-       const shape = e.target;
-       if (shape === stage) return;
-       
-       // Apply fill to selected items if any are selected
-       if (selectedId) {
-         const selectedIds = selectedId.split(',');
-         selectedIds.forEach(id => {
-           const item = items.find(i => i.id === id);
-           if (item) {
-             if (item.type === 'shape') {
-               const transparentFill = hexToRgba(color, 0.6);
-               updateItem(id, { fill: transparentFill, opacity: 1 });
-             } else if (item.type === 'text') {
-               updateItem(id, { fill: color });
-             }
-           }
-         });
-         saveHistory();
-         return;
-       }
-       
-       // Apply fill to clicked item if no selection
-       const id = shape.id() || shape.getParent()?.id();
-       const item = items.find(i => i && i.id === id);
-       if (item) {
-           if (item.type === 'shape') {
-               const transparentFill = hexToRgba(color, 0.6);
-               updateItem(id, { fill: transparentFill, opacity: 1 });
-               saveHistory();
-           } else if (item.type === 'text') {
-               updateItem(id, { fill: color }); 
-               saveHistory();
-           }
-       }
-       return;
+      const shape = e.target;
+      if (shape === stage) return;
+
+      // Apply fill to selected items if any are selected
+      if (selectedId) {
+        const selectedIds = selectedId.split(',');
+        selectedIds.forEach(id => {
+          const item = items.find(i => i.id === id);
+          if (item) {
+            if (item.type === 'shape') {
+              const transparentFill = hexToRgba(color, 0.6);
+              updateItem(id, { fill: transparentFill, opacity: 1 });
+            } else if (item.type === 'text') {
+              updateItem(id, { fill: color });
+            }
+          }
+        });
+        saveHistory();
+        return;
+      }
+
+      // Apply fill to clicked item if no selection
+      const id = shape.id() || shape.getParent()?.id();
+      const item = items.find(i => i && i.id === id);
+      if (item) {
+        if (item.type === 'shape') {
+          const transparentFill = hexToRgba(color, 0.6);
+          updateItem(id, { fill: transparentFill, opacity: 1 });
+          saveHistory();
+        } else if (item.type === 'text') {
+          updateItem(id, { fill: color });
+          saveHistory();
+        }
+      }
+      return;
     }
 
     // Handle selection for all tools
@@ -899,7 +900,7 @@ export const Whiteboard: React.FC = () => {
       if (targetId && tool === 'select') {
         const isMultiSelect = (e.evt as MouseEvent).ctrlKey || (e.evt as MouseEvent).metaKey;
         const currentSelected = selectedId ? selectedId.split(',') : [];
-        
+
         if (isMultiSelect) {
           // Ctrl+click: toggle item
           if (currentSelected.includes(targetId)) {
@@ -923,16 +924,16 @@ export const Whiteboard: React.FC = () => {
     currentPointsRef.current = [pos.x, pos.y];
 
     if (previewLineRef.current) {
-        previewLineRef.current.points([pos.x, pos.y]);
-        previewLineRef.current.stroke(color);
-        previewLineRef.current.strokeWidth(size);
-        previewLineRef.current.opacity(tool === 'highlighter' ? 0.4 : 1);
-        previewLineRef.current.visible(true);
-        previewLineRef.current.getLayer()?.batchDraw();
+      previewLineRef.current.points([pos.x, pos.y]);
+      previewLineRef.current.stroke(color);
+      previewLineRef.current.strokeWidth(size);
+      previewLineRef.current.opacity(tool === 'highlighter' ? 0.4 : 1);
+      previewLineRef.current.visible(true);
+      previewLineRef.current.getLayer()?.batchDraw();
     }
 
     if (tool === 'eraser' || tool === 'highlighter-eraser') {
-       addItem({
+      addItem({
         type: 'stroke',
         id,
         tool,
@@ -942,53 +943,53 @@ export const Whiteboard: React.FC = () => {
         isEraser: true,
         isHighlighter: false
       });
-       return;
+      return;
     }
 
     // Handle handwriting as normal strokes with thinner width
     if (tool === 'handwriting') {
       isHandwritingActive.current = true;
       handwritingStrokesRef.current.push(id);
-      
+
       // Clear any existing timer
       if (handwritingTimerRef.current) {
         clearTimeout(handwritingTimerRef.current);
       }
-      
+
       // Use thinner stroke width for handwriting (3px default)
       const handwritingWidth = Math.max(2, Math.min(size * 0.1, 4));
-      
+
       addItem({
-        type: 'stroke', 
-        id, 
-        tool, 
+        type: 'stroke',
+        id,
+        tool,
         points: [pos.x, pos.y],
         color: color, // Store color at creation time
         size: handwritingWidth, // Store width at creation time
-        isEraser: false, 
+        isEraser: false,
         isHighlighter: false
       });
       return;
     }
-    
+
     addItem({
-      type: 'stroke', 
-      id, 
-      tool, 
+      type: 'stroke',
+      id,
+      tool,
       points: [pos.x, pos.y],
       color: color, // Store color at creation time
       size: size, // Store width at creation time
-      isEraser: false, 
+      isEraser: false,
       isHighlighter: tool === 'highlighter'
     });
   };
 
- const handleMouseMove = (e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
+  const handleMouseMove = (e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
     e.evt.preventDefault();
-    
+
     // Guard: Never process canvas events if target is text
     if ((e.evt.target as HTMLElement)?.dataset?.type === 'text') return;
-    
+
     const stage = e.target.getStage();
     const point = stage?.getRelativePointerPosition();
     if (!point) return;
@@ -1008,14 +1009,14 @@ export const Whiteboard: React.FC = () => {
 
     // Update cursor for eraser tools
     if (cursorRef.current) {
-        const isEraser = tool === 'eraser' || tool === 'highlighter-eraser';
-        cursorRef.current.visible(isEraser);
-        if (isEraser) {
-            cursorRef.current.x(point.x);
-            cursorRef.current.y(point.y);
-            cursorRef.current.radius((size * 2.5) / 2);
-            cursorRef.current.getLayer()?.batchDraw();
-        }
+      const isEraser = tool === 'eraser' || tool === 'highlighter-eraser';
+      cursorRef.current.visible(isEraser);
+      if (isEraser) {
+        cursorRef.current.x(point.x);
+        cursorRef.current.y(point.y);
+        cursorRef.current.radius((size * 2.5) / 2);
+        cursorRef.current.getLayer()?.batchDraw();
+      }
     }
 
     // Only handle drawing if we're actually drawing and not using pan/select tools
@@ -1024,16 +1025,16 @@ export const Whiteboard: React.FC = () => {
     }
 
     if (currentStrokeId.current) {
-        const stroke = items.find(i => i.id === currentStrokeId.current) as Stroke;
-        if (stroke) {
-            updateItem(currentStrokeId.current, {
-                points: [...stroke.points, point.x, point.y]
-            });
-        }
+      const stroke = items.find(i => i.id === currentStrokeId.current) as Stroke;
+      if (stroke) {
+        updateItem(currentStrokeId.current, {
+          points: [...stroke.points, point.x, point.y]
+        });
+      }
     }
   };
 
- const handleMouseUp = () => {
+  const handleMouseUp = () => {
     // Handle selection box completion
     if (selectionBox && tool === 'select') {
       const stage = stageRef.current;
@@ -1045,7 +1046,7 @@ export const Whiteboard: React.FC = () => {
           width: Math.abs(selectionBox.width),
           height: Math.abs(selectionBox.height)
         };
-        
+
         // Find items within selection box
         items.forEach(item => {
           const node = stage.findOne('#' + item.id);
@@ -1061,7 +1062,7 @@ export const Whiteboard: React.FC = () => {
             }
           }
         });
-        
+
         if (selectedItems.length > 0) {
           setSelectedId(selectedItems.join(','));
         }
@@ -1076,7 +1077,7 @@ export const Whiteboard: React.FC = () => {
 
     saveHistory();
     const strokeId = currentStrokeId.current;
-    
+
     if (!strokeId) return;
 
     // Handle handwriting recognition timer
@@ -1085,7 +1086,7 @@ export const Whiteboard: React.FC = () => {
       if (handwritingTimerRef.current) {
         clearTimeout(handwritingTimerRef.current);
       }
-      
+
       // Set new timer for recognition
       handwritingTimerRef.current = setTimeout(() => {
         if (isHandwritingActive.current) {
@@ -1099,9 +1100,9 @@ export const Whiteboard: React.FC = () => {
         processShape(strokeId);
       }, 500);
     }
-    
+
     currentStrokeId.current = null;
-};
+  };
 
   const handleWheel = (e: Konva.KonvaEventObject<WheelEvent>) => {
     e.evt.preventDefault();
@@ -1134,7 +1135,7 @@ export const Whiteboard: React.FC = () => {
       // For groups, update width and height
       updatePayload.width = Math.max(5, node.width() * scaleX);
       updatePayload.height = Math.max(5, node.height() * scaleY);
-      
+
       // Also update all child items' positions and sizes proportionally
       const originalWidth = item.width;
       const originalHeight = item.height;
@@ -1142,15 +1143,15 @@ export const Whiteboard: React.FC = () => {
       const scaleRatioY = originalHeight > 0 ? (updatePayload.height / originalHeight) : 1;
       const deltaX = updatePayload.x - item.x;
       const deltaY = updatePayload.y - item.y;
-      
+
       item.items?.forEach((childItem: WhiteboardItem) => {
         const childUpdatePayload: any = {};
-        
+
         if (childItem.type === 'text' || childItem.type === 'image' || (childItem.type === 'shape' && childItem.shapeType !== 'line' && childItem.shapeType !== 'polygon')) {
           // Update position relative to group
           childUpdatePayload.x = item.x + ((childItem.x || 0) - item.x) * scaleRatioX + deltaX;
           childUpdatePayload.y = item.y + ((childItem.y || 0) - item.y) * scaleRatioY + deltaY;
-          
+
           // Update size if applicable
           if (childItem.type === 'image' || (childItem.type === 'shape' && childItem.shapeType === 'rect')) {
             childUpdatePayload.width = Math.max(5, (childItem.width || 0) * scaleRatioX);
@@ -1165,7 +1166,7 @@ export const Whiteboard: React.FC = () => {
             return item.y + (p - item.y) * scaleRatioY + deltaY;
           });
           childUpdatePayload.points = newPoints;
-          
+
           // Update stroke width proportionally
           if (childItem.type === 'stroke') {
             childUpdatePayload.size = Math.max(1, (childItem.size || 2) * Math.max(scaleRatioX, scaleRatioY));
@@ -1173,7 +1174,7 @@ export const Whiteboard: React.FC = () => {
             childUpdatePayload.strokeWidth = Math.max(1, (childItem.strokeWidth || 2) * Math.max(scaleRatioX, scaleRatioY));
           }
         }
-        
+
         if (Object.keys(childUpdatePayload).length > 0) {
           updateItem(childItem.id, childUpdatePayload);
         }
@@ -1192,7 +1193,7 @@ export const Whiteboard: React.FC = () => {
       const newPoints = item.points.map((p: number, i: number) => i % 2 === 0 ? p * scaleX : p * scaleY);
       updatePayload.points = newPoints;
     } else if (item.type === 'stroke') {
-       const newPoints = item.points.map((p: number, i: number) => i % 2 === 0 ? p * scaleX : p * scaleY);
+      const newPoints = item.points.map((p: number, i: number) => i % 2 === 0 ? p * scaleX : p * scaleY);
       updatePayload.points = newPoints;
     }
 
@@ -1200,7 +1201,7 @@ export const Whiteboard: React.FC = () => {
     saveHistory();
   };
 
-const getCursorStyle = () => {
+  const getCursorStyle = () => {
     if (tool === 'eraser' || tool === 'highlighter-eraser') return { cursor: 'none' };
     if (tool === 'fill') {
       const cursorSize = 24;
@@ -1228,13 +1229,13 @@ const getCursorStyle = () => {
     if (existingContainer) {
       document.body.removeChild(existingContainer);
     }
-    
+
     const textItem = items.find(i => i.id === textId && i.type === 'text');
     if (!textItem || textItem.type !== 'text') return;
 
     setEditingTextId(textId);
     setSelectedId(null);
-    
+
     // Create container
     const container = document.createElement('div');
     container.setAttribute('data-text-editor', 'true');
@@ -1254,10 +1255,10 @@ const getCursorStyle = () => {
     container.style.border = '2px solid #0099ff';
     container.style.borderRadius = '8px';
     container.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-    
+
     // Add resize handles for all corners
     container.style.position = 'relative';
-    
+
     // Create resize handles for all corners and edges
     let isResizingBox = false;
     const createResizeHandle = (position: string, cursor: string) => {
@@ -1268,8 +1269,8 @@ const getCursorStyle = () => {
       handle.style.background = '#0099ff';
       handle.style.cursor = cursor;
       handle.style.zIndex = '1001';
-      
-      switch(position) {
+
+      switch (position) {
         case 'nw': handle.style.top = '-5px'; handle.style.left = '-5px'; break;
         case 'ne': handle.style.top = '-5px'; handle.style.right = '-5px'; break;
         case 'sw': handle.style.bottom = '-5px'; handle.style.left = '-5px'; break;
@@ -1279,10 +1280,10 @@ const getCursorStyle = () => {
         case 'w': handle.style.left = '-5px'; handle.style.top = '50%'; handle.style.transform = 'translateY(-50%)'; handle.style.width = '5px'; handle.style.height = '20px'; break;
         case 'e': handle.style.right = '-5px'; handle.style.top = '50%'; handle.style.transform = 'translateY(-50%)'; handle.style.width = '5px'; handle.style.height = '20px'; break;
       }
-      
+
       let isResizing = false;
       let startX = 0, startY = 0, startWidth = 0, startHeight = 0, startLeft = 0, startTop = 0;
-      
+
       handle.onmousedown = (e) => {
         e.stopPropagation();
         isResizing = true;
@@ -1294,29 +1295,29 @@ const getCursorStyle = () => {
         startHeight = rect.height;
         startLeft = rect.left;
         startTop = rect.top;
-        
+
         const handleMouseMove = (e: MouseEvent) => {
           if (!isResizing) return;
-          
+
           const deltaX = e.clientX - startX;
           const deltaY = e.clientY - startY;
-          
+
           let newWidth = startWidth;
           let newHeight = startHeight;
           let newLeft = startLeft;
           let newTop = startTop;
-          
+
           if (position.includes('e')) newWidth = Math.max(300, startWidth + deltaX);
           if (position.includes('w')) { newWidth = Math.max(300, startWidth - deltaX); newLeft = startLeft + deltaX; }
           if (position.includes('s')) newHeight = Math.max(200, startHeight + deltaY);
           if (position.includes('n')) { newHeight = Math.max(200, startHeight - deltaY); newTop = startTop + deltaY; }
-          
+
           container.style.width = newWidth + 'px';
           container.style.height = newHeight + 'px';
           container.style.left = newLeft + 'px';
           container.style.top = newTop + 'px';
         };
-        
+
         const handleMouseUp = () => {
           isResizing = false;
           // Use a small timeout to allow click events to pass before clearing isResizingBox
@@ -1326,14 +1327,14 @@ const getCursorStyle = () => {
           document.removeEventListener('mousemove', handleMouseMove);
           document.removeEventListener('mouseup', handleMouseUp);
         };
-        
+
         document.addEventListener('mousemove', handleMouseMove);
         document.addEventListener('mouseup', handleMouseUp);
       };
-      
+
       return handle;
     };
-    
+
     // Add all resize handles
     container.appendChild(createResizeHandle('nw', 'nw-resize'));
     container.appendChild(createResizeHandle('ne', 'ne-resize'));
@@ -1353,11 +1354,11 @@ const getCursorStyle = () => {
     toolbar.style.borderBottom = '1px solid #dee2e6';
     toolbar.style.cursor = 'move';
     toolbar.style.flexWrap = 'wrap';
-    
+
     // Make toolbar draggable
     let isDraggingBox = false;
     let dragOffset = { x: 0, y: 0 };
-    
+
     toolbar.onmousedown = (e) => {
       if (e.target === toolbar || (e.target as HTMLElement).parentElement === toolbar) {
         isDraggingBox = true;
@@ -1367,14 +1368,14 @@ const getCursorStyle = () => {
         e.preventDefault();
       }
     };
-    
+
     document.onmousemove = (e) => {
       if (isDraggingBox) {
         container.style.left = `${e.clientX - dragOffset.x}px`;
         container.style.top = `${e.clientY - dragOffset.y}px`;
       }
     };
-    
+
     document.onmouseup = () => {
       // Use a small timeout to allow click events to pass before clearing isDraggingBox
       setTimeout(() => {
@@ -1536,24 +1537,24 @@ const getCursorStyle = () => {
     editableDiv.style.webkitUserSelect = 'text';
     editableDiv.style.mozUserSelect = 'text';
     editableDiv.style.msUserSelect = 'text';
-    
+
     // Add placeholder behavior
     if (!editableDiv.innerHTML.trim()) {
       editableDiv.innerHTML = '<span style="color: #999;">Type here...</span>';
     }
-    
+
     editableDiv.onfocus = () => {
       if (editableDiv.innerHTML === '<span style="color: #999;">Type here...</span>') {
         editableDiv.innerHTML = '';
       }
     };
-    
+
     editableDiv.onblur = () => {
       if (!editableDiv.innerHTML.trim()) {
         editableDiv.innerHTML = '<span style="color: #999;">Type here...</span>';
       }
     };
-    
+
     const finishEditing = () => {
       let newText = editableDiv.innerHTML;
       if (newText === '<span style="color: #999;">Type here...</span>' || !newText.trim()) {
@@ -1570,7 +1571,7 @@ const getCursorStyle = () => {
       setSelectedId(textId);
       saveHistory();
     };
-    
+
     // Close editor when clicking outside
     const handleClickOutside = (e: MouseEvent) => {
       if (!container.contains(e.target as Node) && !isDraggingBox && !isResizingBox) {
@@ -1578,7 +1579,7 @@ const getCursorStyle = () => {
         document.removeEventListener('click', handleClickOutside);
       }
     };
-    
+
     setTimeout(() => {
       document.addEventListener('click', handleClickOutside);
     }, 100);
@@ -1606,13 +1607,13 @@ const getCursorStyle = () => {
         }
       }
     });
-    
+
     container.appendChild(toolbar);
     container.appendChild(editableDiv);
     document.body.appendChild(container);
     textareaRef.current = editableDiv as any;
     editableDiv.focus();
-    
+
     // Select all text if it's the default placeholder
     if ((textItem as any).text === 'Type here...') {
       const range = document.createRange();
@@ -1634,7 +1635,7 @@ const getCursorStyle = () => {
     if (tool === 'text' || tool === 'select') {
       const stage = e.target.getStage();
       const clickedOnEmpty = e.target === stage;
-      
+
       if (!clickedOnEmpty) {
         // Double-click on existing text to edit
         const targetId = e.target.id() || e.target.getParent()?.id();
@@ -1660,7 +1661,8 @@ const getCursorStyle = () => {
       const newWidget = {
         id: uuidv4(),
         x: window.innerWidth / 2 - 200,
-        y: window.innerHeight / 2 - 150
+        y: window.innerHeight / 2 - 150,
+        locked: false
       };
       setChromeWidgets(prev => [...prev, newWidget]);
     };
@@ -1672,94 +1674,94 @@ const getCursorStyle = () => {
 
   const linkedErasersRef = useRef<string[]>([]);
   const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
-  const linkedErasersStartPosRef = useRef<Record<string, {x: number, y: number}>>({});
+  const linkedErasersStartPosRef = useRef<Record<string, { x: number, y: number }>>({});
 
   const handleItemDragStart = (e: Konva.KonvaEventObject<DragEvent>) => {
-      const stage = e.target.getStage();
-      const node = e.target;
-      if (!stage) return;
-      dragStartPosRef.current = { x: node.x(), y: node.y() };
-      linkedErasersRef.current = [];
-      linkedErasersStartPosRef.current = {};
-      const selectedRect = node.getClientRect();
-      items.forEach(item => {
-          if (item.type === 'stroke' && (item.tool === 'eraser' || item.tool === 'highlighter-eraser')) {
-              const eraserNode = stage.findOne('#' + item.id);
-              if (eraserNode) {
-                  const eraserRect = eraserNode.getClientRect();
-                  if (selectedRect.x < eraserRect.x + eraserRect.width && selectedRect.x + selectedRect.width > eraserRect.x && selectedRect.y < eraserRect.y + eraserRect.height && selectedRect.y + selectedRect.height > eraserRect.y) {
-                      linkedErasersRef.current.push(item.id);
-                      linkedErasersStartPosRef.current[item.id] = { x: eraserNode.x(), y: eraserNode.y() };
-                  }
-              }
+    const stage = e.target.getStage();
+    const node = e.target;
+    if (!stage) return;
+    dragStartPosRef.current = { x: node.x(), y: node.y() };
+    linkedErasersRef.current = [];
+    linkedErasersStartPosRef.current = {};
+    const selectedRect = node.getClientRect();
+    items.forEach(item => {
+      if (item.type === 'stroke' && (item.tool === 'eraser' || item.tool === 'highlighter-eraser')) {
+        const eraserNode = stage.findOne('#' + item.id);
+        if (eraserNode) {
+          const eraserRect = eraserNode.getClientRect();
+          if (selectedRect.x < eraserRect.x + eraserRect.width && selectedRect.x + selectedRect.width > eraserRect.x && selectedRect.y < eraserRect.y + eraserRect.height && selectedRect.y + selectedRect.height > eraserRect.y) {
+            linkedErasersRef.current.push(item.id);
+            linkedErasersStartPosRef.current[item.id] = { x: eraserNode.x(), y: eraserNode.y() };
           }
-      });
+        }
+      }
+    });
   };
 
   const handleItemDragMove = (e: Konva.KonvaEventObject<DragEvent>) => {
-      if (!dragStartPosRef.current) return;
-      const node = e.target;
-      const dx = node.x() - dragStartPosRef.current.x;
-      const dy = node.y() - dragStartPosRef.current.y;
-      const stage = node.getStage();
-      if (stage) {
-          linkedErasersRef.current.forEach(id => {
-              const eraserNode = stage.findOne('#' + id);
-              const startPos = linkedErasersStartPosRef.current[id];
-              if (eraserNode && startPos) {
-                  eraserNode.x(startPos.x + dx);
-                  eraserNode.y(startPos.y + dy);
-              }
-          });
-          stage.batchDraw();
-      }
+    if (!dragStartPosRef.current) return;
+    const node = e.target;
+    const dx = node.x() - dragStartPosRef.current.x;
+    const dy = node.y() - dragStartPosRef.current.y;
+    const stage = node.getStage();
+    if (stage) {
+      linkedErasersRef.current.forEach(id => {
+        const eraserNode = stage.findOne('#' + id);
+        const startPos = linkedErasersStartPosRef.current[id];
+        if (eraserNode && startPos) {
+          eraserNode.x(startPos.x + dx);
+          eraserNode.y(startPos.y + dy);
+        }
+      });
+      stage.batchDraw();
+    }
   };
 
   const handleItemDragEnd = (e: Konva.KonvaEventObject<DragEvent>, item: any) => {
-      const node = e.target;
-      const dx = node.x() - (dragStartPosRef.current?.x || node.x());
-      const dy = node.y() - (dragStartPosRef.current?.y || node.y());
-      
-      // Handle group item movement - move all items in the group
-      if (item.type === 'group') {
-        // Update group position
-        updateItem(item.id, { x: node.x(), y: node.y() });
-        
-        // Move all items in the group
-        item.items?.forEach((childItem: WhiteboardItem) => {
-          if (childItem.type === 'text' || childItem.type === 'image' || (childItem.type === 'shape' && childItem.shapeType !== 'line' && childItem.shapeType !== 'polygon')) {
-            updateItem(childItem.id, { 
-              x: (childItem.x || 0) + dx, 
-              y: (childItem.y || 0) + dy 
-            });
-          } else if (childItem.type === 'stroke' || (childItem.type === 'shape' && (childItem.shapeType === 'line' || childItem.shapeType === 'polygon'))) {
-            const newPoints = (childItem.points || []).map((p: number, i: number) => 
-              i % 2 === 0 ? p + dx : p + dy
-            );
-            updateItem(childItem.id, { points: newPoints });
-          }
-        });
-      } else {
-        updateItem(item.id, { x: node.x(), y: node.y() });
-      }
-      
-      const stage = node.getStage();
-      if (stage) {
-          linkedErasersRef.current.forEach(id => {
-              const eraserNode = stage.findOne('#' + id);
-              if (eraserNode) updateItem(id, { x: eraserNode.x(), y: eraserNode.y() });
+    const node = e.target;
+    const dx = node.x() - (dragStartPosRef.current?.x || node.x());
+    const dy = node.y() - (dragStartPosRef.current?.y || node.y());
+
+    // Handle group item movement - move all items in the group
+    if (item.type === 'group') {
+      // Update group position
+      updateItem(item.id, { x: node.x(), y: node.y() });
+
+      // Move all items in the group
+      item.items?.forEach((childItem: WhiteboardItem) => {
+        if (childItem.type === 'text' || childItem.type === 'image' || (childItem.type === 'shape' && childItem.shapeType !== 'line' && childItem.shapeType !== 'polygon')) {
+          updateItem(childItem.id, {
+            x: (childItem.x || 0) + dx,
+            y: (childItem.y || 0) + dy
           });
-      }
-      saveHistory();
+        } else if (childItem.type === 'stroke' || (childItem.type === 'shape' && (childItem.shapeType === 'line' || childItem.shapeType === 'polygon'))) {
+          const newPoints = (childItem.points || []).map((p: number, i: number) =>
+            i % 2 === 0 ? p + dx : p + dy
+          );
+          updateItem(childItem.id, { points: newPoints });
+        }
+      });
+    } else {
+      updateItem(item.id, { x: node.x(), y: node.y() });
+    }
+
+    const stage = node.getStage();
+    if (stage) {
+      linkedErasersRef.current.forEach(id => {
+        const eraserNode = stage.findOne('#' + id);
+        if (eraserNode) updateItem(id, { x: eraserNode.x(), y: eraserNode.y() });
+      });
+    }
+    saveHistory();
   };
 
   const renderLayer3Item = (item: WhiteboardItem) => {
     if (item.type === 'image') return null;
-    
+
     // Don't render items that are part of a group
     const itemIsInGroup = items.some(i => i.type === 'group' && (i as any).items.some((gItem: any) => gItem.id === item.id));
     if (itemIsInGroup) return null;
-    
+
     // Render group items as selectable rectangles
     if (item.type === 'group') {
       return (
@@ -1778,7 +1780,7 @@ const getCursorStyle = () => {
           onClick={(e: any) => {
             if (tool === 'select') {
               const currentSelected = selectedId ? selectedId.split(',') : [];
-              
+
               if (currentSelected.includes(item.id)) {
                 const newSelected = currentSelected.filter(id => id !== item.id);
                 setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
@@ -1799,7 +1801,7 @@ const getCursorStyle = () => {
         />
       );
     }
-    
+
     // Render text as Rich Text
     if (item.type === 'text') {
       // Don't render text on canvas while editing it
@@ -1822,7 +1824,7 @@ const getCursorStyle = () => {
           onClick={(e: any) => {
             if (tool === 'select' || tool === 'text') {
               const currentSelected = selectedId ? selectedId.split(',') : [];
-              
+
               if (currentSelected.includes(item.id)) {
                 const newSelected = currentSelected.filter(id => id !== item.id);
                 setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
@@ -1848,7 +1850,7 @@ const getCursorStyle = () => {
         />
       );
     }
-    
+
     const commonProps = {
       key: item.id,
       id: item.id,
@@ -1856,7 +1858,7 @@ const getCursorStyle = () => {
       onClick: (e: any) => {
         if (tool === 'select' || tool === 'text') {
           const currentSelected = selectedId ? selectedId.split(',') : [];
-          
+
           if (currentSelected.includes(item.id)) {
             const newSelected = currentSelected.filter(id => id !== item.id);
             setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
@@ -1894,7 +1896,7 @@ const getCursorStyle = () => {
           tension={0}
           lineCap="round"
           lineJoin="round"
-          opacity={isHandwriting ? 0.9 : 1} 
+          opacity={isHandwriting ? 0.9 : 1}
           globalCompositeOperation={isEraser ? 'destination-out' : 'source-over'}
           perfectDrawEnabled={false}
           hitStrokeWidth={isEraser ? item.size * 2 + 20 : Math.max(10, item.size + 5)}
@@ -1914,8 +1916,8 @@ const getCursorStyle = () => {
   };
 
   return (
-    <div 
-      className="fixed inset-0 w-screen h-screen overflow-hidden" 
+    <div
+      className="fixed inset-0 w-screen h-screen overflow-hidden"
       style={{
         backgroundImage: `url(${backgroundImage})`,
         backgroundAttachment: 'fixed',
@@ -1928,173 +1930,197 @@ const getCursorStyle = () => {
       }}
     >
 
-      <Stage
-        ref={stageRef}
-        style={{ background: 'transparent', zIndex: 10 }}
-        width={stageSize.width}
-        height={stageSize.height}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onTouchStart={handleMouseDown}
-        onTouchMove={handleMouseMove}
-        onTouchEnd={handleMouseUp}
-        onWheel={handleWheel}
-        onClick={(e) => {
-          // Deselect when clicking on empty canvas
-          if (e.target === e.target.getStage()) {
-            setSelectedId(null);
-          }
-        }}
-        onDblClick={handleCanvasDoubleClick}
-        onDblTap={handleCanvasDoubleClick}
-        draggable={tool === 'hand'}
-        x={stagePos.x}
-        y={stagePos.y}
-        scaleX={stageScale}
-        scaleY={stageScale}
-      >
-        <Layer>
-          {/* 1. Render Images at the bottom */}
-          {items.map((item) => {
-            if (item.type !== 'image') return null;
-            const commonProps = {
-              key: item.id,
-              id: item.id,
-              draggable: tool === 'select',
-              onClick: (e: any) => {
-                if (tool === 'select') {
-                  const currentSelected = selectedId ? selectedId.split(',') : [];
-                  if (currentSelected.includes(item.id)) {
-                    // Deselect if already selected
-                    const newSelected = currentSelected.filter(id => id !== item.id);
-                    setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
-                  } else {
-                    // Add to selection
-                    setSelectedId([...currentSelected, item.id].join(','));
-                  }
-                }
-              },
-              onTap: () => {
-                if (tool === 'select') {
-                  const currentSelected = selectedId ? selectedId.split(',') : [];
-                  if (currentSelected.includes(item.id)) {
-                    // Deselect if already selected
-                    const newSelected = currentSelected.filter(id => id !== item.id);
-                    setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
-                  } else {
-                    // Add to selection
-                    setSelectedId([...currentSelected, item.id].join(','));
-                  }
-                }
-              },
-              onTransformEnd: (e: any) => handleTransformEnd(e, item)
-            };
-            return <URLImage {...commonProps} image={item} />;
-          })}
-        </Layer>
-        
-        <Layer>
-          {/* 2. Render Highlighters and Highlighter-specific Eraser */}
-          {items.map((item) => {
-            if (item.type !== 'stroke') return null;
-            if (item.isHighlighter) {
-              if ((item as any)._hidden) return null;
-              return (
-                <Line 
-                  key={item.id + '-hl'} 
-                  id={item.id}
-                  draggable={tool === 'select'}
-                  onClick={(e: any) => {
-                    if (tool === 'select') {
-                      const currentSelected = selectedId ? selectedId.split(',') : [];
-                      
-                      if (currentSelected.includes(item.id)) {
-                        const newSelected = currentSelected.filter(id => id !== item.id);
-                        setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
-                      } else {
-                        setSelectedId([...currentSelected, item.id].join(','));
-                      }
-                    }
-                  }}
-                  onTap={() => {
-                    if (tool === 'select') {
-                      const currentSelected = selectedId ? selectedId.split(',') : [];
-                      if (currentSelected.includes(item.id)) {
-                        // Deselect if already selected
-                        const newSelected = currentSelected.filter(id => id !== item.id);
-                        setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
-                      } else {
-                        // Add to selection
-                        setSelectedId([...currentSelected, item.id].join(','));
-                      }
-                    }
-                  }}
-                  onTransformEnd={(e: any) => handleTransformEnd(e, item)}
-                  onDragStart={handleItemDragStart}
-                  onDragMove={handleItemDragMove}
-                  onDragEnd={(e: any) => handleItemDragEnd(e, item)}
-                  points={item.points} 
-                  stroke={item.color} 
-                  strokeWidth={item.size} 
-                  tension={0} 
-                  lineCap="round" 
-                  lineJoin="round" 
-                  opacity={0.4} 
-                  globalCompositeOperation="source-over" 
-                  perfectDrawEnabled={false}
-                  hitStrokeWidth={Math.max(10, item.size + 5)}
-                />
-              );
-            }
-            if (item.tool === 'highlighter-eraser') {
-               return (
-                <Line 
-                  key={item.id + '-hl-eraser'} 
-                  id={item.id}
-                  points={item.points} 
-                  stroke="#000000" 
-                  strokeWidth={item.size * 2 + 10} 
-                  tension={0} 
-                  lineCap="round" 
-                  lineJoin="round" 
-                  globalCompositeOperation="destination-out" 
-                  perfectDrawEnabled={false}
-                />
-               );
-            }
-            return null;
-          })}
-        </Layer>
-
-        <Layer>
-          {/* 3. Render everything else (Pen, Shapes, Text, Eraser) */}
-          {items.map((item) => {
-            if (item.type === 'image') return null;
-            if (item.type === 'stroke' && (item.isHighlighter || item.tool === 'highlighter-eraser')) return null;
-            return renderLayer3Item(item);
-          })}
-          
-          {selectionBox && <Rect x={selectionBox.x} y={selectionBox.y} width={selectionBox.width} height={selectionBox.height} stroke="#0099ff" strokeWidth={1} dash={[5, 5]} />}
-          <Line ref={previewLineRef} listening={false} tension={0} lineCap="round" lineJoin="round" stroke={color} strokeWidth={(tool === 'eraser' || tool === 'highlighter-eraser') ? size * 2 + 10 : size} visible={false} />
-          <Circle ref={cursorRef} listening={false} radius={size / 2} stroke="#ff1493" strokeWidth={2.5} fill="rgba(255, 20, 147, 0.15)" visible={tool === 'eraser' || tool === 'highlighter-eraser'} opacity={1} />
-          <Transformer ref={transformerRef} />
-        </Layer>
-      </Stage>
-
       {/* Chrome Widgets */}
       {chromeWidgets.map((widget) => (
-        <ChromeWidget
-          key={widget.id}
-          id={widget.id}
-          x={widget.x}
-          y={widget.y}
-          isDrawing={isDrawing.current}
-          onClose={() => setChromeWidgets(prev => prev.filter(w => w.id !== widget.id))}
-          onMove={(x, y) => setChromeWidgets(prev => prev.map(w => w.id === widget.id ? { ...w, x, y } : w))}
-        />
+        <React.Fragment key={widget.id}>
+          <ChromeWidget
+            id={widget.id}
+            x={widget.x}
+            y={widget.y}
+            locked={widget.locked}
+            isDrawing={isDrawing.current}
+            onClose={() => setChromeWidgets(prev => prev.filter(w => w.id !== widget.id))}
+            onMove={(x, y) => setChromeWidgets(prev => prev.map(w => w.id === widget.id ? { ...w, x, y } : w))}
+            onToggleLock={() => setChromeWidgets(prev => prev.map(w => w.id === widget.id ? { ...w, locked: !w.locked } : w))}
+          />
+          {widget.locked && (
+            <div
+              style={{
+                position: 'fixed',
+                left: widget.x + 60, // Offset to not overlap with close button
+                top: widget.y + 6,
+                zIndex: 60, // Higher than everything
+              }}
+            >
+              <button
+                onClick={() => setChromeWidgets(prev => prev.map(w => w.id === widget.id ? { ...w, locked: false } : w))}
+                className="flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white rounded-full shadow-lg hover:bg-red-700 transition-colors text-sm font-medium border border-red-700"
+                style={{ cursor: 'pointer', pointerEvents: 'auto' }}
+              >
+                <Unlock size={14} />
+                <span>Unlock Widget</span>
+              </button>
+            </div>
+          )}
+        </React.Fragment>
       ))}
 
+      <div style={{ position: 'absolute', inset: 0, zIndex: 10 }}>
+        <Stage
+          ref={stageRef}
+          style={{ background: 'transparent' }}
+          width={stageSize.width}
+          height={stageSize.height}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onTouchStart={handleMouseDown}
+          onTouchMove={handleMouseMove}
+          onTouchEnd={handleMouseUp}
+          onWheel={handleWheel}
+          onClick={(e) => {
+            // Deselect when clicking on empty canvas
+            if (e.target === e.target.getStage()) {
+              setSelectedId(null);
+            }
+          }}
+          onDblClick={handleCanvasDoubleClick}
+          onDblTap={handleCanvasDoubleClick}
+          draggable={tool === 'hand'}
+          x={stagePos.x}
+          y={stagePos.y}
+          scaleX={stageScale}
+          scaleY={stageScale}
+        >
+          <Layer>
+            {/* 1. Render Images at the bottom */}
+            {items.map((item) => {
+              if (item.type !== 'image') return null;
+              const commonProps = {
+                key: item.id,
+                id: item.id,
+                draggable: tool === 'select',
+                onClick: (e: any) => {
+                  if (tool === 'select') {
+                    const currentSelected = selectedId ? selectedId.split(',') : [];
+                    if (currentSelected.includes(item.id)) {
+                      // Deselect if already selected
+                      const newSelected = currentSelected.filter(id => id !== item.id);
+                      setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
+                    } else {
+                      // Add to selection
+                      setSelectedId([...currentSelected, item.id].join(','));
+                    }
+                  }
+                },
+                onTap: () => {
+                  if (tool === 'select') {
+                    const currentSelected = selectedId ? selectedId.split(',') : [];
+                    if (currentSelected.includes(item.id)) {
+                      // Deselect if already selected
+                      const newSelected = currentSelected.filter(id => id !== item.id);
+                      setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
+                    } else {
+                      // Add to selection
+                      setSelectedId([...currentSelected, item.id].join(','));
+                    }
+                  }
+                },
+                onTransformEnd: (e: any) => handleTransformEnd(e, item)
+              };
+              return <URLImage {...commonProps} image={item} />;
+            })}
+          </Layer>
+
+          <Layer>
+            {/* 2. Render Highlighters and Highlighter-specific Eraser */}
+            {items.map((item) => {
+              if (item.type !== 'stroke') return null;
+              if (item.isHighlighter) {
+                if ((item as any)._hidden) return null;
+                return (
+                  <Line
+                    key={item.id + '-hl'}
+                    id={item.id}
+                    draggable={tool === 'select'}
+                    onClick={(e: any) => {
+                      if (tool === 'select') {
+                        const currentSelected = selectedId ? selectedId.split(',') : [];
+
+                        if (currentSelected.includes(item.id)) {
+                          const newSelected = currentSelected.filter(id => id !== item.id);
+                          setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
+                        } else {
+                          setSelectedId([...currentSelected, item.id].join(','));
+                        }
+                      }
+                    }}
+                    onTap={() => {
+                      if (tool === 'select') {
+                        const currentSelected = selectedId ? selectedId.split(',') : [];
+                        if (currentSelected.includes(item.id)) {
+                          // Deselect if already selected
+                          const newSelected = currentSelected.filter(id => id !== item.id);
+                          setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
+                        } else {
+                          // Add to selection
+                          setSelectedId([...currentSelected, item.id].join(','));
+                        }
+                      }
+                    }}
+                    onTransformEnd={(e: any) => handleTransformEnd(e, item)}
+                    onDragStart={handleItemDragStart}
+                    onDragMove={handleItemDragMove}
+                    onDragEnd={(e: any) => handleItemDragEnd(e, item)}
+                    points={item.points}
+                    stroke={item.color}
+                    strokeWidth={item.size}
+                    tension={0}
+                    lineCap="round"
+                    lineJoin="round"
+                    opacity={0.4}
+                    globalCompositeOperation="source-over"
+                    perfectDrawEnabled={false}
+                    hitStrokeWidth={Math.max(10, item.size + 5)}
+                  />
+                );
+              }
+              if (item.tool === 'highlighter-eraser') {
+                return (
+                  <Line
+                    key={item.id + '-hl-eraser'}
+                    id={item.id}
+                    points={item.points}
+                    stroke="#000000"
+                    strokeWidth={item.size * 2 + 10}
+                    tension={0}
+                    lineCap="round"
+                    lineJoin="round"
+                    globalCompositeOperation="destination-out"
+                    perfectDrawEnabled={false}
+                  />
+                );
+              }
+              return null;
+            })}
+          </Layer>
+
+          <Layer>
+            {/* 3. Render everything else (Pen, Shapes, Text, Eraser) */}
+            {items.map((item) => {
+              if (item.type === 'image') return null;
+              if (item.type === 'stroke' && (item.isHighlighter || item.tool === 'highlighter-eraser')) return null;
+              return renderLayer3Item(item);
+            })}
+
+            {selectionBox && <Rect x={selectionBox.x} y={selectionBox.y} width={selectionBox.width} height={selectionBox.height} stroke="#0099ff" strokeWidth={1} dash={[5, 5]} />}
+            <Line ref={previewLineRef} listening={false} tension={0} lineCap="round" lineJoin="round" stroke={color} strokeWidth={(tool === 'eraser' || tool === 'highlighter-eraser') ? size * 2 + 10 : size} visible={false} />
+            <Circle ref={cursorRef} listening={false} radius={size / 2} stroke="#ff1493" strokeWidth={2.5} fill="rgba(255, 20, 147, 0.15)" visible={tool === 'eraser' || tool === 'highlighter-eraser'} opacity={1} />
+            <Transformer ref={transformerRef} />
+          </Layer>
+        </Stage>
+
+      </div>
     </div>
   );
 };
