@@ -1,185 +1,229 @@
+import React, { useRef, useState, useEffect, useCallback } from 'react'
+import { v4 as uuidv4 } from 'uuid'
+import {
+  Stage,
+  Layer,
+  Line,
+  Image as KonvaImage,
+  Rect,
+  Circle,
+  RegularPolygon,
+  Transformer,
+  Text as KonvaText,
+  Group
+} from 'react-konva'
+import Konva from 'konva'
+import useImage from 'use-image'
+import { useWhiteboardStore } from '../store/useWhiteboardStore'
+import type { Stroke, WhiteboardItem } from '../types'
+import { strokesToImage, getBoundingBox } from '../utils/canvasUtils'
+import { FONT_STACKS, FONTS } from './TextToolbar'
+import Ruler from './Ruler'
+import ChromeWidget from './ChromeWidget'
 
-import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { v4 as uuidv4 } from 'uuid';
-import { Stage, Layer, Line, Image as KonvaImage, Rect, Circle, RegularPolygon, Transformer, Text as KonvaText, Group } from 'react-konva';
-import Konva from 'konva';
-import useImage from 'use-image';
-import { useWhiteboardStore } from '../store/useWhiteboardStore';
-import type { Stroke, WhiteboardItem } from '../types';
-import { strokesToImage, getBoundingBox } from '../utils/canvasUtils';
-import { FONT_STACKS, FONTS } from './TextToolbar';
-<<<<<<< HEAD
-import Ruler from './Ruler';
-=======
-import ChromeWidget from './ChromeWidget';
->>>>>>> 86da999c549d00b76c98381b4c3f13271f0cc37e
-
-import { transcribeHandwriting } from '../services/geminiService';
-
-
+import { transcribeHandwriting } from '../services/geminiService'
 
 // --- MATH & SIMPLIFICATION HELPERS (Douglas-Peucker) ---
 
-const getSqDist = (p1: { x: number; y: number }, p2: { x: number; y: number }) => {
-  const dx = p1.x - p2.x, dy = p1.y - p2.y;
-  return dx * dx + dy * dy;
-};
+const getSqDist = (
+  p1: { x: number; y: number },
+  p2: { x: number; y: number }
+) => {
+  const dx = p1.x - p2.x,
+    dy = p1.y - p2.y
+  return dx * dx + dy * dy
+}
 
-const getSqSegDist = (p: { x: number; y: number }, v: { x: number; y: number }, w: { x: number; y: number }) => {
-  let x = v.x, y = v.y, dx = w.x - x, dy = w.y - y;
+const getSqSegDist = (
+  p: { x: number; y: number },
+  v: { x: number; y: number },
+  w: { x: number; y: number }
+) => {
+  let x = v.x,
+    y = v.y,
+    dx = w.x - x,
+    dy = w.y - y
   if (dx !== 0 || dy !== 0) {
-    const t = ((p.x - x) * dx + (p.y - y) * dy) / (dx * dx + dy * dy);
-    if (t > 1) { x = w.x; y = w.y; }
-    else if (t > 0) { x += dx * t; y += dy * t; }
+    const t = ((p.x - x) * dx + (p.y - y) * dy) / (dx * dx + dy * dy)
+    if (t > 1) {
+      x = w.x
+      y = w.y
+    } else if (t > 0) {
+      x += dx * t
+      y += dy * t
+    }
   }
-  dx = p.x - x; dy = p.y - y;
-  return dx * dx + dy * dy;
-};
+  dx = p.x - x
+  dy = p.y - y
+  return dx * dx + dy * dy
+}
 
-const simplifyDP = (points: { x: number; y: number }[], sqTolerance: number) => {
-  const len = points.length;
-  const MarkerArray = new Uint8Array(len);
-  const stack = [0, len - 1];
-  const newPoints: { x: number; y: number }[] = [];
+const simplifyDP = (
+  points: { x: number; y: number }[],
+  sqTolerance: number
+) => {
+  const len = points.length
+  const MarkerArray = new Uint8Array(len)
+  const stack = [0, len - 1]
+  const newPoints: { x: number; y: number }[] = []
 
-  MarkerArray[0] = MarkerArray[len - 1] = 1;
+  MarkerArray[0] = MarkerArray[len - 1] = 1
 
   while (stack.length > 0) {
-    const last = stack.pop()!;
-    const first = stack.pop()!;
-    let maxSqDist = 0;
-    let index = 0;
+    const last = stack.pop()!
+    const first = stack.pop()!
+    let maxSqDist = 0
+    let index = 0
 
     for (let i = first + 1; i < last; i++) {
-      const sqDist = getSqSegDist(points[i], points[first], points[last]);
+      const sqDist = getSqSegDist(points[i], points[first], points[last])
       if (sqDist > maxSqDist) {
-        index = i;
-        maxSqDist = sqDist;
+        index = i
+        maxSqDist = sqDist
       }
     }
 
     if (maxSqDist > sqTolerance) {
-      MarkerArray[index] = 1;
-      stack.push(first, index, index, last);
+      MarkerArray[index] = 1
+      stack.push(first, index, index, last)
     }
   }
 
   for (let i = 0; i < len; i++) {
-    if (MarkerArray[i]) newPoints.push(points[i]);
+    if (MarkerArray[i]) newPoints.push(points[i])
   }
-  return newPoints;
-};
+  return newPoints
+}
 
 const isClosedShape = (pts: { x: number; y: number }[]) => {
-  if (pts.length < 3) return false;
-  const start = pts[0];
-  const end = pts[pts.length - 1];
-  const dist = Math.sqrt(getSqDist(start, end));
-  
-  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  if (pts.length < 3) return false
+  const start = pts[0]
+  const end = pts[pts.length - 1]
+  const dist = Math.sqrt(getSqDist(start, end))
+
+  let minX = Infinity,
+    maxX = -Infinity,
+    minY = Infinity,
+    maxY = -Infinity
   pts.forEach(p => {
-    minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
-    minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
-  });
-  const maxDim = Math.max(maxX - minX, maxY - minY);
-  
-  return dist < Math.max(50, maxDim * 0.2);
-};
+    minX = Math.min(minX, p.x)
+    maxX = Math.max(maxX, p.x)
+    minY = Math.min(minY, p.y)
+    maxY = Math.max(maxY, p.y)
+  })
+  const maxDim = Math.max(maxX - minX, maxY - minY)
+
+  return dist < Math.max(50, maxDim * 0.2)
+}
 
 // --- COMPONENTS ---
 
 // Helper: Parse HTML and create text segments with formatting
 const parseHtmlToSegments = (html: string) => {
-  const div = document.createElement('div');
-  div.innerHTML = html;
-  
+  const div = document.createElement('div')
+  div.innerHTML = html
+
   const segments: Array<{
-    text: string;
-    bold?: boolean;
-    italic?: boolean;
-    underline?: boolean;
-    color?: string;
-  }> = [];
-  
+    text: string
+    bold?: boolean
+    italic?: boolean
+    underline?: boolean
+    color?: string
+  }> = []
+
   const traverse = (node: Node, inheritedStyle: any = {}) => {
     if (node.nodeType === Node.TEXT_NODE) {
-      const text = node.textContent || '';
+      const text = node.textContent || ''
       if (text) {
-        segments.push({ text, ...inheritedStyle });
+        segments.push({ text, ...inheritedStyle })
       }
     } else if (node.nodeType === Node.ELEMENT_NODE) {
-      const element = node as HTMLElement;
-      const tagName = element.tagName.toLowerCase();
-      const style = { ...inheritedStyle };
-      
+      const element = node as HTMLElement
+      const tagName = element.tagName.toLowerCase()
+      const style = { ...inheritedStyle }
+
       // Handle line breaks
       if (tagName === 'br') {
-        segments.push({ text: '\n', ...inheritedStyle });
-        return;
+        segments.push({ text: '\n', ...inheritedStyle })
+        return
       }
 
       // Block elements should often imply a newline if they aren't the first element
-      const isBlock = ['div', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li'].includes(tagName);
-      if (isBlock && segments.length > 0 && segments[segments.length - 1].text !== '\n') {
+      const isBlock = [
+        'div',
+        'p',
+        'h1',
+        'h2',
+        'h3',
+        'h4',
+        'h5',
+        'h6',
+        'li'
+      ].includes(tagName)
+      if (
+        isBlock &&
+        segments.length > 0 &&
+        segments[segments.length - 1].text !== '\n'
+      ) {
         // Only add newline if we don't already have one
         // segments.push({ text: '\n', ...inheritedStyle });
       }
-      
+
       // Apply formatting based on tags
       if (tagName === 'b' || tagName === 'strong') {
-        style.bold = true;
+        style.bold = true
       } else if (tagName === 'i' || tagName === 'em') {
-        style.italic = true;
+        style.italic = true
       } else if (tagName === 'u') {
-        style.underline = true;
+        style.underline = true
       } else if (tagName === 'font') {
-        const color = element.getAttribute('color');
-        if (color) style.color = color;
+        const color = element.getAttribute('color')
+        if (color) style.color = color
       }
-      
+
       // Traverse children with inherited style
-      element.childNodes.forEach(child => traverse(child, style));
+      element.childNodes.forEach(child => traverse(child, style))
 
       // After a block element, if there's more content, add a newline
       if (isBlock) {
-        segments.push({ text: '\n', ...inheritedStyle });
+        segments.push({ text: '\n', ...inheritedStyle })
       }
     }
-  };
-  
-  div.childNodes.forEach(node => traverse(node));
-  
+  }
+
+  div.childNodes.forEach(node => traverse(node))
+
   // Clean up trailing newlines
   while (segments.length > 0 && segments[segments.length - 1].text === '\n') {
-    segments.pop();
+    segments.pop()
   }
-  
-  return segments;
-};
+
+  return segments
+}
 
 // Rich Text Component for Konva
 const RichText: React.FC<{
-  id: string;
-  x: number;
-  y: number;
-  text: string;
-  fontSize: number;
-  fontFamily: string;
-  fill: string;
-  width?: number;
-  draggable?: boolean;
-  onClick?: (e?: any) => void;
-  onTap?: () => void;
-  onDblClick?: () => void;
-  onDblTap?: () => void;
-  onTransformEnd?: (e: any) => void;
-  onDragStart?: (e: any) => void;
-  onDragMove?: (e: any) => void;
-  onDragEnd?: (e: any) => void;
-}> = (props) => {
+  id: string
+  x: number
+  y: number
+  text: string
+  fontSize: number
+  fontFamily: string
+  fill: string
+  width?: number
+  draggable?: boolean
+  onClick?: (e?: any) => void
+  onTap?: () => void
+  onDblClick?: () => void
+  onDblTap?: () => void
+  onTransformEnd?: (e: any) => void
+  onDragStart?: (e: any) => void
+  onDragMove?: (e: any) => void
+  onDragEnd?: (e: any) => void
+}> = props => {
   // Parse HTML and render multiple text elements for different formatting
-  const segments = parseHtmlToSegments(props.text);
-  
+  const segments = parseHtmlToSegments(props.text)
+
   if (segments.length === 0) {
     // Fallback to plain text
     return (
@@ -202,50 +246,54 @@ const RichText: React.FC<{
         onDragMove={props.onDragMove}
         onDragEnd={props.onDragEnd}
       />
-    );
+    )
   }
-  
+
   // Calculate word count and optimal dimensions
-  const totalText = segments.map(s => s.text).join('');
-  const wordCount = totalText.trim().split(/\s+/).length;
-  const baseWidth = Math.max(200, Math.min(600, wordCount * 8)); // 8px per word as base
-  const maxWidth = props.width || baseWidth;
-  
-  let currentX = 0;
-  let currentY = 0;
-  const lineHeight = props.fontSize * 1.2;
-  const renderedElements: React.ReactNode[] = [];
-  
-  const ctx = document.createElement('canvas').getContext('2d');
-  let totalWidth = 0;
-  let totalHeight = 0;
+  const totalText = segments.map(s => s.text).join('')
+  const wordCount = totalText.trim().split(/\s+/).length
+  const baseWidth = Math.max(200, Math.min(600, wordCount * 8)) // 8px per word as base
+  const maxWidth = props.width || baseWidth
+
+  let currentX = 0
+  let currentY = 0
+  const lineHeight = props.fontSize * 1.2
+  const renderedElements: React.ReactNode[] = []
+
+  const ctx = document.createElement('canvas').getContext('2d')
+  let totalWidth = 0
+  let totalHeight = 0
 
   segments.forEach((segment, segmentIndex) => {
-    const fontStyle = `${segment.bold ? 'bold ' : ''}${segment.italic ? 'italic' : ''}`.trim();
-    const textDecoration = segment.underline ? 'underline' : '';
-    const fill = segment.color || props.fill;
-    
+    const fontStyle = `${segment.bold ? 'bold ' : ''}${
+      segment.italic ? 'italic' : ''
+    }`.trim()
+    const textDecoration = segment.underline ? 'underline' : ''
+    const fill = segment.color || props.fill
+
     if (ctx) {
-      ctx.font = `${fontStyle} ${props.fontSize}px ${props.fontFamily}`;
+      ctx.font = `${fontStyle} ${props.fontSize}px ${props.fontFamily}`
     }
 
     // Split text into words while preserving spaces/newlines
-    const words = segment.text.split(/(\s+)/);
-    
+    const words = segment.text.split(/(\s+)/)
+
     words.forEach((word, wordIndex) => {
       if (word === '\n') {
-        currentX = 0;
-        currentY += lineHeight;
-        totalHeight = Math.max(totalHeight, currentY + lineHeight);
-        return;
+        currentX = 0
+        currentY += lineHeight
+        totalHeight = Math.max(totalHeight, currentY + lineHeight)
+        return
       }
 
-      const wordWidth = ctx ? ctx.measureText(word).width : word.length * props.fontSize * 0.6;
+      const wordWidth = ctx
+        ? ctx.measureText(word).width
+        : word.length * props.fontSize * 0.6
 
       // Wrap to next line if word exceeds maxWidth (and it's not the start of a line)
       if (currentX > 0 && currentX + wordWidth > maxWidth) {
-        currentX = 0;
-        currentY += lineHeight;
+        currentX = 0
+        currentY += lineHeight
       }
 
       // Skip rendering empty words but update position if they are spaces
@@ -263,14 +311,14 @@ const RichText: React.FC<{
             fill={fill}
             listening={false}
           />
-        );
-        currentX += wordWidth;
-        totalWidth = Math.max(totalWidth, currentX);
-        totalHeight = Math.max(totalHeight, currentY + lineHeight);
+        )
+        currentX += wordWidth
+        totalWidth = Math.max(totalWidth, currentX)
+        totalHeight = Math.max(totalHeight, currentY + lineHeight)
       }
-    });
-  });
-  
+    })
+  })
+
   return (
     <Group
       id={props.id}
@@ -286,19 +334,27 @@ const RichText: React.FC<{
       onDragMove={props.onDragMove}
       onDragEnd={props.onDragEnd}
     >
-      <Rect
-        width={totalWidth}
-        height={totalHeight}
-        fill="rgba(0,0,0,0)"
-      />
+      <Rect width={totalWidth} height={totalHeight} fill='rgba(0,0,0,0)' />
       {renderedElements}
     </Group>
-  );
-};
+  )
+}
 
 // URLImage component for loading images
-const URLImage = ({ image, onClick, onTap, draggable, onTransformEnd }: { image: any, onClick?: () => void, onTap?: () => void, draggable?: boolean, onTransformEnd?: (e: any) => void }) => {
-  const [img] = useImage(image.src);
+const URLImage = ({
+  image,
+  onClick,
+  onTap,
+  draggable,
+  onTransformEnd
+}: {
+  image: any
+  onClick?: () => void
+  onTap?: () => void
+  draggable?: boolean
+  onTransformEnd?: (e: any) => void
+}) => {
+  const [img] = useImage(image.src)
   return (
     <KonvaImage
       id={image.id}
@@ -312,8 +368,8 @@ const URLImage = ({ image, onClick, onTap, draggable, onTransformEnd }: { image:
       draggable={draggable}
       onTransformEnd={onTransformEnd}
     />
-  );
-};
+  )
+}
 
 export const Whiteboard: React.FC = () => {
   const {
@@ -335,248 +391,291 @@ export const Whiteboard: React.FC = () => {
     backgroundImage,
     groupItems,
     ungroupItems,
-    showRuler,
-  } = useWhiteboardStore();
+    showRuler
+  } = useWhiteboardStore()
 
-  const stageRef = useRef<Konva.Stage>(null);
-  const transformerRef = useRef<Konva.Transformer>(null);
-  const [editingTextId, setEditingTextId] = useState<string | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const stageRef = useRef<Konva.Stage>(null)
+  const transformerRef = useRef<Konva.Transformer>(null)
+  const [editingTextId, setEditingTextId] = useState<string | null>(null)
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null)
 
-  const prevItemsLength = useRef(items.length);
+  const prevItemsLength = useRef(items.length)
 
   useEffect(() => {
     if (items.length > prevItemsLength.current) {
-      const lastItem = items[items.length - 1];
-      if (lastItem.type === 'text' && tool === 'text' && lastItem.text === 'Type here...') {
-        startTextEditing(lastItem.id);
+      const lastItem = items[items.length - 1]
+      if (
+        lastItem.type === 'text' &&
+        tool === 'text' &&
+        lastItem.text === 'Type here...'
+      ) {
+        startTextEditing(lastItem.id)
       }
     }
-    prevItemsLength.current = items.length;
-  }, [items, tool]);
+    prevItemsLength.current = items.length
+  }, [items, tool])
 
   // Drawing state refs
-  const isDrawing = useRef(false);
-  const currentStrokeId = useRef<string | null>(null);
-  const currentPointsRef = useRef<number[]>([]); 
-  const previewLineRef = useRef<Konva.Line>(null); 
-  const cursorRef = useRef<Konva.Circle>(null);
-  const lastEraserPosRef = useRef<{ x: number; y: number } | null>(null);
-  const lastRightClickTime = useRef<number>(0);
-  const [selectionBox, setSelectionBox] = useState<{ x: number, y: number, width: number, height: number } | null>(null);
-  const [chromeWidgets, setChromeWidgets] = useState<Array<{ id: string; x: number; y: number }>>([]);
+  const isDrawing = useRef(false)
+  const currentStrokeId = useRef<string | null>(null)
+  const currentPointsRef = useRef<number[]>([])
+  const previewLineRef = useRef<Konva.Line>(null)
+  const cursorRef = useRef<Konva.Circle>(null)
+  const lastEraserPosRef = useRef<{ x: number; y: number } | null>(null)
+  const lastRightClickTime = useRef<number>(0)
+  const [selectionBox, setSelectionBox] = useState<{
+    x: number
+    y: number
+    width: number
+    height: number
+  } | null>(null)
+  const [chromeWidgets, setChromeWidgets] = useState<
+    Array<{ id: string; x: number; y: number }>
+  >([])
 
   // Handwriting-specific state
-  const handwritingStrokesRef = useRef<string[]>([]);
-  const handwritingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isHandwritingActive = useRef(false);
+  const handwritingStrokesRef = useRef<string[]>([])
+  const handwritingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isHandwritingActive = useRef(false)
 
   // Cleanup effect for tool switching
   useEffect(() => {
     // Reset drawing state when tool changes
-    isDrawing.current = false;
-    currentStrokeId.current = null;
-    currentPointsRef.current = [];
-    lastEraserPosRef.current = null;
-    
+    isDrawing.current = false
+    currentStrokeId.current = null
+    currentPointsRef.current = []
+    lastEraserPosRef.current = null
+
     // Clean up any existing text editors when switching tools
-    const existingContainer = document.querySelector('[data-text-editor]');
+    const existingContainer = document.querySelector('[data-text-editor]')
     if (existingContainer && tool !== 'text') {
-      document.body.removeChild(existingContainer);
-      setEditingTextId(null);
+      document.body.removeChild(existingContainer)
+      setEditingTextId(null)
     }
-    
+
     // Clean up handwriting-specific state
     if (tool !== 'handwriting') {
-      isHandwritingActive.current = false;
+      isHandwritingActive.current = false
       if (handwritingTimerRef.current) {
-        clearTimeout(handwritingTimerRef.current);
-        handwritingTimerRef.current = null;
+        clearTimeout(handwritingTimerRef.current)
+        handwritingTimerRef.current = null
       }
     }
-    
+
     // Hide preview line when switching tools
     if (previewLineRef.current) {
-      previewLineRef.current.visible(false);
-      previewLineRef.current.getLayer()?.batchDraw();
+      previewLineRef.current.visible(false)
+      previewLineRef.current.getLayer()?.batchDraw()
     }
-  }, [tool]);
+  }, [tool])
 
   useEffect(() => {
-    if (!transformerRef.current) return;
+    if (!transformerRef.current) return
 
     // Don't show transformer when editing text
     if (editingTextId) {
-      transformerRef.current.nodes([]);
-      transformerRef.current.getLayer()?.batchDraw();
-      return;
+      transformerRef.current.nodes([])
+      transformerRef.current.getLayer()?.batchDraw()
+      return
     }
 
     if (selectedId) {
-      const stage = stageRef.current;
-      if (!stage) return;
-      
+      const stage = stageRef.current
+      if (!stage) return
+
       // Handle multiple selected items
-      const selectedIds = selectedId.split(',');
-      const nodes: Konva.Node[] = [];
-      
+      const selectedIds = selectedId.split(',')
+      const nodes: Konva.Node[] = []
+
       selectedIds.forEach(id => {
-        const node = stage.findOne('#' + id);
+        const node = stage.findOne('#' + id)
         if (node) {
-          nodes.push(node);
-          
+          nodes.push(node)
+
           // Find overlapping erasers for each selected item
-          const selectedRect = node.getClientRect();
+          const selectedRect = node.getClientRect()
           items.forEach(item => {
-            if (item.type === 'stroke' && (item.tool === 'eraser' || item.tool === 'highlighter-eraser')) {
-              const eraserNode = stage.findOne('#' + item.id);
+            if (
+              item.type === 'stroke' &&
+              (item.tool === 'eraser' || item.tool === 'highlighter-eraser')
+            ) {
+              const eraserNode = stage.findOne('#' + item.id)
               if (eraserNode) {
-                const eraserRect = eraserNode.getClientRect();
+                const eraserRect = eraserNode.getClientRect()
                 if (
                   selectedRect.x < eraserRect.x + eraserRect.width &&
                   selectedRect.x + selectedRect.width > eraserRect.x &&
                   selectedRect.y < eraserRect.y + eraserRect.height &&
                   selectedRect.y + selectedRect.height > eraserRect.y
                 ) {
-                  nodes.push(eraserNode);
+                  nodes.push(eraserNode)
                 }
               }
             }
-          });
+          })
         }
-      });
+      })
 
       if (nodes.length > 0) {
-        transformerRef.current.nodes(nodes);
-        
+        transformerRef.current.nodes(nodes)
+
         // Configure transformer based on selection
         const hasText = selectedIds.some(id => {
-          const item = items.find(i => i.id === id);
-          return item?.type === 'text';
-        });
-        
+          const item = items.find(i => i.id === id)
+          return item?.type === 'text'
+        })
+
         if (hasText && selectedIds.length === 1) {
-          transformerRef.current.enabledAnchors(['top-left', 'top-right', 'bottom-left', 'bottom-right', 'middle-left', 'middle-right']);
-          transformerRef.current.rotateEnabled(false);
+          transformerRef.current.enabledAnchors([
+            'top-left',
+            'top-right',
+            'bottom-left',
+            'bottom-right',
+            'middle-left',
+            'middle-right'
+          ])
+          transformerRef.current.rotateEnabled(false)
         } else {
-          transformerRef.current.enabledAnchors(['top-left', 'top-right', 'bottom-left', 'bottom-right', 'middle-left', 'middle-right', 'top-center', 'bottom-center']);
-          transformerRef.current.rotateEnabled(true);
+          transformerRef.current.enabledAnchors([
+            'top-left',
+            'top-right',
+            'bottom-left',
+            'bottom-right',
+            'middle-left',
+            'middle-right',
+            'top-center',
+            'bottom-center'
+          ])
+          transformerRef.current.rotateEnabled(true)
         }
-        
-        transformerRef.current.getLayer()?.batchDraw();
+
+        transformerRef.current.getLayer()?.batchDraw()
       } else {
-        transformerRef.current.nodes([]);
+        transformerRef.current.nodes([])
       }
     } else {
-      transformerRef.current.nodes([]);
-      transformerRef.current.getLayer()?.batchDraw();
+      transformerRef.current.nodes([])
+      transformerRef.current.getLayer()?.batchDraw()
     }
-  }, [selectedId, items, editingTextId]);
+  }, [selectedId, items, editingTextId])
 
   useEffect(() => {
     const handleContextMenu = (e: MouseEvent) => {
-      e.preventDefault();
-    };
+      e.preventDefault()
+    }
 
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't trigger if user is typing in an input or contenteditable
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || (e.target as HTMLElement).isContentEditable) {
-        return;
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement ||
+        (e.target as HTMLElement).isContentEditable
+      ) {
+        return
       }
 
       // Copy selected items with Ctrl+C
       if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
-        e.preventDefault();
+        e.preventDefault()
         if (selectedId) {
-          const selectedIds = selectedId.split(',').filter(id => id);
-          const selectedItems = selectedIds.map(id => items.find(item => item.id === id)).filter(Boolean);
+          const selectedIds = selectedId.split(',').filter(id => id)
+          const selectedItems = selectedIds
+            .map(id => items.find(item => item.id === id))
+            .filter(Boolean)
           if (selectedItems.length > 0) {
-            localStorage.setItem('whiteboard-clipboard', JSON.stringify(selectedItems));
+            localStorage.setItem(
+              'whiteboard-clipboard',
+              JSON.stringify(selectedItems)
+            )
           }
         }
-        return;
+        return
       }
-      
+
       // Paste items with Ctrl+V
       if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
-        e.preventDefault();
-        const clipboardData = localStorage.getItem('whiteboard-clipboard');
+        e.preventDefault()
+        const clipboardData = localStorage.getItem('whiteboard-clipboard')
         if (clipboardData) {
           try {
-            const clipboardItems = JSON.parse(clipboardData);
+            const clipboardItems = JSON.parse(clipboardData)
             const newItems = clipboardItems.map((item: any) => ({
               ...item,
               id: uuidv4(),
               x: (item.x || 0) + 20,
               y: (item.y || 0) + 20
-            }));
-            newItems.forEach((item: any) => addItem(item));
-            setSelectedId(newItems.map((item: any) => item.id).join(','));
-            saveHistory();
+            }))
+            newItems.forEach((item: any) => addItem(item))
+            setSelectedId(newItems.map((item: any) => item.id).join(','))
+            saveHistory()
           } catch (error) {
-            console.error('Failed to paste items:', error);
+            console.error('Failed to paste items:', error)
           }
         }
-        return;
+        return
       }
 
       // Group items with Ctrl+G
       if ((e.ctrlKey || e.metaKey) && e.key === 'g') {
-        e.preventDefault();
+        e.preventDefault()
         if (selectedId) {
-          const selectedIds = selectedId.split(',').filter(id => id);
+          const selectedIds = selectedId.split(',').filter(id => id)
           if (selectedIds.length > 1) {
-            groupItems(selectedIds);
-            saveHistory();
+            groupItems(selectedIds)
+            saveHistory()
           }
         }
-        return;
+        return
       }
-      
+
       // Ungroup items with Ctrl+Shift+G
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'G') {
-        e.preventDefault();
+        e.preventDefault()
         if (selectedId) {
-          const item = items.find(i => i.id === selectedId);
+          const item = items.find(i => i.id === selectedId)
           if (item && item.type === 'group') {
-            ungroupItems(selectedId);
-            saveHistory();
+            ungroupItems(selectedId)
+            saveHistory()
           }
         }
-        return;
+        return
       }
-      
+
       if (e.key === 'Delete' && selectedId) {
-        const selectedIds = selectedId.split(',');
-        selectedIds.forEach(id => removeItem(id));
-        setSelectedId(null);
-        saveHistory();
-        return;
+        const selectedIds = selectedId.split(',')
+        selectedIds.forEach(id => removeItem(id))
+        setSelectedId(null)
+        saveHistory()
+        return
       }
       if (e.key === 'F12' || e.key === 'F5') {
-        e.preventDefault();
-        return;
+        e.preventDefault()
+        return
       }
-      if (e.ctrlKey && e.shiftKey && ( e.key === 'J' || e.key === 'C')) {
-        e.preventDefault();
-        return;
+      if (e.ctrlKey && e.shiftKey && (e.key === 'J' || e.key === 'C')) {
+        e.preventDefault()
+        return
       }
       if (e.ctrlKey && e.key === 'u') {
-        e.preventDefault();
-        return;
+        e.preventDefault()
+        return
       }
-    };
+    }
 
     const handlePaste = (e: ClipboardEvent) => {
       // Don't trigger if user is typing in an input or contenteditable
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || (e.target as HTMLElement).isContentEditable) {
-        return;
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement ||
+        (e.target as HTMLElement).isContentEditable
+      ) {
+        return
       }
 
-      const text = e.clipboardData?.getData('text');
+      const text = e.clipboardData?.getData('text')
       if (text) {
-        e.preventDefault();
-        
+        e.preventDefault()
+
         // Add new text item from clipboard
         addItem({
           type: 'text',
@@ -587,100 +686,110 @@ export const Whiteboard: React.FC = () => {
           fontSize: size,
           fontFamily: textOptions.fontFamily,
           fill: color,
-          width: 400, // Explicit width for wrapping
-        });
-        saveHistory();
+          width: 400 // Explicit width for wrapping
+        })
+        saveHistory()
       }
-    };
+    }
 
-    window.addEventListener('keydown', handleKeyDown);
-    document.addEventListener('contextmenu', handleContextMenu);
-    window.addEventListener('paste', handlePaste);
+    window.addEventListener('keydown', handleKeyDown)
+    document.addEventListener('contextmenu', handleContextMenu)
+    window.addEventListener('paste', handlePaste)
 
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      document.removeEventListener('contextmenu', handleContextMenu);
-      window.removeEventListener('paste', handlePaste);
-    };
-  }, [selectedId, removeItem, setSelectedId, saveHistory, groupItems, ungroupItems, items, addItem]);
+      window.removeEventListener('keydown', handleKeyDown)
+      document.removeEventListener('contextmenu', handleContextMenu)
+      window.removeEventListener('paste', handlePaste)
+    }
+  }, [
+    selectedId,
+    removeItem,
+    setSelectedId,
+    saveHistory,
+    groupItems,
+    ungroupItems,
+    items,
+    addItem
+  ])
 
   // Cleanup handwriting timers on unmount
   useEffect(() => {
     return () => {
       if (handwritingTimerRef.current) {
-        clearTimeout(handwritingTimerRef.current);
+        clearTimeout(handwritingTimerRef.current)
       }
       // Clean up any text editors on unmount
-      const existingContainer = document.querySelector('[data-text-editor]');
+      const existingContainer = document.querySelector('[data-text-editor]')
       if (existingContainer) {
-        document.body.removeChild(existingContainer);
+        document.body.removeChild(existingContainer)
       }
-    };
-  }, []);
-
-
+    }
+  }, [])
 
   // Handwriting recognition processing
   const processHandwritingStrokes = useCallback(async () => {
-    if (handwritingStrokesRef.current.length === 0) return;
-    
+    if (handwritingStrokesRef.current.length === 0) return
+
     try {
       // Create a temporary canvas to render handwriting strokes
-      const canvas = document.createElement('canvas');
-      canvas.width = 800;
-      canvas.height = 600;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-      
-      ctx.fillStyle = 'white';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.strokeStyle = '#000000';
-      ctx.lineWidth = 3;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      
+      const canvas = document.createElement('canvas')
+      canvas.width = 800
+      canvas.height = 600
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return
+
+      ctx.fillStyle = 'white'
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+      ctx.strokeStyle = '#000000'
+      ctx.lineWidth = 3
+      ctx.lineCap = 'round'
+      ctx.lineJoin = 'round'
+
       // Find bounding box of all handwriting strokes
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-      const strokeItems = handwritingStrokesRef.current.map(id => 
-        items.find(item => item.id === id && item.type === 'stroke')
-      ).filter(Boolean) as Stroke[];
-      
+      let minX = Infinity,
+        minY = Infinity,
+        maxX = -Infinity,
+        maxY = -Infinity
+      const strokeItems = handwritingStrokesRef.current
+        .map(id => items.find(item => item.id === id && item.type === 'stroke'))
+        .filter(Boolean) as Stroke[]
+
       strokeItems.forEach(stroke => {
         for (let i = 0; i < stroke.points.length; i += 2) {
-          minX = Math.min(minX, stroke.points[i]);
-          maxX = Math.max(maxX, stroke.points[i]);
-          minY = Math.min(minY, stroke.points[i + 1]);
-          maxY = Math.max(maxY, stroke.points[i + 1]);
+          minX = Math.min(minX, stroke.points[i])
+          maxX = Math.max(maxX, stroke.points[i])
+          minY = Math.min(minY, stroke.points[i + 1])
+          maxY = Math.max(maxY, stroke.points[i + 1])
         }
-      });
-      
-      const offsetX = -minX + 50;
-      const offsetY = -minY + 50;
-      
+      })
+
+      const offsetX = -minX + 50
+      const offsetY = -minY + 50
+
       // Draw strokes on canvas
       strokeItems.forEach(stroke => {
-        if (stroke.points.length < 4) return;
-        ctx.beginPath();
-        ctx.moveTo(stroke.points[0] + offsetX, stroke.points[1] + offsetY);
+        if (stroke.points.length < 4) return
+        ctx.beginPath()
+        ctx.moveTo(stroke.points[0] + offsetX, stroke.points[1] + offsetY)
         for (let i = 2; i < stroke.points.length; i += 2) {
-          ctx.lineTo(stroke.points[i] + offsetX, stroke.points[i + 1] + offsetY);
+          ctx.lineTo(stroke.points[i] + offsetX, stroke.points[i + 1] + offsetY)
         }
-        ctx.stroke();
-      });
-      
+        ctx.stroke()
+      })
+
       // Convert canvas to base64 properly
-      const dataUrl = canvas.toDataURL('image/png');
-      const base64Data = dataUrl.split(',')[1]; // Extract base64 part only
-      const text = await transcribeHandwriting(base64Data);
-      
-      if (text && text !== "No handwriting detected") {
+      const dataUrl = canvas.toDataURL('image/png')
+      const base64Data = dataUrl.split(',')[1] // Extract base64 part only
+      const text = await transcribeHandwriting(base64Data)
+
+      if (text && text !== 'No handwriting detected') {
         // Remove original handwriting strokes
-        handwritingStrokesRef.current.forEach(id => removeItem(id));
-        
+        handwritingStrokesRef.current.forEach(id => removeItem(id))
+
         // Add recognized text
-        const centerX = (minX + maxX) / 2;
-        const centerY = (minY + maxY) / 2;
-        
+        const centerX = (minX + maxX) / 2
+        const centerY = (minY + maxY) / 2
+
         addItem({
           type: 'text',
           id: uuidv4(),
@@ -690,65 +799,65 @@ export const Whiteboard: React.FC = () => {
           fontSize: 32,
           fontFamily: 'Monotype Corsiva, "Brush Script MT", cursive',
           fill: color, // Store the color that was active when handwriting was created
-          width: 400,
-        });
-        saveHistory();
+          width: 400
+        })
+        saveHistory()
       }
     } catch (error) {
-      console.error("Handwriting recognition error:", error);
+      console.error('Handwriting recognition error:', error)
     } finally {
-      handwritingStrokesRef.current = [];
+      handwritingStrokesRef.current = []
     }
-  }, [items, removeItem, addItem, color, saveHistory]);
-
-
+  }, [items, removeItem, addItem, color, saveHistory])
 
   // --- MATH HELPERS for Circle Detection ---
-  const getPathLength = (pts: {x:number, y:number}[]) => {
-    let len = 0;
-    for(let i=1; i<pts.length; i++) {
-      len += Math.sqrt(getSqDist(pts[i-1], pts[i]));
+  const getPathLength = (pts: { x: number; y: number }[]) => {
+    let len = 0
+    for (let i = 1; i < pts.length; i++) {
+      len += Math.sqrt(getSqDist(pts[i - 1], pts[i]))
     }
-    return len;
-  };
+    return len
+  }
 
-  const getPolygonArea = (pts: {x:number, y:number}[]) => {
-    let area = 0;
+  const getPolygonArea = (pts: { x: number; y: number }[]) => {
+    let area = 0
     for (let i = 0; i < pts.length; i++) {
-      const j = (i + 1) % pts.length;
-      area += pts[i].x * pts[j].y;
-      area -= pts[j].x * pts[i].y;
+      const j = (i + 1) % pts.length
+      area += pts[i].x * pts[j].y
+      area -= pts[j].x * pts[i].y
     }
-    return Math.abs(area / 2);
-  };
+    return Math.abs(area / 2)
+  }
 
   const isCircle = (pts: { x: number; y: number }[]) => {
-    if (pts.length < 10) return false;
-    const perimeter = getPathLength(pts);
-    const area = getPolygonArea(pts);
-    if (area === 0) return false;
-    const circularity = (4 * Math.PI * area) / (perimeter * perimeter);
-    return circularity > 0.82; 
-  };
+    if (pts.length < 10) return false
+    const perimeter = getPathLength(pts)
+    const area = getPolygonArea(pts)
+    if (area === 0) return false
+    const circularity = (4 * Math.PI * area) / (perimeter * perimeter)
+    return circularity > 0.82
+  }
 
   const processShape = (strokeId: string) => {
-    const stroke = items.find(i => i.id === strokeId && i.type === 'stroke') as Stroke;
-    if (!stroke || stroke.points.length < 5) return;
+    const stroke = items.find(
+      i => i.id === strokeId && i.type === 'stroke'
+    ) as Stroke
+    if (!stroke || stroke.points.length < 5) return
 
-    const rawPoints = stroke.points;
-    const pts = [];
+    const rawPoints = stroke.points
+    const pts = []
     for (let i = 0; i < rawPoints.length; i += 2) {
-      pts.push({ x: rawPoints[i], y: rawPoints[i + 1] });
+      pts.push({ x: rawPoints[i], y: rawPoints[i + 1] })
     }
 
-    let shapeItem: WhiteboardItem;
+    let shapeItem: WhiteboardItem
 
     if (isCircle(pts)) {
-       const box = getBoundingBox(stroke.points);
-       const center = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
-       const radius = (box.width + box.height) / 4;
+      const box = getBoundingBox(stroke.points)
+      const center = { x: box.x + box.width / 2, y: box.y + box.height / 2 }
+      const radius = (box.width + box.height) / 4
 
-       shapeItem = {
+      shapeItem = {
         type: 'shape',
         id: uuidv4(),
         shapeType: 'circle',
@@ -758,186 +867,194 @@ export const Whiteboard: React.FC = () => {
         stroke: stroke.color,
         strokeWidth: stroke.size,
         fill: 'transparent',
-        opacity: 1,
-      } as any;
+        opacity: 1
+      } as any
     } else {
-        const simplified = simplifyDP(pts, 200);
-        const start = pts[0];
-        const end = pts[pts.length - 1];
-        const dist = Math.sqrt(getSqDist(start, end));
-        const box = getBoundingBox(stroke.points);
-        const maxDim = Math.max(box.width, box.height);
-        const closed = dist < Math.max(50, maxDim * 0.2);
+      const simplified = simplifyDP(pts, 200)
+      const start = pts[0]
+      const end = pts[pts.length - 1]
+      const dist = Math.sqrt(getSqDist(start, end))
+      const box = getBoundingBox(stroke.points)
+      const maxDim = Math.max(box.width, box.height)
+      const closed = dist < Math.max(50, maxDim * 0.2)
 
-        if (simplified.length < 2) return;
+      if (simplified.length < 2) return
 
-        const flatPoints: number[] = [];
-        simplified.forEach(p => flatPoints.push(p.x, p.y));
+      const flatPoints: number[] = []
+      simplified.forEach(p => flatPoints.push(p.x, p.y))
 
-        if (closed) {
-            shapeItem = {
-                type: 'shape',
-                id: uuidv4(),
-                shapeType: 'polygon',
-                points: flatPoints,
-                stroke: stroke.color,
-                strokeWidth: stroke.size,
-                opacity: 1,
-                closed: true
-            } as any;
-        } else {
-            shapeItem = {
-                type: 'shape',
-                id: uuidv4(),
-                shapeType: 'line',
-                points: flatPoints,
-                stroke: stroke.color,
-                strokeWidth: stroke.size,
-                opacity: 1,
-                closed: false
-            } as any;
-        }
+      if (closed) {
+        shapeItem = {
+          type: 'shape',
+          id: uuidv4(),
+          shapeType: 'polygon',
+          points: flatPoints,
+          stroke: stroke.color,
+          strokeWidth: stroke.size,
+          opacity: 1,
+          closed: true
+        } as any
+      } else {
+        shapeItem = {
+          type: 'shape',
+          id: uuidv4(),
+          shapeType: 'line',
+          points: flatPoints,
+          stroke: stroke.color,
+          strokeWidth: stroke.size,
+          opacity: 1,
+          closed: false
+        } as any
+      }
     }
 
     if (shapeItem) {
-      removeItem(strokeId);
-      addItem(shapeItem);
-      saveHistory();
+      removeItem(strokeId)
+      addItem(shapeItem)
+      saveHistory()
     }
-  };
+  }
 
   const hexToRgba = (hex: string, alpha: number) => {
-    hex = hex.replace('#', '');
-    const r = parseInt(hex.substring(0, 2), 16);
-    const g = parseInt(hex.substring(2, 4), 16);
-    const b = parseInt(hex.substring(4, 6), 16);
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-  };
+    hex = hex.replace('#', '')
+    const r = parseInt(hex.substring(0, 2), 16)
+    const g = parseInt(hex.substring(2, 4), 16)
+    const b = parseInt(hex.substring(4, 6), 16)
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`
+  }
 
-  const handleMouseDown = (e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
-    e.evt.preventDefault();
-    if ((e.evt as TouchEvent).touches && (e.evt as TouchEvent).touches.length > 1) return;
+  const handleMouseDown = (
+    e: Konva.KonvaEventObject<MouseEvent | TouchEvent>
+  ) => {
+    e.evt.preventDefault()
+    if (
+      (e.evt as TouchEvent).touches &&
+      (e.evt as TouchEvent).touches.length > 1
+    )
+      return
 
-    const stage = e.target.getStage();
-    const clickedOnEmpty = e.target === stage;
-    const isTouch = e.evt.type === 'touchstart';
-    const isRightClick = !isTouch && (e.evt as MouseEvent).button === 2;
-    const pos = stage?.getRelativePointerPosition();
-    if (!pos) return;
+    const stage = e.target.getStage()
+    const clickedOnEmpty = e.target === stage
+    const isTouch = e.evt.type === 'touchstart'
+    const isRightClick = !isTouch && (e.evt as MouseEvent).button === 2
+    const pos = stage?.getRelativePointerPosition()
+    if (!pos) return
 
     if (clickedOnEmpty && tool === 'select') {
-        const isMultiSelect = (e.evt as MouseEvent).ctrlKey || (e.evt as MouseEvent).metaKey;
-        if (!isMultiSelect) {
-          setSelectedId(null);
-        }
-        // Start selection box
-        setSelectionBox({ x: pos.x, y: pos.y, width: 0, height: 0 });
+      const isMultiSelect =
+        (e.evt as MouseEvent).ctrlKey || (e.evt as MouseEvent).metaKey
+      if (!isMultiSelect) {
+        setSelectedId(null)
+      }
+      // Start selection box
+      setSelectionBox({ x: pos.x, y: pos.y, width: 0, height: 0 })
     }
-    
+
     // Early return for pan tool - let stage handle dragging
     if (tool === 'hand') {
-      return;
+      return
     }
 
     if (tool === 'text') {
-      const targetId = e.target.id() || e.target.getParent()?.id();
-      const clickedItem = items.find(i => i.id === targetId);
-      
+      const targetId = e.target.id() || e.target.getParent()?.id()
+      const clickedItem = items.find(i => i.id === targetId)
+
       if (clickedItem?.type === 'text') {
         // Select existing text
-        setSelectedId(targetId!);
+        setSelectedId(targetId!)
       } else {
         // Close any existing text editor
-        const existingContainer = document.querySelector('[data-text-editor]');
+        const existingContainer = document.querySelector('[data-text-editor]')
         if (existingContainer) {
-          document.body.removeChild(existingContainer);
-          setEditingTextId(null);
+          document.body.removeChild(existingContainer)
+          setEditingTextId(null)
         }
-        
+
         // Clear selection if clicking empty space
-        setSelectedId(null);
+        setSelectedId(null)
       }
-      return; 
+      return
     }
 
     if (tool === 'fill') {
-       const shape = e.target;
-       if (shape === stage) return;
-       
-       // Apply fill to selected items if any are selected
-       if (selectedId) {
-         const selectedIds = selectedId.split(',');
-         selectedIds.forEach(id => {
-           const item = items.find(i => i.id === id);
-           if (item) {
-             if (item.type === 'shape') {
-               const transparentFill = hexToRgba(color, 0.6);
-               updateItem(id, { fill: transparentFill, opacity: 1 });
-             } else if (item.type === 'text') {
-               updateItem(id, { fill: color });
-             }
-           }
-         });
-         saveHistory();
-         return;
-       }
-       
-       // Apply fill to clicked item if no selection
-       const id = shape.id() || shape.getParent()?.id();
-       const item = items.find(i => i && i.id === id);
-       if (item) {
-           if (item.type === 'shape') {
-               const transparentFill = hexToRgba(color, 0.6);
-               updateItem(id, { fill: transparentFill, opacity: 1 });
-               saveHistory();
-           } else if (item.type === 'text') {
-               updateItem(id, { fill: color }); 
-               saveHistory();
-           }
-       }
-       return;
+      const shape = e.target
+      if (shape === stage) return
+
+      // Apply fill to selected items if any are selected
+      if (selectedId) {
+        const selectedIds = selectedId.split(',')
+        selectedIds.forEach(id => {
+          const item = items.find(i => i.id === id)
+          if (item) {
+            if (item.type === 'shape') {
+              const transparentFill = hexToRgba(color, 0.6)
+              updateItem(id, { fill: transparentFill, opacity: 1 })
+            } else if (item.type === 'text') {
+              updateItem(id, { fill: color })
+            }
+          }
+        })
+        saveHistory()
+        return
+      }
+
+      // Apply fill to clicked item if no selection
+      const id = shape.id() || shape.getParent()?.id()
+      const item = items.find(i => i && i.id === id)
+      if (item) {
+        if (item.type === 'shape') {
+          const transparentFill = hexToRgba(color, 0.6)
+          updateItem(id, { fill: transparentFill, opacity: 1 })
+          saveHistory()
+        } else if (item.type === 'text') {
+          updateItem(id, { fill: color })
+          saveHistory()
+        }
+      }
+      return
     }
 
     // Handle selection for all tools
     if (!clickedOnEmpty) {
-      const targetId = e.target.id() || e.target.getParent()?.id();
+      const targetId = e.target.id() || e.target.getParent()?.id()
       if (targetId && tool === 'select') {
-        const isMultiSelect = (e.evt as MouseEvent).ctrlKey || (e.evt as MouseEvent).metaKey;
-        const currentSelected = selectedId ? selectedId.split(',') : [];
-        
+        const isMultiSelect =
+          (e.evt as MouseEvent).ctrlKey || (e.evt as MouseEvent).metaKey
+        const currentSelected = selectedId ? selectedId.split(',') : []
+
         if (isMultiSelect) {
           // Ctrl+click: toggle item
           if (currentSelected.includes(targetId)) {
-            const newSelected = currentSelected.filter(id => id !== targetId);
-            setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
+            const newSelected = currentSelected.filter(id => id !== targetId)
+            setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null)
           } else {
-            setSelectedId([...currentSelected, targetId].join(','));
+            setSelectedId([...currentSelected, targetId].join(','))
           }
         } else {
           // Normal click: replace selection
-          setSelectedId(targetId);
+          setSelectedId(targetId)
         }
-        return;
+        return
       }
     }
-    if (isRightClick) return;
+    if (isRightClick) return
 
-    isDrawing.current = true;
-    const id = uuidv4();
-    currentStrokeId.current = id;
-    currentPointsRef.current = [pos.x, pos.y];
+    isDrawing.current = true
+    const id = uuidv4()
+    currentStrokeId.current = id
+    currentPointsRef.current = [pos.x, pos.y]
 
     if (previewLineRef.current) {
-        previewLineRef.current.points([pos.x, pos.y]);
-        previewLineRef.current.stroke(color);
-        previewLineRef.current.strokeWidth(size);
-        previewLineRef.current.opacity(tool === 'highlighter' ? 0.4 : 1);
-        previewLineRef.current.visible(true);
-        previewLineRef.current.getLayer()?.batchDraw();
+      previewLineRef.current.points([pos.x, pos.y])
+      previewLineRef.current.stroke(color)
+      previewLineRef.current.strokeWidth(size)
+      previewLineRef.current.opacity(tool === 'highlighter' ? 0.4 : 1)
+      previewLineRef.current.visible(true)
+      previewLineRef.current.getLayer()?.batchDraw()
     }
 
     if (tool === 'eraser' || tool === 'highlighter-eraser') {
-       addItem({
+      addItem({
         type: 'stroke',
         id,
         tool,
@@ -946,825 +1063,991 @@ export const Whiteboard: React.FC = () => {
         size: size * 1.5,
         isEraser: true,
         isHighlighter: false
-      });
-       return;
+      })
+      return
     }
 
     // Handle handwriting as normal strokes with thinner width
     if (tool === 'handwriting') {
-      isHandwritingActive.current = true;
-      handwritingStrokesRef.current.push(id);
-      
+      isHandwritingActive.current = true
+      handwritingStrokesRef.current.push(id)
+
       // Clear any existing timer
       if (handwritingTimerRef.current) {
-        clearTimeout(handwritingTimerRef.current);
+        clearTimeout(handwritingTimerRef.current)
       }
-      
+
       // Use thinner stroke width for handwriting (3px default)
-      const handwritingWidth = Math.max(2, Math.min(size * 0.1, 4));
-      
+      const handwritingWidth = Math.max(2, Math.min(size * 0.1, 4))
+
       addItem({
-        type: 'stroke', 
-        id, 
-        tool, 
+        type: 'stroke',
+        id,
+        tool,
         points: [pos.x, pos.y],
         color: color, // Store color at creation time
         size: handwritingWidth, // Store width at creation time
-        isEraser: false, 
+        isEraser: false,
         isHighlighter: false
-      });
-      return;
+      })
+      return
     }
-    
+
     addItem({
-      type: 'stroke', 
-      id, 
-      tool, 
+      type: 'stroke',
+      id,
+      tool,
       points: [pos.x, pos.y],
       color: color, // Store color at creation time
       size: size, // Store width at creation time
-      isEraser: false, 
+      isEraser: false,
       isHighlighter: tool === 'highlighter'
-    });
-  };
+    })
+  }
 
- const handleMouseMove = (e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
-    e.evt.preventDefault();
-    
+  const handleMouseMove = (
+    e: Konva.KonvaEventObject<MouseEvent | TouchEvent>
+  ) => {
+    e.evt.preventDefault()
+
     // Guard: Never process canvas events if target is text
-    if ((e.evt.target as HTMLElement)?.dataset?.type === 'text') return;
-    
-    const stage = e.target.getStage();
-    const point = stage?.getRelativePointerPosition();
-    if (!point) return;
+    if ((e.evt.target as HTMLElement)?.dataset?.type === 'text') return
+
+    const stage = e.target.getStage()
+    const point = stage?.getRelativePointerPosition()
+    if (!point) return
 
     // Handle selection box dragging
     if (selectionBox && tool === 'select') {
-      const newWidth = point.x - selectionBox.x;
-      const newHeight = point.y - selectionBox.y;
+      const newWidth = point.x - selectionBox.x
+      const newHeight = point.y - selectionBox.y
       setSelectionBox({
         x: selectionBox.x,
         y: selectionBox.y,
         width: newWidth,
         height: newHeight
-      });
-      return;
+      })
+      return
     }
 
     // Update cursor for eraser tools
     if (cursorRef.current) {
-        const isEraser = tool === 'eraser' || tool === 'highlighter-eraser';
-        cursorRef.current.visible(isEraser);
-        if (isEraser) {
-            cursorRef.current.x(point.x);
-            cursorRef.current.y(point.y);
-            cursorRef.current.radius((size * 2.5) / 2);
-            cursorRef.current.getLayer()?.batchDraw();
-        }
+      const isEraser = tool === 'eraser' || tool === 'highlighter-eraser'
+      cursorRef.current.visible(isEraser)
+      if (isEraser) {
+        cursorRef.current.x(point.x)
+        cursorRef.current.y(point.y)
+        cursorRef.current.radius((size * 2.5) / 2)
+        cursorRef.current.getLayer()?.batchDraw()
+      }
     }
 
     // Only handle drawing if we're actually drawing and not using pan/select tools
-    if (!isDrawing.current || tool === 'hand' || tool === 'select' || tool === 'text' || tool === 'fill') {
-      return;
+    if (
+      !isDrawing.current ||
+      tool === 'hand' ||
+      tool === 'select' ||
+      tool === 'text' ||
+      tool === 'fill'
+    ) {
+      return
     }
 
     if (currentStrokeId.current) {
-        const stroke = items.find(i => i.id === currentStrokeId.current) as Stroke;
-        if (stroke) {
-            updateItem(currentStrokeId.current, {
-                points: [...stroke.points, point.x, point.y]
-            });
-        }
+      const stroke = items.find(i => i.id === currentStrokeId.current) as Stroke
+      if (stroke) {
+        updateItem(currentStrokeId.current, {
+          points: [...stroke.points, point.x, point.y]
+        })
+      }
     }
-  };
+  }
 
- const handleMouseUp = () => {
+  const handleMouseUp = () => {
     // Handle selection box completion
     if (selectionBox && tool === 'select') {
-      const stage = stageRef.current;
+      const stage = stageRef.current
       if (stage) {
-        const selectedItems: string[] = [];
+        const selectedItems: string[] = []
         const box = {
           x: Math.min(selectionBox.x, selectionBox.x + selectionBox.width),
           y: Math.min(selectionBox.y, selectionBox.y + selectionBox.height),
           width: Math.abs(selectionBox.width),
           height: Math.abs(selectionBox.height)
-        };
-        
+        }
+
         // Find items within selection box
         items.forEach(item => {
-          const node = stage.findOne('#' + item.id);
+          const node = stage.findOne('#' + item.id)
           if (node) {
-            const nodeRect = node.getClientRect();
+            const nodeRect = node.getClientRect()
             if (
               nodeRect.x < box.x + box.width &&
               nodeRect.x + nodeRect.width > box.x &&
               nodeRect.y < box.y + box.height &&
               nodeRect.y + nodeRect.height > box.y
             ) {
-              selectedItems.push(item.id);
+              selectedItems.push(item.id)
             }
           }
-        });
-        
+        })
+
         if (selectedItems.length > 0) {
-          setSelectedId(selectedItems.join(','));
+          setSelectedId(selectedItems.join(','))
         }
       }
-      setSelectionBox(null);
-      return;
+      setSelectionBox(null)
+      return
     }
 
-    if (!isDrawing.current) return;
-    isDrawing.current = false;
-    lastEraserPosRef.current = null;
+    if (!isDrawing.current) return
+    isDrawing.current = false
+    lastEraserPosRef.current = null
 
-    saveHistory();
-    const strokeId = currentStrokeId.current;
-    
-    if (!strokeId) return;
+    saveHistory()
+    const strokeId = currentStrokeId.current
+
+    if (!strokeId) return
 
     // Handle handwriting recognition timer
     if (tool === 'handwriting' && isHandwritingActive.current) {
       // Clear existing timer
       if (handwritingTimerRef.current) {
-        clearTimeout(handwritingTimerRef.current);
+        clearTimeout(handwritingTimerRef.current)
       }
-      
+
       // Set new timer for recognition
       handwritingTimerRef.current = setTimeout(() => {
         if (isHandwritingActive.current) {
-          processHandwritingStrokes();
+          processHandwritingStrokes()
         }
-      }, 1500); // Wait 1.5 seconds after last stroke
+      }, 1500) // Wait 1.5 seconds after last stroke
     }
 
     if (tool === 'shape') {
       setTimeout(() => {
-        processShape(strokeId);
-      }, 500);
+        processShape(strokeId)
+      }, 500)
     }
-    
-    currentStrokeId.current = null;
-};
+
+    currentStrokeId.current = null
+  }
 
   const handleWheel = (e: Konva.KonvaEventObject<WheelEvent>) => {
-    e.evt.preventDefault();
-    const stage = stageRef.current;
-    if (!stage) return;
-    const scaleBy = 1.1;
-    const oldScale = stage.scaleX();
-    const pointer = stage.getPointerPosition();
-    if (!pointer) return;
-    const mousePointTo = { x: (pointer.x - stage.x()) / oldScale, y: (pointer.y - stage.y()) / oldScale };
-    const newScale = e.evt.deltaY > 0 ? oldScale / scaleBy : oldScale * scaleBy;
-    setStageScale(newScale);
-    setStagePos({ x: pointer.x - mousePointTo.x * newScale, y: pointer.y - mousePointTo.y * newScale });
-  };
+    e.evt.preventDefault()
+    const stage = stageRef.current
+    if (!stage) return
+    const scaleBy = 1.1
+    const oldScale = stage.scaleX()
+    const pointer = stage.getPointerPosition()
+    if (!pointer) return
+    const mousePointTo = {
+      x: (pointer.x - stage.x()) / oldScale,
+      y: (pointer.y - stage.y()) / oldScale
+    }
+    const newScale = e.evt.deltaY > 0 ? oldScale / scaleBy : oldScale * scaleBy
+    setStageScale(newScale)
+    setStagePos({
+      x: pointer.x - mousePointTo.x * newScale,
+      y: pointer.y - mousePointTo.y * newScale
+    })
+  }
 
   const handleTransformEnd = (e: Konva.KonvaEventObject<Event>, item: any) => {
-    const node = e.target;
-    const scaleX = node.scaleX();
-    const scaleY = node.scaleY();
-    node.scaleX(1);
-    node.scaleY(1);
+    const node = e.target
+    const scaleX = node.scaleX()
+    const scaleY = node.scaleY()
+    node.scaleX(1)
+    node.scaleY(1)
 
     const updatePayload: any = {
       x: node.x(),
       y: node.y(),
-      rotation: node.rotation(),
-    };
+      rotation: node.rotation()
+    }
 
     if (item.type === 'group') {
       // For groups, update width and height
-      updatePayload.width = Math.max(5, node.width() * scaleX);
-      updatePayload.height = Math.max(5, node.height() * scaleY);
-      
+      updatePayload.width = Math.max(5, node.width() * scaleX)
+      updatePayload.height = Math.max(5, node.height() * scaleY)
+
       // Also update all child items' positions and sizes proportionally
-      const originalWidth = item.width;
-      const originalHeight = item.height;
-      const scaleRatioX = originalWidth > 0 ? (updatePayload.width / originalWidth) : 1;
-      const scaleRatioY = originalHeight > 0 ? (updatePayload.height / originalHeight) : 1;
-      const deltaX = updatePayload.x - item.x;
-      const deltaY = updatePayload.y - item.y;
-      
+      const originalWidth = item.width
+      const originalHeight = item.height
+      const scaleRatioX =
+        originalWidth > 0 ? updatePayload.width / originalWidth : 1
+      const scaleRatioY =
+        originalHeight > 0 ? updatePayload.height / originalHeight : 1
+      const deltaX = updatePayload.x - item.x
+      const deltaY = updatePayload.y - item.y
+
       item.items?.forEach((childItem: WhiteboardItem) => {
-        const childUpdatePayload: any = {};
-        
-        if (childItem.type === 'text' || childItem.type === 'image' || (childItem.type === 'shape' && childItem.shapeType !== 'line' && childItem.shapeType !== 'polygon')) {
+        const childUpdatePayload: any = {}
+
+        if (
+          childItem.type === 'text' ||
+          childItem.type === 'image' ||
+          (childItem.type === 'shape' &&
+            childItem.shapeType !== 'line' &&
+            childItem.shapeType !== 'polygon')
+        ) {
           // Update position relative to group
-          childUpdatePayload.x = item.x + ((childItem.x || 0) - item.x) * scaleRatioX + deltaX;
-          childUpdatePayload.y = item.y + ((childItem.y || 0) - item.y) * scaleRatioY + deltaY;
-          
+          childUpdatePayload.x =
+            item.x + ((childItem.x || 0) - item.x) * scaleRatioX + deltaX
+          childUpdatePayload.y =
+            item.y + ((childItem.y || 0) - item.y) * scaleRatioY + deltaY
+
           // Update size if applicable
-          if (childItem.type === 'image' || (childItem.type === 'shape' && childItem.shapeType === 'rect')) {
-            childUpdatePayload.width = Math.max(5, (childItem.width || 0) * scaleRatioX);
-            childUpdatePayload.height = Math.max(5, (childItem.height || 0) * scaleRatioY);
+          if (
+            childItem.type === 'image' ||
+            (childItem.type === 'shape' && childItem.shapeType === 'rect')
+          ) {
+            childUpdatePayload.width = Math.max(
+              5,
+              (childItem.width || 0) * scaleRatioX
+            )
+            childUpdatePayload.height = Math.max(
+              5,
+              (childItem.height || 0) * scaleRatioY
+            )
           } else if (childItem.type === 'text') {
-            childUpdatePayload.fontSize = Math.max(10, (childItem.fontSize || 12) * scaleRatioY);
-            childUpdatePayload.width = Math.max(30, (childItem.width || 100) * scaleRatioX);
+            childUpdatePayload.fontSize = Math.max(
+              10,
+              (childItem.fontSize || 12) * scaleRatioY
+            )
+            childUpdatePayload.width = Math.max(
+              30,
+              (childItem.width || 100) * scaleRatioX
+            )
           }
-        } else if (childItem.type === 'stroke' || (childItem.type === 'shape' && (childItem.shapeType === 'line' || childItem.shapeType === 'polygon'))) {
-          const newPoints = (childItem.points || []).map((p: number, i: number) => {
-            if (i % 2 === 0) return item.x + (p - item.x) * scaleRatioX + deltaX;
-            return item.y + (p - item.y) * scaleRatioY + deltaY;
-          });
-          childUpdatePayload.points = newPoints;
-          
+        } else if (
+          childItem.type === 'stroke' ||
+          (childItem.type === 'shape' &&
+            (childItem.shapeType === 'line' ||
+              childItem.shapeType === 'polygon'))
+        ) {
+          const newPoints = (childItem.points || []).map(
+            (p: number, i: number) => {
+              if (i % 2 === 0)
+                return item.x + (p - item.x) * scaleRatioX + deltaX
+              return item.y + (p - item.y) * scaleRatioY + deltaY
+            }
+          )
+          childUpdatePayload.points = newPoints
+
           // Update stroke width proportionally
           if (childItem.type === 'stroke') {
-            childUpdatePayload.size = Math.max(1, (childItem.size || 2) * Math.max(scaleRatioX, scaleRatioY));
+            childUpdatePayload.size = Math.max(
+              1,
+              (childItem.size || 2) * Math.max(scaleRatioX, scaleRatioY)
+            )
           } else if (childItem.type === 'shape') {
-            childUpdatePayload.strokeWidth = Math.max(1, (childItem.strokeWidth || 2) * Math.max(scaleRatioX, scaleRatioY));
+            childUpdatePayload.strokeWidth = Math.max(
+              1,
+              (childItem.strokeWidth || 2) * Math.max(scaleRatioX, scaleRatioY)
+            )
           }
         }
-        
+
         if (Object.keys(childUpdatePayload).length > 0) {
-          updateItem(childItem.id, childUpdatePayload);
+          updateItem(childItem.id, childUpdatePayload)
         }
-      });
+      })
     } else if (item.type === 'text') {
-      updatePayload.width = Math.max(30, node.width() * scaleX);
-      updatePayload.fontSize = Math.max(10, item.fontSize * scaleY);
-    } else if (item.type === 'image' || (item.type === 'shape' && item.shapeType === 'rect')) {
-      updatePayload.width = Math.max(5, node.width() * scaleX);
-      updatePayload.height = Math.max(5, node.height() * scaleY);
+      updatePayload.width = Math.max(30, node.width() * scaleX)
+      updatePayload.fontSize = Math.max(10, item.fontSize * scaleY)
+    } else if (
+      item.type === 'image' ||
+      (item.type === 'shape' && item.shapeType === 'rect')
+    ) {
+      updatePayload.width = Math.max(5, node.width() * scaleX)
+      updatePayload.height = Math.max(5, node.height() * scaleY)
     } else if (item.type === 'shape' && item.shapeType === 'circle') {
-      updatePayload.width = Math.max(5, item.width * scaleX);
+      updatePayload.width = Math.max(5, item.width * scaleX)
     } else if (item.type === 'shape' && item.shapeType === 'triangle') {
-      updatePayload.width = Math.max(5, item.width * scaleX);
-    } else if (item.type === 'shape' && (item.shapeType === 'line' || item.shapeType === 'polygon')) {
-      const newPoints = item.points.map((p: number, i: number) => i % 2 === 0 ? p * scaleX : p * scaleY);
-      updatePayload.points = newPoints;
+      updatePayload.width = Math.max(5, item.width * scaleX)
+    } else if (
+      item.type === 'shape' &&
+      (item.shapeType === 'line' || item.shapeType === 'polygon')
+    ) {
+      const newPoints = item.points.map((p: number, i: number) =>
+        i % 2 === 0 ? p * scaleX : p * scaleY
+      )
+      updatePayload.points = newPoints
     } else if (item.type === 'stroke') {
-       const newPoints = item.points.map((p: number, i: number) => i % 2 === 0 ? p * scaleX : p * scaleY);
-      updatePayload.points = newPoints;
+      const newPoints = item.points.map((p: number, i: number) =>
+        i % 2 === 0 ? p * scaleX : p * scaleY
+      )
+      updatePayload.points = newPoints
     }
 
-    updateItem(item.id, updatePayload);
-    saveHistory();
-  };
+    updateItem(item.id, updatePayload)
+    saveHistory()
+  }
 
-const getCursorStyle = () => {
-    if (tool === 'eraser' || tool === 'highlighter-eraser') return { cursor: 'none' };
+  const getCursorStyle = () => {
+    if (tool === 'eraser' || tool === 'highlighter-eraser')
+      return { cursor: 'none' }
     if (tool === 'fill') {
-      const cursorSize = 24;
-      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${cursorSize}" height="${cursorSize}" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 11l-8-8-8.6 8.6a2 2 0 0 0 0 2.8l5.2 5.2c.8.8 2 .8 2.8 0L19 11z"/><path d="M5 21v-7"/></svg>`;
-      const encoded = encodeURIComponent(svg);
-      return { cursor: `url('data:image/svg+xml;utf8,${encoded}') 2 22, auto` };
+      const cursorSize = 24
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${cursorSize}" height="${cursorSize}" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 11l-8-8-8.6 8.6a2 2 0 0 0 0 2.8l5.2 5.2c.8.8 2 .8 2.8 0L19 11z"/><path d="M5 21v-7"/></svg>`
+      const encoded = encodeURIComponent(svg)
+      return { cursor: `url('data:image/svg+xml;utf8,${encoded}') 2 22, auto` }
     }
-    return { cursor: 'crosshair' };
-  };
+    return { cursor: 'crosshair' }
+  }
 
-  const [stageSize, setStageSize] = React.useState({ width: window.innerWidth, height: window.innerHeight });
+  const [stageSize, setStageSize] = React.useState({
+    width: window.innerWidth,
+    height: window.innerHeight
+  })
 
   React.useEffect(() => {
-    const handleResize = () => setStageSize({ width: window.innerWidth, height: window.innerHeight });
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-
+    const handleResize = () =>
+      setStageSize({ width: window.innerWidth, height: window.innerHeight })
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   // Text editing functions
   const startTextEditing = (textId: string) => {
     // Clean up any existing editing session first
-    const existingContainer = document.querySelector('[data-text-editor]');
+    const existingContainer = document.querySelector('[data-text-editor]')
     if (existingContainer) {
-      document.body.removeChild(existingContainer);
+      document.body.removeChild(existingContainer)
     }
-    
-    const textItem = items.find(i => i.id === textId && i.type === 'text');
-    if (!textItem || textItem.type !== 'text') return;
 
-    setEditingTextId(textId);
-    setSelectedId(null);
-    
+    const textItem = items.find(i => i.id === textId && i.type === 'text')
+    if (!textItem || textItem.type !== 'text') return
+
+    setEditingTextId(textId)
+    setSelectedId(null)
+
     // Create container
-    const container = document.createElement('div');
-    container.setAttribute('data-text-editor', 'true');
-    container.style.position = 'absolute';
-    container.style.left = '50%';
-    container.style.top = '50%';
-    container.style.transform = 'translate(-50%, -190%)';
-    container.style.zIndex = '1000';
-    container.style.display = 'flex';
-    container.style.flexDirection = 'column';
-    container.style.gap = '4px';
-    container.style.width = '350px';
-    container.style.height = '250px';
-    container.style.resize = 'both';
-    container.style.overflow = 'hidden';
-    container.style.background = '#fff';
-    container.style.border = '2px solid #0099ff';
-    container.style.borderRadius = '8px';
-    container.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-    
+    const container = document.createElement('div')
+    container.setAttribute('data-text-editor', 'true')
+    container.style.position = 'absolute'
+    container.style.left = '50%'
+    container.style.top = '50%'
+    container.style.transform = 'translate(-50%, -190%)'
+    container.style.zIndex = '1000'
+    container.style.display = 'flex'
+    container.style.flexDirection = 'column'
+    container.style.gap = '4px'
+    container.style.width = '350px'
+    container.style.height = '250px'
+    container.style.resize = 'both'
+    container.style.overflow = 'hidden'
+    container.style.background = '#fff'
+    container.style.border = '2px solid #0099ff'
+    container.style.borderRadius = '8px'
+    container.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'
+
     // Add resize handles for all corners
-    container.style.position = 'relative';
-    
+    container.style.position = 'relative'
+
     // Create resize handles for all corners and edges
-    let isResizingBox = false;
+    let isResizingBox = false
     const createResizeHandle = (position: string, cursor: string) => {
-      const handle = document.createElement('div');
-      handle.style.position = 'absolute';
-      handle.style.width = '10px';
-      handle.style.height = '10px';
-      handle.style.background = '#0099ff';
-      handle.style.cursor = cursor;
-      handle.style.zIndex = '1001';
-      
-      switch(position) {
-        case 'nw': handle.style.top = '-5px'; handle.style.left = '-5px'; break;
-        case 'ne': handle.style.top = '-5px'; handle.style.right = '-5px'; break;
-        case 'sw': handle.style.bottom = '-5px'; handle.style.left = '-5px'; break;
-        case 'se': handle.style.bottom = '-5px'; handle.style.right = '-5px'; break;
-        case 'n': handle.style.top = '-5px'; handle.style.left = '50%'; handle.style.transform = 'translateX(-50%)'; handle.style.width = '20px'; handle.style.height = '5px'; break;
-        case 's': handle.style.bottom = '-5px'; handle.style.left = '50%'; handle.style.transform = 'translateX(-50%)'; handle.style.width = '20px'; handle.style.height = '5px'; break;
-        case 'w': handle.style.left = '-5px'; handle.style.top = '50%'; handle.style.transform = 'translateY(-50%)'; handle.style.width = '5px'; handle.style.height = '20px'; break;
-        case 'e': handle.style.right = '-5px'; handle.style.top = '50%'; handle.style.transform = 'translateY(-50%)'; handle.style.width = '5px'; handle.style.height = '20px'; break;
+      const handle = document.createElement('div')
+      handle.style.position = 'absolute'
+      handle.style.width = '10px'
+      handle.style.height = '10px'
+      handle.style.background = '#0099ff'
+      handle.style.cursor = cursor
+      handle.style.zIndex = '1001'
+
+      switch (position) {
+        case 'nw':
+          handle.style.top = '-5px'
+          handle.style.left = '-5px'
+          break
+        case 'ne':
+          handle.style.top = '-5px'
+          handle.style.right = '-5px'
+          break
+        case 'sw':
+          handle.style.bottom = '-5px'
+          handle.style.left = '-5px'
+          break
+        case 'se':
+          handle.style.bottom = '-5px'
+          handle.style.right = '-5px'
+          break
+        case 'n':
+          handle.style.top = '-5px'
+          handle.style.left = '50%'
+          handle.style.transform = 'translateX(-50%)'
+          handle.style.width = '20px'
+          handle.style.height = '5px'
+          break
+        case 's':
+          handle.style.bottom = '-5px'
+          handle.style.left = '50%'
+          handle.style.transform = 'translateX(-50%)'
+          handle.style.width = '20px'
+          handle.style.height = '5px'
+          break
+        case 'w':
+          handle.style.left = '-5px'
+          handle.style.top = '50%'
+          handle.style.transform = 'translateY(-50%)'
+          handle.style.width = '5px'
+          handle.style.height = '20px'
+          break
+        case 'e':
+          handle.style.right = '-5px'
+          handle.style.top = '50%'
+          handle.style.transform = 'translateY(-50%)'
+          handle.style.width = '5px'
+          handle.style.height = '20px'
+          break
       }
-      
-      let isResizing = false;
-      let startX = 0, startY = 0, startWidth = 0, startHeight = 0, startLeft = 0, startTop = 0;
-      
-      handle.onmousedown = (e) => {
-        e.stopPropagation();
-        isResizing = true;
-        isResizingBox = true;
-        startX = e.clientX;
-        startY = e.clientY;
-        const rect = container.getBoundingClientRect();
-        startWidth = rect.width;
-        startHeight = rect.height;
-        startLeft = rect.left;
-        startTop = rect.top;
-        
+
+      let isResizing = false
+      let startX = 0,
+        startY = 0,
+        startWidth = 0,
+        startHeight = 0,
+        startLeft = 0,
+        startTop = 0
+
+      handle.onmousedown = e => {
+        e.stopPropagation()
+        isResizing = true
+        isResizingBox = true
+        startX = e.clientX
+        startY = e.clientY
+        const rect = container.getBoundingClientRect()
+        startWidth = rect.width
+        startHeight = rect.height
+        startLeft = rect.left
+        startTop = rect.top
+
         const handleMouseMove = (e: MouseEvent) => {
-          if (!isResizing) return;
-          
-          const deltaX = e.clientX - startX;
-          const deltaY = e.clientY - startY;
-          
-          let newWidth = startWidth;
-          let newHeight = startHeight;
-          let newLeft = startLeft;
-          let newTop = startTop;
-          
-          if (position.includes('e')) newWidth = Math.max(300, startWidth + deltaX);
-          if (position.includes('w')) { newWidth = Math.max(300, startWidth - deltaX); newLeft = startLeft + deltaX; }
-          if (position.includes('s')) newHeight = Math.max(200, startHeight + deltaY);
-          if (position.includes('n')) { newHeight = Math.max(200, startHeight - deltaY); newTop = startTop + deltaY; }
-          
-          container.style.width = newWidth + 'px';
-          container.style.height = newHeight + 'px';
-          container.style.left = newLeft + 'px';
-          container.style.top = newTop + 'px';
-        };
-        
+          if (!isResizing) return
+
+          const deltaX = e.clientX - startX
+          const deltaY = e.clientY - startY
+
+          let newWidth = startWidth
+          let newHeight = startHeight
+          let newLeft = startLeft
+          let newTop = startTop
+
+          if (position.includes('e'))
+            newWidth = Math.max(300, startWidth + deltaX)
+          if (position.includes('w')) {
+            newWidth = Math.max(300, startWidth - deltaX)
+            newLeft = startLeft + deltaX
+          }
+          if (position.includes('s'))
+            newHeight = Math.max(200, startHeight + deltaY)
+          if (position.includes('n')) {
+            newHeight = Math.max(200, startHeight - deltaY)
+            newTop = startTop + deltaY
+          }
+
+          container.style.width = newWidth + 'px'
+          container.style.height = newHeight + 'px'
+          container.style.left = newLeft + 'px'
+          container.style.top = newTop + 'px'
+        }
+
         const handleMouseUp = () => {
-          isResizing = false;
+          isResizing = false
           // Use a small timeout to allow click events to pass before clearing isResizingBox
           setTimeout(() => {
-            isResizingBox = false;
-          }, 50);
-          document.removeEventListener('mousemove', handleMouseMove);
-          document.removeEventListener('mouseup', handleMouseUp);
-        };
-        
-        document.addEventListener('mousemove', handleMouseMove);
-        document.addEventListener('mouseup', handleMouseUp);
-      };
-      
-      return handle;
-    };
-    
+            isResizingBox = false
+          }, 50)
+          document.removeEventListener('mousemove', handleMouseMove)
+          document.removeEventListener('mouseup', handleMouseUp)
+        }
+
+        document.addEventListener('mousemove', handleMouseMove)
+        document.addEventListener('mouseup', handleMouseUp)
+      }
+
+      return handle
+    }
+
     // Add all resize handles
-    container.appendChild(createResizeHandle('nw', 'nw-resize'));
-    container.appendChild(createResizeHandle('ne', 'ne-resize'));
-    container.appendChild(createResizeHandle('sw', 'sw-resize'));
-    container.appendChild(createResizeHandle('se', 'se-resize'));
-    container.appendChild(createResizeHandle('n', 'n-resize'));
-    container.appendChild(createResizeHandle('s', 's-resize'));
-    container.appendChild(createResizeHandle('w', 'w-resize'));
-    container.appendChild(createResizeHandle('e', 'e-resize'));
+    container.appendChild(createResizeHandle('nw', 'nw-resize'))
+    container.appendChild(createResizeHandle('ne', 'ne-resize'))
+    container.appendChild(createResizeHandle('sw', 'sw-resize'))
+    container.appendChild(createResizeHandle('se', 'se-resize'))
+    container.appendChild(createResizeHandle('n', 'n-resize'))
+    container.appendChild(createResizeHandle('s', 's-resize'))
+    container.appendChild(createResizeHandle('w', 'w-resize'))
+    container.appendChild(createResizeHandle('e', 'e-resize'))
 
     // Create toolbar
-    const toolbar = document.createElement('div');
-    toolbar.style.display = 'flex';
-    toolbar.style.gap = '4px';
-    toolbar.style.background = '#f8f9fa';
-    toolbar.style.padding = '8px';
-    toolbar.style.borderBottom = '1px solid #dee2e6';
-    toolbar.style.cursor = 'move';
-    toolbar.style.flexWrap = 'wrap';
-    
+    const toolbar = document.createElement('div')
+    toolbar.style.display = 'flex'
+    toolbar.style.gap = '4px'
+    toolbar.style.background = '#f8f9fa'
+    toolbar.style.padding = '8px'
+    toolbar.style.borderBottom = '1px solid #dee2e6'
+    toolbar.style.cursor = 'move'
+    toolbar.style.flexWrap = 'wrap'
+
     // Make toolbar draggable
-    let isDraggingBox = false;
-    let dragOffset = { x: 0, y: 0 };
-    
-    toolbar.onmousedown = (e) => {
-      if (e.target === toolbar || (e.target as HTMLElement).parentElement === toolbar) {
-        isDraggingBox = true;
-        const rect = container.getBoundingClientRect();
-        dragOffset.x = e.clientX - rect.left;
-        dragOffset.y = e.clientY - rect.top;
-        e.preventDefault();
+    let isDraggingBox = false
+    let dragOffset = { x: 0, y: 0 }
+
+    toolbar.onmousedown = e => {
+      if (
+        e.target === toolbar ||
+        (e.target as HTMLElement).parentElement === toolbar
+      ) {
+        isDraggingBox = true
+        const rect = container.getBoundingClientRect()
+        dragOffset.x = e.clientX - rect.left
+        dragOffset.y = e.clientY - rect.top
+        e.preventDefault()
       }
-    };
-    
-    document.onmousemove = (e) => {
+    }
+
+    document.onmousemove = e => {
       if (isDraggingBox) {
-        container.style.left = `${e.clientX - dragOffset.x}px`;
-        container.style.top = `${e.clientY - dragOffset.y}px`;
+        container.style.left = `${e.clientX - dragOffset.x}px`
+        container.style.top = `${e.clientY - dragOffset.y}px`
       }
-    };
-    
+    }
+
     document.onmouseup = () => {
       // Use a small timeout to allow click events to pass before clearing isDraggingBox
       setTimeout(() => {
-        isDraggingBox = false;
-      }, 50);
-    };
+        isDraggingBox = false
+      }, 50)
+    }
 
     // Helper function to apply formatting to selected text
     const applyFormatToSelection = (command: string) => {
-      const selection = window.getSelection();
+      const selection = window.getSelection()
       if (selection && selection.rangeCount > 0 && !selection.isCollapsed) {
-        document.execCommand(command, false);
+        document.execCommand(command, false)
       }
-      editableDiv.focus();
-    };
+      editableDiv.focus()
+    }
 
     // Bold button
-    const boldBtn = document.createElement('button');
-    boldBtn.innerHTML = '<b>B</b>';
-    boldBtn.style.width = '28px';
-    boldBtn.style.height = '28px';
-    boldBtn.style.border = '1px solid #dee2e6';
-    boldBtn.style.borderRadius = '4px';
-    boldBtn.style.cursor = 'pointer';
-    boldBtn.style.background = '#fff';
-    boldBtn.style.fontSize = '14px';
-    boldBtn.style.fontWeight = 'bold';
-    boldBtn.title = 'Bold (Ctrl+B)';
-    boldBtn.onmousedown = (e) => e.preventDefault();
-    boldBtn.onclick = (e) => {
-      e.stopPropagation();
-      applyFormatToSelection('bold');
-    };
+    const boldBtn = document.createElement('button')
+    boldBtn.innerHTML = '<b>B</b>'
+    boldBtn.style.width = '28px'
+    boldBtn.style.height = '28px'
+    boldBtn.style.border = '1px solid #dee2e6'
+    boldBtn.style.borderRadius = '4px'
+    boldBtn.style.cursor = 'pointer'
+    boldBtn.style.background = '#fff'
+    boldBtn.style.fontSize = '14px'
+    boldBtn.style.fontWeight = 'bold'
+    boldBtn.title = 'Bold (Ctrl+B)'
+    boldBtn.onmousedown = e => e.preventDefault()
+    boldBtn.onclick = e => {
+      e.stopPropagation()
+      applyFormatToSelection('bold')
+    }
 
     // Italic button
-    const italicBtn = document.createElement('button');
-    italicBtn.innerHTML = '<i>I</i>';
-    italicBtn.style.width = '28px';
-    italicBtn.style.height = '28px';
-    italicBtn.style.border = '1px solid #dee2e6';
-    italicBtn.style.borderRadius = '4px';
-    italicBtn.style.cursor = 'pointer';
-    italicBtn.style.background = '#fff';
-    italicBtn.style.fontSize = '14px';
-    italicBtn.style.fontStyle = 'italic';
-    italicBtn.title = 'Italic (Ctrl+I)';
-    italicBtn.onmousedown = (e) => e.preventDefault();
-    italicBtn.onclick = (e) => {
-      e.stopPropagation();
-      applyFormatToSelection('italic');
-    };
+    const italicBtn = document.createElement('button')
+    italicBtn.innerHTML = '<i>I</i>'
+    italicBtn.style.width = '28px'
+    italicBtn.style.height = '28px'
+    italicBtn.style.border = '1px solid #dee2e6'
+    italicBtn.style.borderRadius = '4px'
+    italicBtn.style.cursor = 'pointer'
+    italicBtn.style.background = '#fff'
+    italicBtn.style.fontSize = '14px'
+    italicBtn.style.fontStyle = 'italic'
+    italicBtn.title = 'Italic (Ctrl+I)'
+    italicBtn.onmousedown = e => e.preventDefault()
+    italicBtn.onclick = e => {
+      e.stopPropagation()
+      applyFormatToSelection('italic')
+    }
 
     // Underline button
-    const underlineBtn = document.createElement('button');
-    underlineBtn.innerHTML = '<u>U</u>';
-    underlineBtn.style.width = '28px';
-    underlineBtn.style.height = '28px';
-    underlineBtn.style.border = '1px solid #dee2e6';
-    underlineBtn.style.borderRadius = '4px';
-    underlineBtn.style.cursor = 'pointer';
-    underlineBtn.style.background = '#fff';
-    underlineBtn.style.fontSize = '14px';
-    underlineBtn.style.textDecoration = 'underline';
-    underlineBtn.title = 'Underline (Ctrl+U)';
-    underlineBtn.onmousedown = (e) => e.preventDefault();
-    underlineBtn.onclick = (e) => {
-      e.stopPropagation();
-      applyFormatToSelection('underline');
-    };
+    const underlineBtn = document.createElement('button')
+    underlineBtn.innerHTML = '<u>U</u>'
+    underlineBtn.style.width = '28px'
+    underlineBtn.style.height = '28px'
+    underlineBtn.style.border = '1px solid #dee2e6'
+    underlineBtn.style.borderRadius = '4px'
+    underlineBtn.style.cursor = 'pointer'
+    underlineBtn.style.background = '#fff'
+    underlineBtn.style.fontSize = '14px'
+    underlineBtn.style.textDecoration = 'underline'
+    underlineBtn.title = 'Underline (Ctrl+U)'
+    underlineBtn.onmousedown = e => e.preventDefault()
+    underlineBtn.onclick = e => {
+      e.stopPropagation()
+      applyFormatToSelection('underline')
+    }
 
     // Text color picker
-    const colorPicker = document.createElement('input');
-    colorPicker.type = 'color';
-    colorPicker.value = (textItem as any).fill || '#000000';
-    colorPicker.style.width = '28px';
-    colorPicker.style.height = '28px';
-    colorPicker.style.border = '1px solid #dee2e6';
-    colorPicker.style.borderRadius = '4px';
-    colorPicker.style.cursor = 'pointer';
-    colorPicker.style.padding = '0';
-    colorPicker.title = 'Text Color';
-    colorPicker.onmousedown = (e) => e.stopPropagation();
+    const colorPicker = document.createElement('input')
+    colorPicker.type = 'color'
+    colorPicker.value = (textItem as any).fill || '#000000'
+    colorPicker.style.width = '28px'
+    colorPicker.style.height = '28px'
+    colorPicker.style.border = '1px solid #dee2e6'
+    colorPicker.style.borderRadius = '4px'
+    colorPicker.style.cursor = 'pointer'
+    colorPicker.style.padding = '0'
+    colorPicker.title = 'Text Color'
+    colorPicker.onmousedown = e => e.stopPropagation()
     colorPicker.onchange = () => {
-      const selection = window.getSelection();
+      const selection = window.getSelection()
       if (selection && selection.rangeCount > 0 && !selection.isCollapsed) {
-        document.execCommand('foreColor', false, colorPicker.value);
+        document.execCommand('foreColor', false, colorPicker.value)
       } else {
-        editableDiv.style.color = colorPicker.value;
-        updateItem(textId, { fill: colorPicker.value });
+        editableDiv.style.color = colorPicker.value
+        updateItem(textId, { fill: colorPicker.value })
       }
-      editableDiv.focus();
-    };
+      editableDiv.focus()
+    }
 
     // Font selector
-    const fontSelect = document.createElement('select');
+    const fontSelect = document.createElement('select')
     FONTS.forEach(f => {
-      const opt = document.createElement('option');
-      opt.value = f;
-      opt.innerText = f;
-      if (FONT_STACKS[f] === (textItem as any).fontFamily || f === (textItem as any).fontFamily) opt.selected = true;
-      fontSelect.appendChild(opt);
-    });
-    fontSelect.style.fontSize = '12px';
-    fontSelect.style.cursor = 'pointer';
-    fontSelect.style.padding = '4px';
-    fontSelect.style.border = '1px solid #dee2e6';
-    fontSelect.style.borderRadius = '4px';
-    fontSelect.onmousedown = (e) => e.stopPropagation();
+      const opt = document.createElement('option')
+      opt.value = f
+      opt.innerText = f
+      if (
+        FONT_STACKS[f] === (textItem as any).fontFamily ||
+        f === (textItem as any).fontFamily
+      )
+        opt.selected = true
+      fontSelect.appendChild(opt)
+    })
+    fontSelect.style.fontSize = '12px'
+    fontSelect.style.cursor = 'pointer'
+    fontSelect.style.padding = '4px'
+    fontSelect.style.border = '1px solid #dee2e6'
+    fontSelect.style.borderRadius = '4px'
+    fontSelect.onmousedown = e => e.stopPropagation()
     fontSelect.onchange = () => {
-      const newFont = FONT_STACKS[fontSelect.value] || fontSelect.value;
-      editableDiv.style.fontFamily = newFont;
-      updateItem(textId, { fontFamily: newFont });
-      editableDiv.focus();
-    };
+      const newFont = FONT_STACKS[fontSelect.value] || fontSelect.value
+      editableDiv.style.fontFamily = newFont
+      updateItem(textId, { fontFamily: newFont })
+      editableDiv.focus()
+    }
 
     // Font size selector
-    const sizeInput = document.createElement('input');
-    sizeInput.type = 'number';
-    sizeInput.value = (textItem as any).fontSize.toString();
-    sizeInput.style.width = '50px';
-    sizeInput.style.fontSize = '12px';
-    sizeInput.style.padding = '4px';
-    sizeInput.style.border = '1px solid #dee2e6';
-    sizeInput.style.borderRadius = '4px';
-    sizeInput.onmousedown = (e) => e.stopPropagation();
+    const sizeInput = document.createElement('input')
+    sizeInput.type = 'number'
+    sizeInput.value = (textItem as any).fontSize.toString()
+    sizeInput.style.width = '50px'
+    sizeInput.style.fontSize = '12px'
+    sizeInput.style.padding = '4px'
+    sizeInput.style.border = '1px solid #dee2e6'
+    sizeInput.style.borderRadius = '4px'
+    sizeInput.onmousedown = e => e.stopPropagation()
     sizeInput.oninput = () => {
-      const newSize = parseInt(sizeInput.value);
+      const newSize = parseInt(sizeInput.value)
       if (newSize > 0) {
-        editableDiv.style.fontSize = `${newSize}px`;
-        updateItem(textId, { fontSize: newSize });
+        editableDiv.style.fontSize = `${newSize}px`
+        updateItem(textId, { fontSize: newSize })
       }
-    };
+    }
 
-    toolbar.appendChild(boldBtn);
-    toolbar.appendChild(italicBtn);
-    toolbar.appendChild(underlineBtn);
-    toolbar.appendChild(colorPicker);
-    toolbar.appendChild(fontSelect);
-    toolbar.appendChild(sizeInput);
+    toolbar.appendChild(boldBtn)
+    toolbar.appendChild(italicBtn)
+    toolbar.appendChild(underlineBtn)
+    toolbar.appendChild(colorPicker)
+    toolbar.appendChild(fontSelect)
+    toolbar.appendChild(sizeInput)
 
     // Create editable div instead of textarea for rich text support
-    const editableDiv = document.createElement('div');
-    editableDiv.contentEditable = 'true';
-    editableDiv.innerHTML = (textItem as any).text === 'Type here...' ? '' : (textItem as any).text;
-    editableDiv.style.fontSize = `${(textItem as any).fontSize}px`;
-    editableDiv.style.fontFamily = (textItem as any).fontFamily;
-    editableDiv.style.color = (textItem as any).fill;
-    editableDiv.style.background = 'transparent';
-    editableDiv.style.border = 'none';
-    editableDiv.style.outline = 'none';
-    editableDiv.style.minWidth = '280px';
-    editableDiv.style.minHeight = '100px';
-    editableDiv.style.maxHeight = '400px';
-    editableDiv.style.overflowY = 'auto';
-    editableDiv.style.padding = '12px';
-    editableDiv.style.lineHeight = '1.4';
-    editableDiv.style.wordWrap = 'break-word';
-    editableDiv.style.userSelect = 'text';
-    editableDiv.style.webkitUserSelect = 'text';
-    editableDiv.style.mozUserSelect = 'text';
-    editableDiv.style.msUserSelect = 'text';
-    
+    const editableDiv = document.createElement('div')
+    editableDiv.contentEditable = 'true'
+    editableDiv.innerHTML =
+      (textItem as any).text === 'Type here...' ? '' : (textItem as any).text
+    editableDiv.style.fontSize = `${(textItem as any).fontSize}px`
+    editableDiv.style.fontFamily = (textItem as any).fontFamily
+    editableDiv.style.color = (textItem as any).fill
+    editableDiv.style.background = 'transparent'
+    editableDiv.style.border = 'none'
+    editableDiv.style.outline = 'none'
+    editableDiv.style.minWidth = '280px'
+    editableDiv.style.minHeight = '100px'
+    editableDiv.style.maxHeight = '400px'
+    editableDiv.style.overflowY = 'auto'
+    editableDiv.style.padding = '12px'
+    editableDiv.style.lineHeight = '1.4'
+    editableDiv.style.wordWrap = 'break-word'
+    editableDiv.style.userSelect = 'text'
+    editableDiv.style.webkitUserSelect = 'text'
+    editableDiv.style.mozUserSelect = 'text'
+    editableDiv.style.msUserSelect = 'text'
+
     // Add placeholder behavior
     if (!editableDiv.innerHTML.trim()) {
-      editableDiv.innerHTML = '<span style="color: #999;">Type here...</span>';
+      editableDiv.innerHTML = '<span style="color: #999;">Type here...</span>'
     }
-    
+
     editableDiv.onfocus = () => {
-      if (editableDiv.innerHTML === '<span style="color: #999;">Type here...</span>') {
-        editableDiv.innerHTML = '';
+      if (
+        editableDiv.innerHTML ===
+        '<span style="color: #999;">Type here...</span>'
+      ) {
+        editableDiv.innerHTML = ''
       }
-    };
-    
+    }
+
     editableDiv.onblur = () => {
       if (!editableDiv.innerHTML.trim()) {
-        editableDiv.innerHTML = '<span style="color: #999;">Type here...</span>';
+        editableDiv.innerHTML = '<span style="color: #999;">Type here...</span>'
       }
-    };
-    
+    }
+
     const finishEditing = () => {
-      let newText = editableDiv.innerHTML;
-      if (newText === '<span style="color: #999;">Type here...</span>' || !newText.trim()) {
-        newText = 'Type here...';
+      let newText = editableDiv.innerHTML
+      if (
+        newText === '<span style="color: #999;">Type here...</span>' ||
+        !newText.trim()
+      ) {
+        newText = 'Type here...'
       }
-      updateItem(textId, { text: newText });
+      updateItem(textId, { text: newText })
       if (container.parentNode) {
-        document.body.removeChild(container);
+        document.body.removeChild(container)
       }
-      document.removeEventListener('click', handleClickOutside);
-      document.onmousemove = null;
-      document.onmouseup = null;
-      setEditingTextId(null);
-      setSelectedId(textId);
-      saveHistory();
-    };
-    
+      document.removeEventListener('click', handleClickOutside)
+      document.onmousemove = null
+      document.onmouseup = null
+      setEditingTextId(null)
+      setSelectedId(textId)
+      saveHistory()
+    }
+
     // Close editor when clicking outside
     const handleClickOutside = (e: MouseEvent) => {
-      if (!container.contains(e.target as Node) && !isDraggingBox && !isResizingBox) {
-        finishEditing();
-        document.removeEventListener('click', handleClickOutside);
+      if (
+        !container.contains(e.target as Node) &&
+        !isDraggingBox &&
+        !isResizingBox
+      ) {
+        finishEditing()
+        document.removeEventListener('click', handleClickOutside)
       }
-    };
-    
+    }
+
     setTimeout(() => {
-      document.addEventListener('click', handleClickOutside);
-    }, 100);
+      document.addEventListener('click', handleClickOutside)
+    }, 100)
 
     // Handle keyboard shortcuts
-    editableDiv.addEventListener('keydown', (e) => {
+    editableDiv.addEventListener('keydown', e => {
       if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        finishEditing();
+        e.preventDefault()
+        finishEditing()
       }
       if (e.key === 'Escape') {
-        finishEditing();
+        finishEditing()
       }
       // Handle formatting shortcuts
       if (e.ctrlKey) {
         if (e.key === 'b') {
-          e.preventDefault();
-          applyFormatToSelection('bold');
+          e.preventDefault()
+          applyFormatToSelection('bold')
         } else if (e.key === 'i') {
-          e.preventDefault();
-          applyFormatToSelection('italic');
+          e.preventDefault()
+          applyFormatToSelection('italic')
         } else if (e.key === 'u') {
-          e.preventDefault();
-          applyFormatToSelection('underline');
+          e.preventDefault()
+          applyFormatToSelection('underline')
         }
       }
-    });
-    
-    container.appendChild(toolbar);
-    container.appendChild(editableDiv);
-    document.body.appendChild(container);
-    textareaRef.current = editableDiv as any;
-    editableDiv.focus();
-    
+    })
+
+    container.appendChild(toolbar)
+    container.appendChild(editableDiv)
+    document.body.appendChild(container)
+    textareaRef.current = editableDiv as any
+    editableDiv.focus()
+
     // Select all text if it's the default placeholder
     if ((textItem as any).text === 'Type here...') {
-      const range = document.createRange();
-      range.selectNodeContents(editableDiv);
-      const selection = window.getSelection();
+      const range = document.createRange()
+      range.selectNodeContents(editableDiv)
+      const selection = window.getSelection()
       if (selection) {
-        selection.removeAllRanges();
-        selection.addRange(range);
+        selection.removeAllRanges()
+        selection.addRange(range)
       }
     }
-  };
+  }
 
   const handleTextDoubleClick = (textId: string) => {
-    startTextEditing(textId);
-  };
+    startTextEditing(textId)
+  }
 
-  const handleCanvasDoubleClick = (e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
+  const handleCanvasDoubleClick = (
+    e: Konva.KonvaEventObject<MouseEvent | TouchEvent>
+  ) => {
     // Only handle double-click on existing text items
     if (tool === 'text' || tool === 'select') {
-      const stage = e.target.getStage();
-      const clickedOnEmpty = e.target === stage;
-      
+      const stage = e.target.getStage()
+      const clickedOnEmpty = e.target === stage
+
       if (!clickedOnEmpty) {
         // Double-click on existing text to edit
-        const targetId = e.target.id() || e.target.getParent()?.id();
+        const targetId = e.target.id() || e.target.getParent()?.id()
         if (targetId) {
-          const item = items.find(i => i.id === targetId);
+          const item = items.find(i => i.id === targetId)
           if (item?.type === 'text') {
             // Ensure the text item stays selected when double-clicking
-            const currentSelected = selectedId ? selectedId.split(',') : [];
+            const currentSelected = selectedId ? selectedId.split(',') : []
             if (!currentSelected.includes(targetId)) {
-              setSelectedId(targetId);
+              setSelectedId(targetId)
             }
-            startTextEditing(targetId);
+            startTextEditing(targetId)
           }
         }
       }
     }
-  };
+  }
 
   // Expose functions globally for toolbar access
   useEffect(() => {
-    (window as any).startTextEditing = startTextEditing;
-    (window as any).addChromeWidget = () => {
+    ;(window as any).startTextEditing = startTextEditing
+    ;(window as any).addChromeWidget = () => {
       const newWidget = {
         id: uuidv4(),
         x: window.innerWidth / 2 - 200,
         y: window.innerHeight / 2 - 150
-      };
-      setChromeWidgets(prev => [...prev, newWidget]);
-    };
+      }
+      setChromeWidgets(prev => [...prev, newWidget])
+    }
     return () => {
-      delete (window as any).startTextEditing;
-      delete (window as any).addChromeWidget;
-    };
-  }, [startTextEditing]);
+      delete (window as any).startTextEditing
+      delete (window as any).addChromeWidget
+    }
+  }, [startTextEditing])
 
-  const linkedErasersRef = useRef<string[]>([]);
-  const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
-  const linkedErasersStartPosRef = useRef<Record<string, {x: number, y: number}>>({});
+  const linkedErasersRef = useRef<string[]>([])
+  const dragStartPosRef = useRef<{ x: number; y: number } | null>(null)
+  const linkedErasersStartPosRef = useRef<
+    Record<string, { x: number; y: number }>
+  >({})
 
   const handleItemDragStart = (e: Konva.KonvaEventObject<DragEvent>) => {
-      const stage = e.target.getStage();
-      const node = e.target;
-      if (!stage) return;
-      dragStartPosRef.current = { x: node.x(), y: node.y() };
-      linkedErasersRef.current = [];
-      linkedErasersStartPosRef.current = {};
-      const selectedRect = node.getClientRect();
-      items.forEach(item => {
-          if (item.type === 'stroke' && (item.tool === 'eraser' || item.tool === 'highlighter-eraser')) {
-              const eraserNode = stage.findOne('#' + item.id);
-              if (eraserNode) {
-                  const eraserRect = eraserNode.getClientRect();
-                  if (selectedRect.x < eraserRect.x + eraserRect.width && selectedRect.x + selectedRect.width > eraserRect.x && selectedRect.y < eraserRect.y + eraserRect.height && selectedRect.y + selectedRect.height > eraserRect.y) {
-                      linkedErasersRef.current.push(item.id);
-                      linkedErasersStartPosRef.current[item.id] = { x: eraserNode.x(), y: eraserNode.y() };
-                  }
-              }
+    const stage = e.target.getStage()
+    const node = e.target
+    if (!stage) return
+    dragStartPosRef.current = { x: node.x(), y: node.y() }
+    linkedErasersRef.current = []
+    linkedErasersStartPosRef.current = {}
+    const selectedRect = node.getClientRect()
+    items.forEach(item => {
+      if (
+        item.type === 'stroke' &&
+        (item.tool === 'eraser' || item.tool === 'highlighter-eraser')
+      ) {
+        const eraserNode = stage.findOne('#' + item.id)
+        if (eraserNode) {
+          const eraserRect = eraserNode.getClientRect()
+          if (
+            selectedRect.x < eraserRect.x + eraserRect.width &&
+            selectedRect.x + selectedRect.width > eraserRect.x &&
+            selectedRect.y < eraserRect.y + eraserRect.height &&
+            selectedRect.y + selectedRect.height > eraserRect.y
+          ) {
+            linkedErasersRef.current.push(item.id)
+            linkedErasersStartPosRef.current[item.id] = {
+              x: eraserNode.x(),
+              y: eraserNode.y()
+            }
           }
-      });
-  };
+        }
+      }
+    })
+  }
 
   const handleItemDragMove = (e: Konva.KonvaEventObject<DragEvent>) => {
-      if (!dragStartPosRef.current) return;
-      const node = e.target;
-      const dx = node.x() - dragStartPosRef.current.x;
-      const dy = node.y() - dragStartPosRef.current.y;
-      const stage = node.getStage();
-      if (stage) {
-          linkedErasersRef.current.forEach(id => {
-              const eraserNode = stage.findOne('#' + id);
-              const startPos = linkedErasersStartPosRef.current[id];
-              if (eraserNode && startPos) {
-                  eraserNode.x(startPos.x + dx);
-                  eraserNode.y(startPos.y + dy);
-              }
-          });
-          stage.batchDraw();
-      }
-  };
+    if (!dragStartPosRef.current) return
+    const node = e.target
+    const dx = node.x() - dragStartPosRef.current.x
+    const dy = node.y() - dragStartPosRef.current.y
+    const stage = node.getStage()
+    if (stage) {
+      linkedErasersRef.current.forEach(id => {
+        const eraserNode = stage.findOne('#' + id)
+        const startPos = linkedErasersStartPosRef.current[id]
+        if (eraserNode && startPos) {
+          eraserNode.x(startPos.x + dx)
+          eraserNode.y(startPos.y + dy)
+        }
+      })
+      stage.batchDraw()
+    }
+  }
 
-  const handleItemDragEnd = (e: Konva.KonvaEventObject<DragEvent>, item: any) => {
-      const node = e.target;
-      const dx = node.x() - (dragStartPosRef.current?.x || node.x());
-      const dy = node.y() - (dragStartPosRef.current?.y || node.y());
-      
-      // Handle group item movement - move all items in the group
-      if (item.type === 'group') {
-        // Update group position
-        updateItem(item.id, { x: node.x(), y: node.y() });
-        
-        // Move all items in the group
-        item.items?.forEach((childItem: WhiteboardItem) => {
-          if (childItem.type === 'text' || childItem.type === 'image' || (childItem.type === 'shape' && childItem.shapeType !== 'line' && childItem.shapeType !== 'polygon')) {
-            updateItem(childItem.id, { 
-              x: (childItem.x || 0) + dx, 
-              y: (childItem.y || 0) + dy 
-            });
-          } else if (childItem.type === 'stroke' || (childItem.type === 'shape' && (childItem.shapeType === 'line' || childItem.shapeType === 'polygon'))) {
-            const newPoints = (childItem.points || []).map((p: number, i: number) => 
-              i % 2 === 0 ? p + dx : p + dy
-            );
-            updateItem(childItem.id, { points: newPoints });
-          }
-        });
-      } else {
-        updateItem(item.id, { x: node.x(), y: node.y() });
-      }
-      
-      const stage = node.getStage();
-      if (stage) {
-          linkedErasersRef.current.forEach(id => {
-              const eraserNode = stage.findOne('#' + id);
-              if (eraserNode) updateItem(id, { x: eraserNode.x(), y: eraserNode.y() });
-          });
-      }
-      saveHistory();
-  };
+  const handleItemDragEnd = (
+    e: Konva.KonvaEventObject<DragEvent>,
+    item: any
+  ) => {
+    const node = e.target
+    const dx = node.x() - (dragStartPosRef.current?.x || node.x())
+    const dy = node.y() - (dragStartPosRef.current?.y || node.y())
+
+    // Handle group item movement - move all items in the group
+    if (item.type === 'group') {
+      // Update group position
+      updateItem(item.id, { x: node.x(), y: node.y() })
+
+      // Move all items in the group
+      item.items?.forEach((childItem: WhiteboardItem) => {
+        if (
+          childItem.type === 'text' ||
+          childItem.type === 'image' ||
+          (childItem.type === 'shape' &&
+            childItem.shapeType !== 'line' &&
+            childItem.shapeType !== 'polygon')
+        ) {
+          updateItem(childItem.id, {
+            x: (childItem.x || 0) + dx,
+            y: (childItem.y || 0) + dy
+          })
+        } else if (
+          childItem.type === 'stroke' ||
+          (childItem.type === 'shape' &&
+            (childItem.shapeType === 'line' ||
+              childItem.shapeType === 'polygon'))
+        ) {
+          const newPoints = (childItem.points || []).map(
+            (p: number, i: number) => (i % 2 === 0 ? p + dx : p + dy)
+          )
+          updateItem(childItem.id, { points: newPoints })
+        }
+      })
+    } else {
+      updateItem(item.id, { x: node.x(), y: node.y() })
+    }
+
+    const stage = node.getStage()
+    if (stage) {
+      linkedErasersRef.current.forEach(id => {
+        const eraserNode = stage.findOne('#' + id)
+        if (eraserNode) updateItem(id, { x: eraserNode.x(), y: eraserNode.y() })
+      })
+    }
+    saveHistory()
+  }
 
   const renderLayer3Item = (item: WhiteboardItem) => {
-    if (item.type === 'image') return null;
-    
+    if (item.type === 'image') return null
+
     // Don't render items that are part of a group
-    const itemIsInGroup = items.some(i => i.type === 'group' && (i as any).items.some((gItem: any) => gItem.id === item.id));
-    if (itemIsInGroup) return null;
-    
+    const itemIsInGroup = items.some(
+      i =>
+        i.type === 'group' &&
+        (i as any).items.some((gItem: any) => gItem.id === item.id)
+    )
+    if (itemIsInGroup) return null
+
     // Render group items as selectable rectangles
     if (item.type === 'group') {
       return (
@@ -1775,26 +2058,28 @@ const getCursorStyle = () => {
           y={item.y}
           width={item.width}
           height={item.height}
-          stroke="#0099ff"
+          stroke='#0099ff'
           strokeWidth={2}
-          fill="transparent"
+          fill='transparent'
           dash={[5, 5]}
           draggable={tool === 'select'}
           onClick={(e: any) => {
             if (tool === 'select') {
-              const currentSelected = selectedId ? selectedId.split(',') : [];
-              
+              const currentSelected = selectedId ? selectedId.split(',') : []
+
               if (currentSelected.includes(item.id)) {
-                const newSelected = currentSelected.filter(id => id !== item.id);
-                setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
+                const newSelected = currentSelected.filter(id => id !== item.id)
+                setSelectedId(
+                  newSelected.length > 0 ? newSelected.join(',') : null
+                )
               } else {
-                setSelectedId([...currentSelected, item.id].join(','));
+                setSelectedId([...currentSelected, item.id].join(','))
               }
             }
           }}
           onTap={() => {
             if (tool === 'select') {
-              setSelectedId(item.id);
+              setSelectedId(item.id)
             }
           }}
           onTransformEnd={(e: any) => handleTransformEnd(e, item)}
@@ -1802,14 +2087,14 @@ const getCursorStyle = () => {
           onDragMove={handleItemDragMove}
           onDragEnd={(e: any) => handleItemDragEnd(e, item)}
         />
-      );
+      )
     }
-    
+
     // Render text as Rich Text
     if (item.type === 'text') {
       // Don't render text on canvas while editing it
       if (editingTextId === item.id) {
-        return null;
+        return null
       }
 
       return (
@@ -1826,21 +2111,23 @@ const getCursorStyle = () => {
           draggable={tool === 'select' || tool === 'text'}
           onClick={(e: any) => {
             if (tool === 'select' || tool === 'text') {
-              const currentSelected = selectedId ? selectedId.split(',') : [];
-              
+              const currentSelected = selectedId ? selectedId.split(',') : []
+
               if (currentSelected.includes(item.id)) {
-                const newSelected = currentSelected.filter(id => id !== item.id);
-                setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
+                const newSelected = currentSelected.filter(id => id !== item.id)
+                setSelectedId(
+                  newSelected.length > 0 ? newSelected.join(',') : null
+                )
               } else {
-                setSelectedId([...currentSelected, item.id].join(','));
+                setSelectedId([...currentSelected, item.id].join(','))
               }
             }
           }}
           onTap={() => {
             if (tool === 'select' || tool === 'text') {
-              const currentSelected = selectedId ? selectedId.split(',') : [];
+              const currentSelected = selectedId ? selectedId.split(',') : []
               if (!currentSelected.includes(item.id)) {
-                setSelectedId([...currentSelected, item.id].join(','));
+                setSelectedId([...currentSelected, item.id].join(','))
               }
             }
           }}
@@ -1851,44 +2138,44 @@ const getCursorStyle = () => {
           onDragMove={handleItemDragMove}
           onDragEnd={(e: any) => handleItemDragEnd(e, item)}
         />
-      );
+      )
     }
-    
+
     const commonProps = {
       key: item.id,
       id: item.id,
       draggable: tool === 'select',
       onClick: (e: any) => {
         if (tool === 'select' || tool === 'text') {
-          const currentSelected = selectedId ? selectedId.split(',') : [];
-          
+          const currentSelected = selectedId ? selectedId.split(',') : []
+
           if (currentSelected.includes(item.id)) {
-            const newSelected = currentSelected.filter(id => id !== item.id);
-            setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
+            const newSelected = currentSelected.filter(id => id !== item.id)
+            setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null)
           } else {
-            setSelectedId([...currentSelected, item.id].join(','));
+            setSelectedId([...currentSelected, item.id].join(','))
           }
         }
       },
       onTap: () => {
         if (tool === 'select' || tool === 'text') {
-          const currentSelected = selectedId ? selectedId.split(',') : [];
+          const currentSelected = selectedId ? selectedId.split(',') : []
           if (!currentSelected.includes(item.id)) {
-            setSelectedId([...currentSelected, item.id].join(','));
+            setSelectedId([...currentSelected, item.id].join(','))
           }
         }
       },
       onTransformEnd: (e: any) => handleTransformEnd(e, item),
       onDragStart: handleItemDragStart,
       onDragMove: handleItemDragMove,
-      onDragEnd: (e: any) => handleItemDragEnd(e, item),
-    };
+      onDragEnd: (e: any) => handleItemDragEnd(e, item)
+    }
 
     if (item.type === 'stroke') {
-      if (item.isHighlighter || item.tool === 'highlighter-eraser') return null;
-      if ((item as any)._hidden) return null;
-      const isEraser = item.tool === 'eraser';
-      const isHandwriting = item.tool === 'handwriting';
+      if (item.isHighlighter || item.tool === 'highlighter-eraser') return null
+      if ((item as any)._hidden) return null
+      const isEraser = item.tool === 'eraser'
+      const isHandwriting = item.tool === 'handwriting'
       return (
         <Line
           {...commonProps}
@@ -1897,30 +2184,92 @@ const getCursorStyle = () => {
           stroke={item.color}
           strokeWidth={isEraser ? item.size * 2 + 10 : item.size}
           tension={0}
-          lineCap="round"
-          lineJoin="round"
-          opacity={isHandwriting ? 0.9 : 1} 
-          globalCompositeOperation={isEraser ? 'destination-out' : 'source-over'}
+          lineCap='round'
+          lineJoin='round'
+          opacity={isHandwriting ? 0.9 : 1}
+          globalCompositeOperation={
+            isEraser ? 'destination-out' : 'source-over'
+          }
           perfectDrawEnabled={false}
-          hitStrokeWidth={isEraser ? item.size * 2 + 20 : Math.max(10, item.size + 5)}
+          hitStrokeWidth={
+            isEraser ? item.size * 2 + 20 : Math.max(10, item.size + 5)
+          }
         />
-      );
+      )
     }
 
     if (item.type === 'shape') {
-      if (item.shapeType === 'line') return <Line {...commonProps} points={item.points || []} stroke={item.stroke} strokeWidth={item.strokeWidth} opacity={item.opacity ?? 1} />;
-      if (item.shapeType === 'polygon') return <Line {...commonProps} points={item.points || []} closed={true} stroke={item.stroke} strokeWidth={item.strokeWidth} fill={item.fill || 'transparent'} opacity={item.opacity ?? 1} />;
-      if (item.shapeType === 'circle') return <Circle {...commonProps} x={item.x} y={item.y} radius={item.width} stroke={item.stroke} strokeWidth={item.strokeWidth} fill={item.fill || 'transparent'} opacity={item.opacity ?? 1} />;
-      if (item.shapeType === 'rect') return <Rect {...commonProps} x={item.x} y={item.y} width={item.width} height={item.height} stroke={item.stroke} strokeWidth={item.strokeWidth} fill={item.fill || 'transparent'} opacity={item.opacity ?? 1} />;
-      if (item.shapeType === 'triangle') return <RegularPolygon {...commonProps} x={item.x + (item.width ?? 50) / 2} y={item.y + (item.height ?? 50) / 2} sides={3} radius={(item.width ?? 50) / 2} stroke={item.stroke} strokeWidth={item.strokeWidth} fill={item.fill || 'transparent'} opacity={item.opacity ?? 1} />;
+      if (item.shapeType === 'line')
+        return (
+          <Line
+            {...commonProps}
+            points={item.points || []}
+            stroke={item.stroke}
+            strokeWidth={item.strokeWidth}
+            opacity={item.opacity ?? 1}
+          />
+        )
+      if (item.shapeType === 'polygon')
+        return (
+          <Line
+            {...commonProps}
+            points={item.points || []}
+            closed={true}
+            stroke={item.stroke}
+            strokeWidth={item.strokeWidth}
+            fill={item.fill || 'transparent'}
+            opacity={item.opacity ?? 1}
+          />
+        )
+      if (item.shapeType === 'circle')
+        return (
+          <Circle
+            {...commonProps}
+            x={item.x}
+            y={item.y}
+            radius={item.width}
+            stroke={item.stroke}
+            strokeWidth={item.strokeWidth}
+            fill={item.fill || 'transparent'}
+            opacity={item.opacity ?? 1}
+          />
+        )
+      if (item.shapeType === 'rect')
+        return (
+          <Rect
+            {...commonProps}
+            x={item.x}
+            y={item.y}
+            width={item.width}
+            height={item.height}
+            stroke={item.stroke}
+            strokeWidth={item.strokeWidth}
+            fill={item.fill || 'transparent'}
+            opacity={item.opacity ?? 1}
+          />
+        )
+      if (item.shapeType === 'triangle')
+        return (
+          <RegularPolygon
+            {...commonProps}
+            x={item.x + (item.width ?? 50) / 2}
+            y={item.y + (item.height ?? 50) / 2}
+            sides={3}
+            radius={(item.width ?? 50) / 2}
+            stroke={item.stroke}
+            strokeWidth={item.strokeWidth}
+            fill={item.fill || 'transparent'}
+            opacity={item.opacity ?? 1}
+          />
+        )
     }
 
-    return null;
-  };
+    return null
+  }
 
   return (
-    <div 
-      className="fixed inset-0 w-screen h-screen overflow-hidden" 
+    <div
+      className='fixed inset-0 w-screen h-screen overflow-hidden'
       style={{
         backgroundImage: `url(${backgroundImage})`,
         backgroundAttachment: 'fixed',
@@ -1929,10 +2278,9 @@ const getCursorStyle = () => {
         backgroundSize: 'cover',
         ...getCursorStyle(),
         backgroundColor: '#f5f5f5',
-        touchAction: 'none',
+        touchAction: 'none'
       }}
     >
-
       <Stage
         ref={stageRef}
         style={{ background: 'transparent', zIndex: 10 }}
@@ -1945,10 +2293,10 @@ const getCursorStyle = () => {
         onTouchMove={handleMouseMove}
         onTouchEnd={handleMouseUp}
         onWheel={handleWheel}
-        onClick={(e) => {
+        onClick={e => {
           // Deselect when clicking on empty canvas
           if (e.target === e.target.getStage()) {
-            setSelectedId(null);
+            setSelectedId(null)
           }
         }}
         onDblClick={handleCanvasDoubleClick}
@@ -1961,77 +2309,101 @@ const getCursorStyle = () => {
       >
         <Layer>
           {/* 1. Render Images at the bottom */}
-          {items.map((item) => {
-            if (item.type !== 'image') return null;
+          {items.map(item => {
+            if (item.type !== 'image') return null
             const commonProps = {
               key: item.id,
               id: item.id,
               draggable: tool === 'select',
               onClick: (e: any) => {
                 if (tool === 'select') {
-                  const currentSelected = selectedId ? selectedId.split(',') : [];
+                  const currentSelected = selectedId
+                    ? selectedId.split(',')
+                    : []
                   if (currentSelected.includes(item.id)) {
                     // Deselect if already selected
-                    const newSelected = currentSelected.filter(id => id !== item.id);
-                    setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
+                    const newSelected = currentSelected.filter(
+                      id => id !== item.id
+                    )
+                    setSelectedId(
+                      newSelected.length > 0 ? newSelected.join(',') : null
+                    )
                   } else {
                     // Add to selection
-                    setSelectedId([...currentSelected, item.id].join(','));
+                    setSelectedId([...currentSelected, item.id].join(','))
                   }
                 }
               },
               onTap: () => {
                 if (tool === 'select') {
-                  const currentSelected = selectedId ? selectedId.split(',') : [];
+                  const currentSelected = selectedId
+                    ? selectedId.split(',')
+                    : []
                   if (currentSelected.includes(item.id)) {
                     // Deselect if already selected
-                    const newSelected = currentSelected.filter(id => id !== item.id);
-                    setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
+                    const newSelected = currentSelected.filter(
+                      id => id !== item.id
+                    )
+                    setSelectedId(
+                      newSelected.length > 0 ? newSelected.join(',') : null
+                    )
                   } else {
                     // Add to selection
-                    setSelectedId([...currentSelected, item.id].join(','));
+                    setSelectedId([...currentSelected, item.id].join(','))
                   }
                 }
               },
               onTransformEnd: (e: any) => handleTransformEnd(e, item)
-            };
-            return <URLImage {...commonProps} image={item} />;
+            }
+            return <URLImage {...commonProps} image={item} />
           })}
         </Layer>
-        
+
         <Layer>
           {/* 2. Render Highlighters and Highlighter-specific Eraser */}
-          {items.map((item) => {
-            if (item.type !== 'stroke') return null;
+          {items.map(item => {
+            if (item.type !== 'stroke') return null
             if (item.isHighlighter) {
-              if ((item as any)._hidden) return null;
+              if ((item as any)._hidden) return null
               return (
-                <Line 
-                  key={item.id + '-hl'} 
+                <Line
+                  key={item.id + '-hl'}
                   id={item.id}
                   draggable={tool === 'select'}
                   onClick={(e: any) => {
                     if (tool === 'select') {
-                      const currentSelected = selectedId ? selectedId.split(',') : [];
-                      
+                      const currentSelected = selectedId
+                        ? selectedId.split(',')
+                        : []
+
                       if (currentSelected.includes(item.id)) {
-                        const newSelected = currentSelected.filter(id => id !== item.id);
-                        setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
+                        const newSelected = currentSelected.filter(
+                          id => id !== item.id
+                        )
+                        setSelectedId(
+                          newSelected.length > 0 ? newSelected.join(',') : null
+                        )
                       } else {
-                        setSelectedId([...currentSelected, item.id].join(','));
+                        setSelectedId([...currentSelected, item.id].join(','))
                       }
                     }
                   }}
                   onTap={() => {
                     if (tool === 'select') {
-                      const currentSelected = selectedId ? selectedId.split(',') : [];
+                      const currentSelected = selectedId
+                        ? selectedId.split(',')
+                        : []
                       if (currentSelected.includes(item.id)) {
                         // Deselect if already selected
-                        const newSelected = currentSelected.filter(id => id !== item.id);
-                        setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
+                        const newSelected = currentSelected.filter(
+                          id => id !== item.id
+                        )
+                        setSelectedId(
+                          newSelected.length > 0 ? newSelected.join(',') : null
+                        )
                       } else {
                         // Add to selection
-                        setSelectedId([...currentSelected, item.id].join(','));
+                        setSelectedId([...currentSelected, item.id].join(','))
                       }
                     }
                   }}
@@ -2039,76 +2411,109 @@ const getCursorStyle = () => {
                   onDragStart={handleItemDragStart}
                   onDragMove={handleItemDragMove}
                   onDragEnd={(e: any) => handleItemDragEnd(e, item)}
-                  points={item.points} 
-                  stroke={item.color} 
-                  strokeWidth={item.size} 
-                  tension={0} 
-                  lineCap="round" 
-                  lineJoin="round" 
-                  opacity={0.4} 
-                  globalCompositeOperation="source-over" 
+                  points={item.points}
+                  stroke={item.color}
+                  strokeWidth={item.size}
+                  tension={0}
+                  lineCap='round'
+                  lineJoin='round'
+                  opacity={0.4}
+                  globalCompositeOperation='source-over'
                   perfectDrawEnabled={false}
                   hitStrokeWidth={Math.max(10, item.size + 5)}
                 />
-              );
+              )
             }
             if (item.tool === 'highlighter-eraser') {
-               return (
-                <Line 
-                  key={item.id + '-hl-eraser'} 
+              return (
+                <Line
+                  key={item.id + '-hl-eraser'}
                   id={item.id}
-                  points={item.points} 
-                  stroke="#000000" 
-                  strokeWidth={item.size * 2 + 10} 
-                  tension={0} 
-                  lineCap="round" 
-                  lineJoin="round" 
-                  globalCompositeOperation="destination-out" 
+                  points={item.points}
+                  stroke='#000000'
+                  strokeWidth={item.size * 2 + 10}
+                  tension={0}
+                  lineCap='round'
+                  lineJoin='round'
+                  globalCompositeOperation='destination-out'
                   perfectDrawEnabled={false}
                 />
-               );
+              )
             }
-            return null;
+            return null
           })}
         </Layer>
 
         <Layer>
           {/* 3. Render everything else (Pen, Shapes, Text, Eraser) */}
-          {items.map((item) => {
-            if (item.type === 'image') return null;
-            if (item.type === 'stroke' && (item.isHighlighter || item.tool === 'highlighter-eraser')) return null;
-            return renderLayer3Item(item);
+          {items.map(item => {
+            if (item.type === 'image') return null
+            if (
+              item.type === 'stroke' &&
+              (item.isHighlighter || item.tool === 'highlighter-eraser')
+            )
+              return null
+            return renderLayer3Item(item)
           })}
-          
-          {selectionBox && <Rect x={selectionBox.x} y={selectionBox.y} width={selectionBox.width} height={selectionBox.height} stroke="#0099ff" strokeWidth={1} dash={[5, 5]} />}
-          <Line ref={previewLineRef} listening={false} tension={0} lineCap="round" lineJoin="round" stroke={color} strokeWidth={(tool === 'eraser' || tool === 'highlighter-eraser') ? size * 2 + 10 : size} visible={false} />
-          <Circle ref={cursorRef} listening={false} radius={size / 2} stroke="#ff1493" strokeWidth={2.5} fill="rgba(255, 20, 147, 0.15)" visible={tool === 'eraser' || tool === 'highlighter-eraser'} opacity={1} />
+
+          {selectionBox && (
+            <Rect
+              x={selectionBox.x}
+              y={selectionBox.y}
+              width={selectionBox.width}
+              height={selectionBox.height}
+              stroke='#0099ff'
+              strokeWidth={1}
+              dash={[5, 5]}
+            />
+          )}
+          <Line
+            ref={previewLineRef}
+            listening={false}
+            tension={0}
+            lineCap='round'
+            lineJoin='round'
+            stroke={color}
+            strokeWidth={
+              tool === 'eraser' || tool === 'highlighter-eraser'
+                ? size * 2 + 10
+                : size
+            }
+            visible={false}
+          />
+          <Circle
+            ref={cursorRef}
+            listening={false}
+            radius={size / 2}
+            stroke='#ff1493'
+            strokeWidth={2.5}
+            fill='rgba(255, 20, 147, 0.15)'
+            visible={tool === 'eraser' || tool === 'highlighter-eraser'}
+            opacity={1}
+          />
           <Transformer ref={transformerRef} />
         </Layer>
       </Stage>
 
-<<<<<<< HEAD
       {showRuler && <Ruler />}
-=======
       {/* Chrome Widgets */}
-      {chromeWidgets.map((widget) => (
+      {chromeWidgets.map(widget => (
         <ChromeWidget
           key={widget.id}
           id={widget.id}
           x={widget.x}
           y={widget.y}
           isDrawing={isDrawing.current}
-          onClose={() => setChromeWidgets(prev => prev.filter(w => w.id !== widget.id))}
-          onMove={(x, y) => setChromeWidgets(prev => prev.map(w => w.id === widget.id ? { ...w, x, y } : w))}
+          onClose={() =>
+            setChromeWidgets(prev => prev.filter(w => w.id !== widget.id))
+          }
+          onMove={(x, y) =>
+            setChromeWidgets(prev =>
+              prev.map(w => (w.id === widget.id ? { ...w, x, y } : w))
+            )
+          }
         />
       ))}
->>>>>>> 86da999c549d00b76c98381b4c3f13271f0cc37e
-
     </div>
-  );
-};
-
-
-
-
-
+  )
+}
