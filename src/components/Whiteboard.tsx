@@ -897,20 +897,14 @@ export const Whiteboard: React.FC = () => {
     if (!clickedOnEmpty) {
       const targetId = e.target.id() || e.target.getParent()?.id();
       if (targetId && tool === 'select') {
-        const isMultiSelect = (e.evt as MouseEvent).ctrlKey || (e.evt as MouseEvent).metaKey;
         const currentSelected = selectedId ? selectedId.split(',') : [];
         
-        if (isMultiSelect) {
-          // Ctrl+click: toggle item
-          if (currentSelected.includes(targetId)) {
-            const newSelected = currentSelected.filter(id => id !== targetId);
-            setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
-          } else {
-            setSelectedId([...currentSelected, targetId].join(','));
-          }
+        // Always add to selection without Ctrl requirement
+        if (currentSelected.includes(targetId)) {
+          const newSelected = currentSelected.filter(id => id !== targetId);
+          setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
         } else {
-          // Normal click: replace selection
-          setSelectedId(targetId);
+          setSelectedId([...currentSelected, targetId].join(','));
         }
         return;
       }
