@@ -9,6 +9,7 @@ import { COLORS, type ToolType } from '../types';
 import * as pdfjsLib from 'pdfjs-dist';
 
 
+
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 
 export const Toolbar: React.FC = () => {
@@ -67,6 +68,27 @@ export const Toolbar: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bgUploadRef = useRef<HTMLInputElement>(null);
   const wasInFullscreenRef = useRef(false);
+
+
+
+  const [showBrowser, setShowBrowser] = React.useState(false);
+
+  const handleChromeClick = () => {
+    if ((window as any).addChromeWidget) {
+      (window as any).addChromeWidget();
+    }
+    setShowExpandableToolbar(false);
+  };
+
+  const handlePcClick = () => {
+    if (document.fullscreenElement) {
+      wasInFullscreenRef.current = true;
+    }
+    fileInputRef.current?.click();
+    setShowExpandableToolbar(false);
+  };
+
+
 
   const ADMIN_PASSWORD = 'Wboard310193##';
 
@@ -296,7 +318,6 @@ export const Toolbar: React.FC = () => {
     if (!file) return;
 
     // Reset the input value so the same file can be selected again if needed
-    // We do this early to ensure the UI is responsive
     if (fileInputRef.current) fileInputRef.current.value = '';
 
     let srcList: string[] = [];
@@ -355,7 +376,6 @@ export const Toolbar: React.FC = () => {
         });
       }
       
-      // if (fileInputRef.current) fileInputRef.current.value = ''; // Moved up
     } catch (error) {
       console.error("Import failed:", error);
       setPdfProgress(null);
@@ -534,7 +554,7 @@ export const Toolbar: React.FC = () => {
           <input 
             type="file" 
             ref={fileInputRef} 
-            className="hidden" 
+            style={{ position: 'absolute', opacity: 0, width: 0, height: 0, pointerEvents: 'none' }}
             accept="image/png,image/jpeg,image/webp,application/pdf"
             onChange={handleFileImport}
           />
@@ -594,6 +614,9 @@ export const Toolbar: React.FC = () => {
                 {/* Upload Button */}
                 <button
                   onClick={() => {
+                    if (document.fullscreenElement) {
+                      wasInFullscreenRef.current = true;
+                    }
                     if (!isAdminAuthenticated) {
                       setPendingAction({ type: 'upload' });
                       setShowPasswordModal(true);
@@ -610,7 +633,7 @@ export const Toolbar: React.FC = () => {
                 <input
                   type="file"
                   ref={bgUploadRef}
-                  className="hidden"
+                  style={{ position: 'absolute', opacity: 0, width: 0, height: 0, pointerEvents: 'none' }}
                   accept="image/*"
                   onChange={handleBackgroundUpload}
                 />
@@ -635,7 +658,71 @@ export const Toolbar: React.FC = () => {
 
 
         {showExpandableToolbar && (
-    <ExpandableToolbar visible={showExpandableToolbar} onClose={() => setShowExpandableToolbar(false)} />
+    <ExpandableToolbar 
+      visible={showExpandableToolbar} 
+      onClose={() => setShowExpandableToolbar(false)} 
+      onChromeClick={handleChromeClick}
+      onBeforePcClick={() => {
+        if (document.fullscreenElement) {
+          wasInFullscreenRef.current = true;
+        }
+      }}
+      onPcClick={async (file) => {
+        // Use the same logic as handleFileImport, but with the file from ExpandableToolbar
+        if (!file) return;
+        let srcList: string[] = [];
+        let isPdf = false;
+        try {
+          if (file.type === 'application/pdf') {
+            srcList = await convertPdfToImages(file);
+            isPdf = true;
+          } else if (file.type.startsWith('image/')) {
+            const src = await new Promise<string>((resolve) => {
+              const reader = new FileReader();
+              reader.onload = (e) => resolve(e.target?.result as string);
+              reader.readAsDataURL(file);
+            });
+            srcList = [src];
+          } else {
+            alert('Unsupported file type');
+            return;
+          }
+          if (!isPdf) {
+            let yOffset = 50;
+            srcList.forEach((src) => {
+              const img = new Image();
+              img.src = src;
+              img.onload = () => {
+                const maxSize = 600;
+                let width = img.naturalWidth;
+                let height = img.naturalHeight;
+                if (width > maxSize || height > maxSize) {
+                  const ratio = Math.min(maxSize / width, maxSize / height);
+                  width *= ratio;
+                  height *= ratio;
+                }
+                addItem({
+                  type: 'image',
+                  id: uuidv4(),
+                  x: window.innerWidth / 2 - width / 2,
+                  y: yOffset,
+                  width: width,
+                  height: height,
+                  src: src
+                });
+                yOffset += height + 20;
+                saveHistory();
+              };
+            });
+          }
+        } catch (error) {
+          console.error("Import failed:", error);
+          setPdfProgress(null);
+          alert("Failed to import file. If using PDF, ensure it is not password protected.");
+        }
+        setShowExpandableToolbar(false);
+      }}
+    />
   )}
 
       </div>
