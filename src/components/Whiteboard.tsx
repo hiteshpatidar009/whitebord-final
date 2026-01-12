@@ -8,7 +8,11 @@ import { useWhiteboardStore } from '../store/useWhiteboardStore';
 import type { Stroke, WhiteboardItem } from '../types';
 import { strokesToImage, getBoundingBox } from '../utils/canvasUtils';
 import { FONT_STACKS, FONTS } from './TextToolbar';
+<<<<<<< HEAD
 import Ruler from './Ruler';
+=======
+import ChromeWidget from './ChromeWidget';
+>>>>>>> 86da999c549d00b76c98381b4c3f13271f0cc37e
 
 import { transcribeHandwriting } from '../services/geminiService';
 
@@ -360,6 +364,7 @@ export const Whiteboard: React.FC = () => {
   const lastEraserPosRef = useRef<{ x: number; y: number } | null>(null);
   const lastRightClickTime = useRef<number>(0);
   const [selectionBox, setSelectionBox] = useState<{ x: number, y: number, width: number, height: number } | null>(null);
+  const [chromeWidgets, setChromeWidgets] = useState<Array<{ id: string; x: number; y: number }>>([]);
 
   // Handwriting-specific state
   const handwritingStrokesRef = useRef<string[]>([]);
@@ -1653,11 +1658,20 @@ const getCursorStyle = () => {
     }
   };
 
-  // Expose startTextEditing globally for toolbar access
+  // Expose functions globally for toolbar access
   useEffect(() => {
     (window as any).startTextEditing = startTextEditing;
+    (window as any).addChromeWidget = () => {
+      const newWidget = {
+        id: uuidv4(),
+        x: window.innerWidth / 2 - 200,
+        y: window.innerHeight / 2 - 150
+      };
+      setChromeWidgets(prev => [...prev, newWidget]);
+    };
     return () => {
       delete (window as any).startTextEditing;
+      delete (window as any).addChromeWidget;
     };
   }, [startTextEditing]);
 
@@ -2073,7 +2087,22 @@ const getCursorStyle = () => {
         </Layer>
       </Stage>
 
+<<<<<<< HEAD
       {showRuler && <Ruler />}
+=======
+      {/* Chrome Widgets */}
+      {chromeWidgets.map((widget) => (
+        <ChromeWidget
+          key={widget.id}
+          id={widget.id}
+          x={widget.x}
+          y={widget.y}
+          isDrawing={isDrawing.current}
+          onClose={() => setChromeWidgets(prev => prev.filter(w => w.id !== widget.id))}
+          onMove={(x, y) => setChromeWidgets(prev => prev.map(w => w.id === widget.id ? { ...w, x, y } : w))}
+        />
+      ))}
+>>>>>>> 86da999c549d00b76c98381b4c3f13271f0cc37e
 
     </div>
   );
