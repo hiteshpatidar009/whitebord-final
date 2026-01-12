@@ -127,7 +127,7 @@ const FloatingStopwatch: React.FC = () => {
     >
       {/* TOP ICONS */}
       <div className="top-icons">
-<Move size={27} className="text-gray-500 cursor-grab h-8 bg-[#fff] p-1 rounded-lg  active:cursor-grabbing" />
+     <Move size={27} className="text-gray-500 cursor-grab h-8 bg-[#fff] p-1 rounded-lg  active:cursor-grabbing" />
 
         <span className="icon" onClick={() => setShowStopwatch(false)}><X size={24} className="text-gray-500 cursor-grab   bg-[#fff] mt-[0.8px]   active:cursor-grabbing" /></span>
       </div>

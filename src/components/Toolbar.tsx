@@ -2,8 +2,9 @@ import React, { useRef, useEffect } from 'react';
 import { useWhiteboardStore } from '../store/useWhiteboardStore';
 import { v4 as uuidv4 } from 'uuid';
 import { 
-  Pen, Hand, Eraser, Shapes, Type, Undo, Redo, FileUp, MousePointer2, PenLine, Trash2, Image as ImageIcon, Highlighter, PaintBucket, Maximize2, Upload, X, Timer
+  Pen, Hand, Eraser, Shapes, Type, Undo, Redo, FileUp, MousePointer2, PenLine, Trash2, Image as ImageIcon, Highlighter, PaintBucket, Maximize2, Upload, X, Timer , Plus
 } from 'lucide-react';
+import ExpandableToolbar from "./ExpandableToolbar";
 import { COLORS, type ToolType } from '../types';
 import * as pdfjsLib from 'pdfjs-dist';
 
@@ -16,9 +17,19 @@ export const Toolbar: React.FC = () => {
     textOptions, setSelectedId, showStopwatch, setShowStopwatch
   } = useWhiteboardStore();
   
-  const handleToolClick = (toolId: ToolType) => {
-    setTool(toolId);
-  };
+  // const handleToolClick = (toolId: ToolType) => {
+  //   setTool(toolId);
+  // };
+
+  const handleToolClick = (toolId: ToolType | 'plus') => {
+  if (toolId === "plus") {
+    setShowExpandableToolbar(prev => !prev);
+    return;
+  }
+  setTool(toolId);
+};
+
+  
   
   const handleTextDoubleClick = () => {
     // Close any existing text editor first
@@ -46,6 +57,7 @@ export const Toolbar: React.FC = () => {
   };
   
   const [showBackgroundPicker, setShowBackgroundPicker] = React.useState(false);
+  const [showExpandableToolbar, setShowExpandableToolbar] = React.useState(false);
   const [uploadedBackgrounds, setUploadedBackgrounds] = React.useState<{id: number, url: string, name: string}[]>([]);
   const [pdfProgress, setPdfProgress] = React.useState<number | null>(null);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = React.useState(false);
@@ -351,7 +363,9 @@ export const Toolbar: React.FC = () => {
     }
   };
 
-  const tools: { id: ToolType; icon: React.ReactNode; label: string }[] = [
+  const tools: { id: ToolType | 'plus'; icon: React.ReactNode; label: string }[] = [
+
+    { id: 'plus', icon: <Plus size={20} />, label: 'Expand' },
     { id: 'select', icon: <MousePointer2 size={20} />, label: 'Select' },
     { id: 'hand', icon: <Hand size={20} />, label: 'Pan' },
     { id: 'pen', icon: <Pen size={20} />, label: 'Pen' },
@@ -436,8 +450,24 @@ export const Toolbar: React.FC = () => {
       )}
 
       {/* Desktop: Horizontal toolbar at top */}
-      <div className="hidden sm:flex fixed left-1/2 transform -translate-x-1/2 scale-75 origin-top bg-white shadow-lg rounded-full px-6 py-1 flex items-center gap-4 z-50 border border-gray-200">
-        {/* Tools */}
+
+<div
+  className={`
+    fixed left-1/2 transform -translate-x-1/2 scale-75 origin-top z-50 bg-white border shadow-lg
+    transition-all duration-300 rounded-full px-6 py-1 flex items-center gap-4 border-gray-200
+    ${showExpandableToolbar ? 'w-[1350px] h-10 space-y-2  overflow-y-auto' : 
+                              ''}
+  
+  `}
+>
+
+    
+{!showExpandableToolbar && (
+
+  <div className="flex items-center gap-4 overflow-y-auto">
+
+
+   {/* Tools */}
         <div className="flex items-center gap-2 border-r border-gray-200 pr-4">
           {tools.map((t) => (
             <button
@@ -603,168 +633,22 @@ export const Toolbar: React.FC = () => {
             <Maximize2 size={20} />
           </button>
         </div>
+
+        
+</div>
+
+
+ )}
+
+
+        {showExpandableToolbar && (
+    <ExpandableToolbar visible={showExpandableToolbar} onClose={() => setShowExpandableToolbar(false)} />
+  )}
+
       </div>
 
-      {/* Mobile: Vertical toolbar on left */}
-      <div className="sm:hidden fixed left-2 top-1/2 transform -translate-y-1/2 bg-white shadow-lg rounded-lg p-2 flex flex-col items-center gap-2 z-50 border border-gray-200 max-h-[calc(100vh-1rem)] overflow-y-auto">
-        {/* Tools */}
-        <div className="flex flex-col items-center gap-1 border-b border-gray-200 pb-2">
-          {tools.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => handleToolClick(t.id)}
-              onDoubleClick={t.id === 'text' ? handleTextDoubleClick : undefined}
-              className={`p-2 rounded-full transition-colors ${
-                tool === t.id 
-                  ? 'bg-blue-100 text-blue-600' 
-                  : 'hover:bg-gray-100 text-gray-600'
-              }`}
-              title={t.id === 'text' ? `${t.label} (Double-click to add text)` : t.label}
-            >
-              {t.icon}
-            </button>
-          ))}
-        </div>
 
-        {/* Colors */}
-        {['pen', 'shape', 'text', 'handwriting', 'highlighter'].includes(tool) && (
-          <div className="flex flex-col items-center gap-1 border-b border-gray-200 pb-2">
-            {colorOptions.map((c) => (
-              <button
-                key={c.color}
-                onClick={() => setColor(c.color)}
-                className={`w-6 h-6 rounded-full border border-gray-300 transition-transform ${
-                  color === c.color ? 'ring-2 ring-blue-400' : ''
-                }`}
-                style={{ backgroundColor: c.color }}
-                title={c.label}
-              />
-            ))}
-          </div>
-        )}
 
-        {/* Size Slider */}
-        {['pen', 'eraser', 'shape', 'handwriting', 'highlighter', 'highlighter-eraser'].includes(tool) && (
-          <div className="flex flex-col items-center gap-1 border-b border-gray-200 pb-2">
-            <span className="text-xs text-gray-500">Size</span>
-            <input
-              type="range"
-              min="1"
-              max={(tool === 'eraser' || tool === 'highlighter-eraser') ? 200 : tool === 'handwriting' ? 20 : 50}
-              value={tool === 'handwriting' ? Math.min(size, 20) : size}
-              onChange={(e) => setSize(parseInt(e.target.value))}
-              className="w-8 h-20 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-              style={{ writingMode: 'vertical-rl' }}
-            />
-          </div>
-        )}
-
-        {/* Actions */}
-        <div className="flex flex-col items-center gap-1">
-          <button onClick={undo} className="p-2 rounded-full hover:bg-gray-100 text-gray-600" title="Undo">
-            <Undo size={20} />
-          </button>
-          
-          <button onClick={redo} className="p-2 rounded-full hover:bg-gray-100 text-gray-600" title="Redo">
-            <Redo size={20} />
-          </button>
-          
-          <button
-            onClick={() => {
-              if (document.fullscreenElement) wasInFullscreenRef.current = true;
-              fileInputRef.current?.click();
-            }}
-            className="p-2 rounded-full hover:bg-gray-100 text-gray-600"
-            title="Import"
-          >
-            <FileUp size={20} />
-          </button>
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            className="hidden" 
-            accept="image/png,image/jpeg,image/webp,application/pdf"
-            onChange={handleFileImport}
-          />
-
-          <button onClick={clear} className="p-2 rounded-full hover:bg-red-100 text-red-600" title="Clear">
-            <Trash2 size={20} />
-          </button>
-
-          <button 
-            onClick={() => setShowStopwatch(!showStopwatch)} 
-            className={`p-2 rounded-full transition-colors ${showStopwatch ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-100 text-gray-600'}`} 
-            title="Stopwatch"
-          >
-            <Timer size={20} />
-          </button>
-
-          <div className="relative">
-            <button 
-              onClick={() => setShowBackgroundPicker(!showBackgroundPicker)}
-              className="p-2 rounded-full hover:bg-gray-100 text-gray-600" 
-              title="Background"
-            >
-              <ImageIcon size={20} />
-            </button>
-            
-            {showBackgroundPicker && (
-              <div className="absolute left-full top-0 ml-2 bg-white shadow-lg rounded-lg p-2 border border-gray-200 flex flex-col gap-2 z-10 max-h-64 overflow-y-auto">
-                {uploadedBackgrounds.map((bg) => (
-                  <div key={`uploaded-mobile-${bg.id}`} className="relative group">
-                    <button
-                      onClick={() => {
-                        setBackgroundImage(bg.url);
-                        setShowBackgroundPicker(false);
-                      }}
-                      className={`w-12 h-12 rounded border-2 overflow-hidden transition-all flex-shrink-0 ${
-                        backgroundImage === bg.url ? 'border-blue-500' : 'border-gray-300 hover:border-gray-400'
-                      }`}
-                      title={bg.name}
-                    >
-                      <img 
-                        src={bg.url} 
-                        alt={bg.name}
-                        className="w-full h-full object-cover"
-                      />
-                    </button>
-                    <button
-                      onClick={(e) => handleBackgroundDelete(bg.id, e)}
-                      className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
-                      title="Delete Background"
-                    >
-                      <X size={10} />
-                    </button>
-                  </div>
-                ))}
-                <button
-                  onClick={() => {
-                    if (!isAdminAuthenticated) {
-                      setPendingAction({ type: 'upload' });
-                      setShowPasswordModal(true);
-                      setShowBackgroundPicker(false);
-                    } else {
-                      bgUploadRef.current?.click();
-                    }
-                  }}
-                  className="w-12 h-12 rounded border-2 border-dashed border-gray-300 hover:border-blue-500 flex items-center justify-center text-gray-500 hover:text-blue-500 transition-all flex-shrink-0"
-                  title="Upload Background"
-                >
-                  <Upload size={20} />
-                </button>
-              </div>
-            )}
-          </div>
-
-          <button 
-            onClick={handleFullscreen}
-            className="p-2 rounded-full hover:bg-gray-100 text-gray-600" 
-            title="Fullscreen"
-          >
-            <Maximize2 size={20} />
-          </button>
-        </div>
-      </div>
     </>
   );
 };
