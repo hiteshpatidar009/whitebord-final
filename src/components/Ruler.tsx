@@ -1,6 +1,8 @@
-import React, { useRef, useState } from 'react'
+import React, { useRef, useState, useEffect } from 'react'
+import { useWhiteboardStore } from '../store/useWhiteboardStore'
 
 const Ruler: React.FC = () => {
+  const { setShowRuler } = useWhiteboardStore()
   const rulerRef = useRef<HTMLDivElement>(null)
 
   const [position, setPosition] = useState({ x: 200, y: 200 })
@@ -10,8 +12,18 @@ const Ruler: React.FC = () => {
   const [dragging, setDragging] = useState(false)
   const [resizing, setResizing] = useState(false)
   const [rotating, setRotating] = useState(false)
+  const [tickMarks, setTickMarks] = useState<number[]>([])
 
   const startRef = useRef({ x: 0, y: 0, width: 0, angle: 0 })
+
+  // Generate tick marks based on width
+  useEffect(() => {
+    const cmInPixels = 37.8 // 1cm = 37.8 pixels
+    const totalCm = Math.floor(width / cmInPixels)
+    const totalTicks = totalCm * 10 // 10 ticks per cm (mm)
+    const marks = Array.from({ length: totalTicks + 1 }, (_, i) => i)
+    setTickMarks(marks)
+  }, [width])
 
   /* ---------------- Drag ---------------- */
   const onDragStart = (e: React.MouseEvent) => {
@@ -55,7 +67,7 @@ const Ruler: React.FC = () => {
 
     if (resizing) {
       const delta = e.clientX - startRef.current.x
-      setWidth(Math.max(250, Math.min(700, startRef.current.width + delta)))
+      setWidth(Math.max(250, Math.min(1000, startRef.current.width + delta)))
     }
 
     if (rotating) {
@@ -76,13 +88,35 @@ const Ruler: React.FC = () => {
     setRotating(false)
   }
 
+  // Get tick height based on type
+  const getTickHeight = (index: number) => {
+    if (index % 10 === 0) return 20 // Centimeter marks (tallest)
+    if (index % 5 === 0) return 14 // Half-centimeter marks
+    return 8 // Millimeter marks (shortest)
+  }
+
+  // Get tick color based on type
+  const getTickColor = (index: number) => {
+    if (index % 10 === 0) return 'bg-gray-900' // Centimeter marks - darkest
+    if (index % 5 === 0) return 'bg-gray-800' // Half-centimeter marks
+    return 'bg-gray-700' // Millimeter marks
+  }
+
+  // Calculate position for each tick
+  const getTickPosition = (index: number) => {
+    const cmInPixels = 37.8
+    return (index * cmInPixels) / 10
+  }
+
   return (
     <div
       className='absolute inset-0'
       onMouseMove={onMouseMove}
       onMouseUp={stopAll}
       onMouseLeave={stopAll}
-      style={{ pointerEvents: dragging || resizing || rotating ? 'auto' : 'none' }}
+      style={{
+        pointerEvents: dragging || resizing || rotating ? 'auto' : 'none'
+      }}
     >
       <div
         ref={rulerRef}
@@ -96,38 +130,105 @@ const Ruler: React.FC = () => {
         }}
         className='absolute cursor-grab select-none'
       >
-        {/* Ruler Body */}
-        <div className='relative h-20 rounded-2xl bg-gradient-to-b from-[#e8f0dc] to-[#cfdcbc] shadow-md flex items-center px-10'>
-          {/* Ticks */}
-          <div className='absolute top-2 left-6 right-6 flex justify-between text-xs text-gray-600'>
-            {Array.from({ length: 9 }).map((_, i) => (
-              <span key={i}>{i}</span>
-            ))}
+        {/* Ruler Body with realistic look */}
+        <div className='relative h-28 rounded-xl bg-[#B9DEA5] border-2 border-gray-800 shadow-2xl shadow-gray-900/30 flex items-center overflow-hidden'>
+          {/* Top edge highlight */}
+          <div className='absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-white/20 to-transparent'></div>
+
+          {/* Millimeter and Centimeter Tick Marks */}
+          <div className='absolute top-0 left-0 h-full w-full flex'>
+            {tickMarks.map(tick => {
+              const isCm = tick % 10 === 0
+              const isHalfCm = tick % 5 === 0
+              const position = getTickPosition(tick)
+
+              return (
+                <div
+                  key={tick}
+                  className='absolute flex flex-col items-center'
+                  style={{
+                    left: `${position}px`,
+                    transform: 'translateX(-50%)'
+                  }}
+                >
+                  {/* Top tick mark */}
+                  <div
+                    className={`w-[1.2px] ${getTickColor(tick)}`}
+                    style={{ height: `${getTickHeight(tick)}px` }}
+                  />
+
+                  {/* Centimeter numbers */}
+                  {isCm && (
+                    <div className='mt-1 text-xs font-bold text-gray-900 tracking-tight'>
+                      {tick / 10}
+                    </div>
+                  )}
+
+                  {/* Bottom tick mark (mirrored) */}
+                  <div
+                    className={`absolute bottom-0 w-[1.2px] ${getTickColor(
+                      tick
+                    )}`}
+                    style={{
+                      height: `${getTickHeight(tick)}px`,
+                      transform: 'translateY(100%)'
+                    }}
+                  />
+                </div>
+              )
+            })}
           </div>
 
-          {/* Center Angle */}
-          <div className='mx-auto text-gray-700 font-semibold'>
-            {Math.round(rotation)}°
+          {/* Center line indicator */}
+          <div className='absolute left-1/2 top-0 bottom-0 w-0.5 bg-red-600/80 transform -translate-x-1/2'></div>
+
+          {/* Angle display with professional look */}
+          <div className='absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-gray-900/90 px-4 py-2 rounded-lg border border-gray-800 shadow-lg'>
+            <div className='text-sm font-bold text-white flex items-center gap-2'>
+              <span className='text-gray-300'>⟳</span>
+              <span>{Math.round(rotation)}°</span>
+            </div>
           </div>
 
-          {/* Close Button (UI only) */}
-          <button className='absolute left-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-gray-400 text-white text-sm flex items-center justify-center'>
+          {/* Scale indicator */}
+          <div className='absolute top-2 left-1/2 transform -translate-x-1/2 bg-gray-900/80 px-3 py-1 rounded text-xs font-medium text-white'>
+            1:1 Scale
+          </div>
+
+          {/* Close Button with better styling */}
+          <button 
+            className='absolute left-4 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-gray-800 hover:bg-gray-900 border-2 border-gray-700 text-white text-sm font-bold flex items-center justify-center shadow-md transition-all hover:scale-110 active:scale-95'
+            onClick={() => setShowRuler(false)}
+          >
             ×
           </button>
 
-          {/* Resize Handle */}
+          {/* Resize Handle - professional design */}
           <div
             onMouseDown={onResizeStart}
-            className='absolute right-10 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-gray-500 cursor-ew-resize'
-          />
+            className='absolute right-8 top-1/2 -translate-y-1/2 w-3 h-16 rounded bg-gradient-to-r from-gray-800 to-gray-900 border border-gray-700 cursor-ew-resize hover:from-gray-700 hover:to-gray-800 transition-all shadow-inner flex items-center justify-center group'
+            title='Resize'
+          >
+            <div className='w-0.5 h-10 bg-gray-600/50 rounded'></div>
+            <div className='absolute -right-6 text-xs font-medium text-gray-800 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap'>
+              {Math.round(width / 37.8)} cm
+            </div>
+          </div>
 
-          {/* Rotate Handle */}
+          {/* Rotate Handle - professional design */}
           <div
             onMouseDown={onRotateStart}
-            className='absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-gray-600 cursor-pointer flex items-center justify-center text-white text-sm'
+            className='absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-gradient-to-br from-gray-800 to-gray-900 border-2 border-gray-700 cursor-pointer flex items-center justify-center text-white hover:text-gray-200 hover:from-gray-700 hover:to-gray-800 transition-all shadow-lg group'
+            title='Rotate'
           >
-            ⟳
+            <span className='text-lg'>⟳</span>
+            <div className='absolute -right-10 text-xs font-medium text-gray-800 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap'>
+              Rotate
+            </div>
           </div>
+
+          {/* Bottom edge shadow */}
+          <div className='absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-gray-900/20 to-transparent'></div>
         </div>
       </div>
     </div>

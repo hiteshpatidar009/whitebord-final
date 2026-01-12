@@ -24,6 +24,12 @@ type ExpandableToolbarProps = {
 const ExpandableToolbar: React.FC<ExpandableToolbarProps> = ({ visible, onClose }) => {
   const { setShowRuler } = useWhiteboardStore();
   
+  const handleRulerClick = () => {
+    console.log('Ruler button clicked'); // Debug log
+    setShowRuler(true);
+    onClose(); // Close the toolbar after selecting ruler
+  };
+  
   if (!visible) return null;
 
   return (
@@ -58,7 +64,7 @@ const ExpandableToolbar: React.FC<ExpandableToolbarProps> = ({ visible, onClose 
             <div className="inline-flex items-center gap-3 px-4 py-1 rounded-full bg-black text-white text-sm font-semibold">
             GEOMETRY TOOLS
           </div>
-            <Pill icon={<Ruler size={18} />} label="Ruler" onClick={() => setShowRuler(true)} />
+            <Pill icon={<Ruler size={18} />} label="Ruler" onClick={handleRulerClick} />
             <Pill icon={<Compass size={18} />} label="Compass" />
             <Pill icon={<Divide size={18} />} label="Divider" />
             <Pill icon={<Square size={18} />} label="Set Square 60°" />
