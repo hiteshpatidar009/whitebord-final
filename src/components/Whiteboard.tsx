@@ -8,6 +8,7 @@ import { useWhiteboardStore } from '../store/useWhiteboardStore';
 import type { Stroke, WhiteboardItem } from '../types';
 import { strokesToImage, getBoundingBox } from '../utils/canvasUtils';
 import { FONT_STACKS, FONTS } from './TextToolbar';
+import Ruler from './Ruler';
 
 import { transcribeHandwriting } from '../services/geminiService';
 
@@ -2070,6 +2071,8 @@ const getCursorStyle = () => {
           <Transformer ref={transformerRef} />
         </Layer>
       </Stage>
+
+      <Ruler />
 
     </div>
   );
