@@ -26,7 +26,7 @@ const ExpandableToolbar: React.FC<ExpandableToolbarProps> = ({ visible, onClose 
   return (
     <div className="fixed -top-0  left-1/2 -translate-x-1/2 z-[999]">
       {/* VERTICAL SCROLL CONTAINER */}
-      <div className="w-[90vw] max-w-[1360px] max-h-[60px] overflow-y-auto bg-white rounded-full shadow-lg border px-4 py-2 space-y-6">
+      <div className="w-[90vw] max-w-[1360px] max-h-[64px] overflow-y-auto bg-white rounded-full shadow-lg border px-4 py-2 space-y-6">
 
         {/* ================= SECTION 1 ================= */}
        
@@ -37,7 +37,7 @@ const ExpandableToolbar: React.FC<ExpandableToolbarProps> = ({ visible, onClose 
               <Plus size={20} className="rotate-45" />
             </button>
 
-            <div className="inline-flex items-center gap-3 px-4 py-3 rounded-full bg-black text-white text-sm font-semibold">
+            <div className="inline-flex items-center gap-3 px-4 py-2 rounded-full bg-black text-white text-lg font-semibold">
             Chrome | PC | App
           </div>
             <Pill icon={<Chrome size={18} />} label="Chrome" />
@@ -54,7 +54,7 @@ const ExpandableToolbar: React.FC<ExpandableToolbarProps> = ({ visible, onClose 
             <button onClick={onClose} className="text-gray-500">
               <Plus size={20} className="rotate-45" />
             </button>
-            <div className="inline-flex items-center gap-3 px-4 py-3 rounded-full bg-black text-white text-sm font-semibold">
+            <div className="inline-flex items-center gap-3 px-4 py-2 rounded-full bg-black text-white text-lg font-semibold">
             GEOMETRY TOOLS
           </div>
             <Pill icon={<Ruler size={18} />} label="Ruler" />
@@ -71,7 +71,7 @@ const ExpandableToolbar: React.FC<ExpandableToolbarProps> = ({ visible, onClose 
             <button onClick={onClose} className="text-gray-500">
               <Plus size={20} className="rotate-45" />
             </button>
-            <div className="inline-flex items-center gap-3 px-4 py-3 rounded-full bg-black text-white text-sm font-semibold">
+            <div className="inline-flex items-center gap-3 px-4 py-2 rounded-full bg-black text-white text-lg font-semibold">
             3D & OTHER TOOLS
           </div>
             <Pill icon={<Dice3 size={18} />} label="3D Dice" />
@@ -92,6 +92,6 @@ export default ExpandableToolbar;
 const Pill = ({ icon, label }: { icon: React.ReactNode; label: string }) => (
   <button className="flex items-center gap-2 px-4 py-2 rounded-full bg-gray-100 hover:bg-blue-100 text-gray-700 hover:text-blue-600 transition whitespace-nowrap">
     {icon}
-    <span className="text-sm font-medium">{label}</span>
+    <span className="text-lg font-medium">{label}</span>
   </button>
 );
