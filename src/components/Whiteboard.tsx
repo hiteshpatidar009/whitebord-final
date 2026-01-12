@@ -331,6 +331,7 @@ export const Whiteboard: React.FC = () => {
     backgroundImage,
     groupItems,
     ungroupItems,
+    showRuler,
   } = useWhiteboardStore();
 
   const stageRef = useRef<Konva.Stage>(null);
@@ -2072,7 +2073,7 @@ const getCursorStyle = () => {
         </Layer>
       </Stage>
 
-      <Ruler />
+      {showRuler && <Ruler />}
 
     </div>
   );

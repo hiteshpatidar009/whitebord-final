@@ -14,6 +14,7 @@ import {
   Box,
   Plus
 } from "lucide-react";
+import { useWhiteboardStore } from '../store/useWhiteboardStore';
 
 type ExpandableToolbarProps = {
   visible: boolean;
@@ -21,6 +22,8 @@ type ExpandableToolbarProps = {
 };
 
 const ExpandableToolbar: React.FC<ExpandableToolbarProps> = ({ visible, onClose }) => {
+  const { setShowRuler } = useWhiteboardStore();
+  
   if (!visible) return null;
 
   return (
@@ -55,7 +58,7 @@ const ExpandableToolbar: React.FC<ExpandableToolbarProps> = ({ visible, onClose 
             <div className="inline-flex items-center gap-3 px-4 py-1 rounded-full bg-black text-white text-sm font-semibold">
             GEOMETRY TOOLS
           </div>
-            <Pill icon={<Ruler size={18} />} label="Ruler" />
+            <Pill icon={<Ruler size={18} />} label="Ruler" onClick={() => setShowRuler(true)} />
             <Pill icon={<Compass size={18} />} label="Compass" />
             <Pill icon={<Divide size={18} />} label="Divider" />
             <Pill icon={<Square size={18} />} label="Set Square 60°" />
@@ -88,8 +91,11 @@ export default ExpandableToolbar;
 
 /* ================= PILL COMPONENT ================= */
 
-const Pill = ({ icon, label }: { icon: React.ReactNode; label: string }) => (
-  <button className="flex items-center gap-2 px-4 py-2 rounded-full bg-gray-100 hover:bg-blue-100 text-gray-700 hover:text-blue-600 transition whitespace-nowrap">
+const Pill = ({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick?: () => void }) => (
+  <button 
+    className="flex items-center gap-2 px-4 py-2 rounded-full bg-gray-100 hover:bg-blue-100 text-gray-700 hover:text-blue-600 transition whitespace-nowrap"
+    onClick={onClick}
+  >
     {icon}
     <span className="text-sm font-medium">{label}</span>
   </button>
