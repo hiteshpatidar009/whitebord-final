@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { Settings, Play, Pause , Square, Move, X} from "lucide-react";
 import { useWhiteboardStore } from "../store/useWhiteboardStore";
 
 const FloatingStopwatch: React.FC = () => {
@@ -126,9 +127,9 @@ const FloatingStopwatch: React.FC = () => {
     >
       {/* TOP ICONS */}
       <div className="top-icons">
-        <span className="icon" />
-        <span className="icon" />
-        <span className="icon" onClick={() => setShowStopwatch(false)}>✕</span>
+<Move size={27} className="text-gray-500 cursor-grab h-8 bg-[#fff] p-1 rounded-lg  active:cursor-grabbing" />
+
+        <span className="icon" onClick={() => setShowStopwatch(false)}><X size={24} className="text-gray-500 cursor-grab   bg-[#fff] mt-[0.8px]   active:cursor-grabbing" /></span>
       </div>
 
       {/* BODY */}
@@ -141,16 +142,24 @@ const FloatingStopwatch: React.FC = () => {
                 <div className="digit">{d}</div>
                 {settings && <button onClick={() => updateDigit(i, -1)}>▼</button>}
               </div>
-              {(i === 1 || i === 3) && <span className="colon">:</span>}
+              {(i === 1 || i === 3) && <span className="colon flex justify-center items-center w-7 text-black">:</span>}
             </React.Fragment>
           ))}
         </div>
 
         {/* CONTROLS */}
-        <div className="controls">
-          <button onClick={reset}>■</button>
+        <div className="controls ">
+          <button onClick={reset}> <Square size={20} fill="black" stroke="none"  /> </button>
 
-         <button
+         <button style={{backgroundColor: "#D3D3D3",
+    borderRadius: "50%",
+    width: "48px",
+    height: "48px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center"
+         }}
+
   onClick={() => {
     // PAUSE
     if (running) {
@@ -168,7 +177,11 @@ const FloatingStopwatch: React.FC = () => {
     setRunning(true);
   }}
 >
-  {running ? "❚❚" : "▶"}
+{running ? (
+  <Pause size={24} fill="black" stroke="none" />
+) : (
+  <Play size={24} fill="black" stroke="none" />
+)}
 </button>
 
 
@@ -179,10 +192,10 @@ const FloatingStopwatch: React.FC = () => {
               setSettings((s) => !s);
             }}
           >
-            ⚙️
+              <Settings size={22} fill="black" stroke="lightgray"  />
           </button>
 
-          <button onClick={() => setShowStopwatch(false)}>—</button>
+          {/* <button onClick={() => setShowStopwatch(false)}>—</button> */}
         </div>
       </div>
     </div>
