@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from "react";
-import { RotateCcw, Home } from "lucide-react";
+import { RotateCcw, Home, Lock, Unlock , CircleX as Cross } from "lucide-react";
 
 interface ChromeWidgetProps {
   id: string;
   x: number;
   y: number;
+  locked: boolean;
   onClose: () => void;
   onMove: (x: number, y: number) => void;
+  onToggleLock: () => void;
   isDrawing?: boolean;
 }
 
@@ -15,8 +17,10 @@ const HOME_URL = "https://www.chrome.com";
 const ChromeWidget: React.FC<ChromeWidgetProps> = ({
   x,
   y,
+  locked,
   onClose,
   onMove,
+  onToggleLock,
   isDrawing = false,
 }) => {
   const [url, setUrl] = useState(HOME_URL);
@@ -68,12 +72,14 @@ const ChromeWidget: React.FC<ChromeWidgetProps> = ({
 
   return (
     <div
-      className="fixed bg-white rounded-lg shadow-2xl border border-gray-300 overflow-hidden z-50"
+      className="absolute bg-white rounded-lg shadow-2xl border border-gray-300 overflow-hidden"
       style={{
         left: x,
         top: y,
         width: 720,
         height: 420,
+        zIndex: locked ? 5 : 50,
+        pointerEvents: locked ? 'none' : 'auto',
       }}
     >
       {/* HEADER */}
@@ -83,17 +89,14 @@ const ChromeWidget: React.FC<ChromeWidgetProps> = ({
       >
         {/* Window controls */}
         <div className="flex gap-1">
-          <button
-            onClick={onClose}
-            className="w-3 h-3 bg-red-500 rounded-full"
-          />
+          <Cross size={20}  onClick={onClose} className="text-red-500 cursor-pointer" />
           {/* <span className="w-3 h-3 bg-yellow-500 rounded-full" />
           <span className="w-3 h-3 bg-green-500 rounded-full" /> */}
         </div>
 
         {/* Navigation */}
         <button
-          onClick={() => setCurrentUrl(currentUrl)}
+          onClick={() => setCurrentUrl(currentUrl + '?t=' + Date.now())}
           className="p-1 hover:bg-gray-200 rounded"
         >
           <RotateCcw size={14} />
@@ -104,6 +107,15 @@ const ChromeWidget: React.FC<ChromeWidgetProps> = ({
           className="p-1 hover:bg-gray-200 rounded"
         >
           <Home size={14} />
+        </button>
+
+        {/* Lock/Unlock Button */}
+        <button
+          onClick={onToggleLock}
+          className="p-1 hover:bg-gray-200 rounded"
+          style={{ pointerEvents: 'auto' }}
+        >
+          {locked ? <Lock size={14} /> : <Unlock size={14} />}
         </button>
 
         {/* Address Bar */}

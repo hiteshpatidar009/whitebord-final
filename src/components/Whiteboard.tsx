@@ -254,7 +254,7 @@ export const Whiteboard: React.FC = () => {
   const lastEraserPosRef = useRef<{ x: number; y: number } | null>(null);
   // const _lastRightClickTime = useRef<number>(0);
   const [selectionBox, setSelectionBox] = useState<{ x: number, y: number, width: number, height: number } | null>(null);
-  const [chromeWidgets, setChromeWidgets] = useState<Array<{ id: string; x: number; y: number }>>([]);
+  const [chromeWidgets, setChromeWidgets] = useState<Array<{ id: string; x: number; y: number; locked: boolean }>>([]);
 
   // Handwriting-specific state
   const handwritingStrokesRef = useRef<string[]>([]);
@@ -577,7 +577,7 @@ export const Whiteboard: React.FC = () => {
           x: centerX - 100,
           y: centerY - 16,
           text: text,
-          fontSize: 32,
+          fontSize: 44,
           fontFamily: 'Monotype Corsiva, "Brush Script MT", cursive',
           fill: color, // Store the color that was active when handwriting was created
           width: 400,
@@ -893,7 +893,7 @@ export const Whiteboard: React.FC = () => {
         if (isEraser) {
             cursorRef.current.x(point.x);
             cursorRef.current.y(point.y);
-            cursorRef.current.radius((size * 2.5) / 2);
+            cursorRef.current.radius(size * 1.1);
             cursorRef.current.getLayer()?.batchDraw();
         }
     }
@@ -1829,7 +1829,8 @@ const getCursorStyle = () => {
       const newWidget = {
         id: uuidv4(),
         x: window.innerWidth / 2 - 200,
-        y: window.innerHeight / 2 - 150
+        y: window.innerHeight / 2 - 150,
+        locked: false
       };
       setChromeWidgets(prev => [...prev, newWidget]);
     };
@@ -2290,7 +2291,7 @@ const getCursorStyle = () => {
           
           {selectionBox && <Rect x={selectionBox.x} y={selectionBox.y} width={selectionBox.width} height={selectionBox.height} stroke="#0099ff" strokeWidth={1} dash={[5, 5]} />}
           <Line ref={previewLineRef} listening={false} tension={0} lineCap="round" lineJoin="round" stroke={color} strokeWidth={(tool === 'eraser' || tool === 'highlighter-eraser') ? size * 2 + 10 : size} visible={false} />
-          <Circle ref={cursorRef} listening={false} radius={size / 2} stroke="#ff1493" strokeWidth={2.5} fill="rgba(255, 20, 147, 0.15)" visible={tool === 'eraser' || tool === 'highlighter-eraser'} opacity={1} />
+          <Circle ref={cursorRef} listening={false} radius={size * 0.5} stroke="#ff1493" strokeWidth={2.5} fill="rgba(255, 20, 147, 0.15)" visible={tool === 'eraser' || tool === 'highlighter-eraser'} opacity={1} />
           <Transformer ref={transformerRef} />
         </Layer>
       </Stage>
@@ -2329,18 +2330,197 @@ const getCursorStyle = () => {
         );
       })}
 
-      {/* Chrome Widgets */}
+      {/* Chrome Widgets - Render BEFORE Stage */}
       {chromeWidgets.map((widget) => (
-        <ChromeWidget
-          key={widget.id}
-          id={widget.id}
-          x={widget.x}
-          y={widget.y}
-          isDrawing={isDrawing.current}
-          onClose={() => setChromeWidgets(prev => prev.filter(w => w.id !== widget.id))}
-          onMove={(x, y) => setChromeWidgets(prev => prev.map(w => w.id === widget.id ? { ...w, x, y } : w))}
-        />
+        <React.Fragment key={widget.id}>
+          <ChromeWidget
+            id={widget.id}
+            x={widget.x}
+            y={widget.y}
+            locked={widget.locked}
+            isDrawing={isDrawing.current}
+            onClose={() => setChromeWidgets(prev => prev.filter(w => w.id !== widget.id))}
+            onMove={(x, y) => setChromeWidgets(prev => prev.map(w => w.id === widget.id ? { ...w, x, y } : w))}
+            onToggleLock={() => setChromeWidgets(prev => prev.map(w => w.id === widget.id ? { ...w, locked: !w.locked } : w))}
+          />
+          {/* Floating Unlock Button when locked */}
+          {widget.locked && (
+            <div
+              style={{
+                position: 'absolute',
+                left: widget.x + 640,
+                top: widget.y + 10,
+                zIndex: 60,
+                pointerEvents: 'auto'
+              }}
+            >
+              <button
+                onClick={() => setChromeWidgets(prev => prev.map(w => w.id === widget.id ? { ...w, locked: false } : w))}
+                className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600"
+              >
+                Unlock
+              </button>
+            </div>
+          )}
+        </React.Fragment>
       ))}
+
+      {/* Stage Wrapper with higher z-index */}
+      <div style={{ position: 'absolute', inset: 0, zIndex: 10 }}>
+        <Stage
+          ref={stageRef}
+          style={{ background: 'transparent', zIndex: 10 }}
+          width={stageSize.width}
+          height={stageSize.height}
+          onMouseDown={qModeActive ? (e) => e.evt.preventDefault() : handleMouseDown}
+          onMouseMove={qModeActive ? handleQMouseMove : handleMouseMove}
+          onMouseUp={qModeActive ? handleQMouseUp : handleMouseUp}
+          onTouchStart={handleMouseDown}
+          onTouchMove={handleMouseMove}
+          onTouchEnd={handleMouseUp}
+          onWheel={handleWheel}
+          onClick={(e) => {
+            // Deselect when clicking on empty canvas
+            if (e.target === e.target.getStage()) {
+              setSelectedId(null);
+            }
+          }}
+          onDblClick={handleCanvasDoubleClick}
+          onDblTap={handleCanvasDoubleClick}
+          draggable={tool === 'hand'}
+          x={stagePos.x}
+          y={stagePos.y}
+          scaleX={stageScale}
+          scaleY={stageScale}
+        >
+          <Layer>
+            {/* 1. Render Images at the bottom */}
+            {items.map((item) => {
+              if (item.type !== 'image') return null;
+              const commonProps = {
+                key: item.id,
+                id: item.id,
+                draggable: tool === 'select',
+                onClick: () => {
+                  if (tool === 'select') {
+                    const currentSelected = selectedId ? selectedId.split(',') : [];
+                    if (currentSelected.includes(item.id)) {
+                      // Deselect if already selected
+                      const newSelected = currentSelected.filter(id => id !== item.id);
+                      setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
+                    } else {
+                      // Add to selection
+                      setSelectedId([...currentSelected, item.id].join(','));
+                    }
+                  }
+                },
+                onTap: () => {
+                  if (tool === 'select') {
+                    const currentSelected = selectedId ? selectedId.split(',') : [];
+                    if (currentSelected.includes(item.id)) {
+                      // Deselect if already selected
+                      const newSelected = currentSelected.filter(id => id !== item.id);
+                      setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
+                    } else {
+                      // Add to selection
+                      setSelectedId([...currentSelected, item.id].join(','));
+                    }
+                  }
+                },
+                onTransformEnd: (e: any) => handleTransformEnd(e, item)
+              };
+              return <URLImage {...commonProps} image={item} />;
+            })}
+          </Layer>
+          
+          <Layer>
+            {/* 2. Render Highlighters and Highlighter-specific Eraser */}
+            {items.map((item) => {
+              if (item.type !== 'stroke') return null;
+              if (item.isHighlighter) {
+                if ((item as any)._hidden) return null;
+                return (
+                  <Line 
+                    key={item.id + '-hl'} 
+                    id={item.id}
+                    draggable={tool === 'select'}
+                    onClick={() => {
+                      if (tool === 'select') {
+                        const currentSelected = selectedId ? selectedId.split(',') : [];
+                        
+                        if (currentSelected.includes(item.id)) {
+                          const newSelected = currentSelected.filter(id => id !== item.id);
+                          setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
+                        } else {
+                          setSelectedId([...currentSelected, item.id].join(','));
+                        }
+                      }
+                    }}
+                    onTap={() => {
+                      if (tool === 'select') {
+                        const currentSelected = selectedId ? selectedId.split(',') : [];
+                        if (currentSelected.includes(item.id)) {
+                          // Deselect if already selected
+                          const newSelected = currentSelected.filter(id => id !== item.id);
+                          setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
+                        } else {
+                          // Add to selection
+                          setSelectedId([...currentSelected, item.id].join(','));
+                        }
+                      }
+                    }}
+                    onTransformEnd={(e: any) => handleTransformEnd(e, item)}
+                    onDragStart={handleItemDragStart}
+                    onDragMove={handleItemDragMove}
+                    onDragEnd={(e: any) => handleItemDragEnd(e, item)}
+                    points={item.points} 
+                    stroke={item.color} 
+                    strokeWidth={item.size} 
+                    tension={0} 
+                    lineCap="round" 
+                    lineJoin="round" 
+                    opacity={0.4} 
+                    globalCompositeOperation="source-over" 
+                    perfectDrawEnabled={false}
+                    hitStrokeWidth={Math.max(10, item.size + 5)}
+                  />
+                );
+              }
+              if (item.tool === 'highlighter-eraser') {
+                 return (
+                  <Line 
+                    key={item.id + '-hl-eraser'} 
+                    id={item.id}
+                    points={item.points} 
+                    stroke="#000000" 
+                    strokeWidth={item.size * 2 + 10} 
+                    tension={0} 
+                    lineCap="round" 
+                    lineJoin="round" 
+                    globalCompositeOperation="destination-out" 
+                    perfectDrawEnabled={false}
+                  />
+                 );
+              }
+              return null;
+            })}
+          </Layer>
+
+          <Layer>
+            {/* 3. Render everything else (Pen, Shapes, Text, Eraser) */}
+            {items.map((item) => {
+              if (item.type === 'image') return null;
+              if (item.type === 'stroke' && (item.isHighlighter || item.tool === 'highlighter-eraser')) return null;
+              return renderLayer3Item(item);
+            })}
+            
+            {selectionBox && <Rect x={selectionBox.x} y={selectionBox.y} width={selectionBox.width} height={selectionBox.height} stroke="#0099ff" strokeWidth={1} dash={[5, 5]} />}
+            <Line ref={previewLineRef} listening={false} tension={0} lineCap="round" lineJoin="round" stroke={color} strokeWidth={(tool === 'eraser' || tool === 'highlighter-eraser') ? size * 2 + 10 : size} visible={false} />
+            <Circle ref={cursorRef} listening={false} radius={size * 0.5} stroke="#ff1493" strokeWidth={2.5} fill="rgba(255, 20, 147, 0.15)" visible={tool === 'eraser' || tool === 'highlighter-eraser'} opacity={1} />
+            <Transformer ref={transformerRef} />
+          </Layer>
+        </Stage>
+      </div>
 
     </div>
   );
