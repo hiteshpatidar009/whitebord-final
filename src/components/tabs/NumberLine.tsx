@@ -29,16 +29,32 @@ const NumberLine: React.FC = () => {
     start.current.y = e.clientY - position.y
   }
 
-  /* ---------------- Stretch X ---------------- */
-  const onStretchXStart = (e: React.MouseEvent) => {
+  /* ---------------- Stretch X Left ---------------- */
+  const onStretchXLeftStart = (e: React.MouseEvent) => {
     e.stopPropagation()
     setStretchX(true)
     start.current.x = e.clientX
     start.current.range = xRange
   }
 
-  /* ---------------- Stretch Y ---------------- */
-  const onStretchYStart = (e: React.MouseEvent) => {
+  /* ---------------- Stretch X Right ---------------- */
+  const onStretchXRightStart = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setStretchX(true)
+    start.current.x = e.clientX
+    start.current.range = xRange
+  }
+
+  /* ---------------- Stretch Y Top ---------------- */
+  const onStretchYTopStart = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setStretchY(true)
+    start.current.y = e.clientY
+    start.current.range = yRange
+  }
+
+  /* ---------------- Stretch Y Bottom ---------------- */
+  const onStretchYBottomStart = (e: React.MouseEvent) => {
     e.stopPropagation()
     setStretchY(true)
     start.current.y = e.clientY
@@ -141,22 +157,22 @@ const NumberLine: React.FC = () => {
 
           {/* Right stretch handle */}
           <div
-            onMouseDown={onStretchXStart}
+            onMouseDown={onStretchXRightStart}
             className='absolute right-0 top-1/2 w-4 h-4 bg-gray-800 text-white rounded-full cursor-ew-resize flex items-center justify-center text-xs font-bold hover:bg-gray-700'
             style={{ transform: 'translate(50%, -50%)' }}
             title='Stretch X-axis'
           >
-            ›
+            →
           </div>
 
           {/* Left stretch handle */}
           <div
-            onMouseDown={onStretchXStart}
+            onMouseDown={onStretchXLeftStart}
             className='absolute left-0 top-1/2 w-4 h-4 bg-gray-800 text-white rounded-full cursor-ew-resize flex items-center justify-center text-xs font-bold hover:bg-gray-700'
             style={{ transform: 'translate(-50%, -50%)' }}
             title='Stretch X-axis'
           >
-            ‹
+            ←
           </div>
         </div>
 
@@ -202,22 +218,22 @@ const NumberLine: React.FC = () => {
 
           {/* Top stretch handle */}
           <div
-            onMouseDown={onStretchYStart}
+            onMouseDown={onStretchYTopStart}
             className='absolute top-0 left-1/2 w-4 h-4 bg-gray-800 text-white rounded-full cursor-ns-resize flex items-center justify-center text-xs font-bold hover:bg-gray-700'
             style={{ transform: 'translate(-50%, -50%)' }}
             title='Stretch Y-axis'
           >
-            ‹
+            ↑
           </div>
 
           {/* Bottom stretch handle */}
           <div
-            onMouseDown={onStretchYStart}
+            onMouseDown={onStretchYBottomStart}
             className='absolute bottom-0 left-1/2 w-4 h-4 bg-gray-800 text-white rounded-full cursor-ns-resize flex items-center justify-center text-xs font-bold hover:bg-gray-700'
             style={{ transform: 'translate(-50%, 50%)' }}
             title='Stretch Y-axis'
           >
-            ›
+            ↓
           </div>
         </div>
 
