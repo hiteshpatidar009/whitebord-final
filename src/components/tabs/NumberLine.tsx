@@ -95,8 +95,8 @@ const NumberLine: React.FC = () => {
         }}
       >
         {/* Close Button */}
-        <button 
-          className='absolute -top-8 left-1/2 -translate-x-1/2 w-7 h-7 rounded-full bg-gray-800 hover:bg-gray-900 border-2 border-gray-700 text-white text-sm font-bold flex items-center justify-center shadow-md transition-all hover:scale-110 active:scale-95'
+        <button
+          className='absolute -top-9 -right-3 w-6 h-6 rounded-full bg-gray-800 hover:bg-gray-900 border-2 border-gray-700 text-white text-sm font-bold flex items-center justify-center shadow-md transition-all hover:scale-110 active:scale-95'
           onClick={() => setShowNumberLine(false)}
         >
           ×
@@ -223,9 +223,11 @@ const NumberLine: React.FC = () => {
 
         {/* Origin */}
         <div className='absolute left-1/2 top-0 w-3 h-3 bg-red-600 rounded-full -translate-x-1/2 -translate-y-1/2 border-2 border-white shadow-md' />
-        
+
         {/* Origin label */}
-        <span className='absolute left-1/2 top-0 text-xs font-bold text-red-600 transform translate-x-2 translate-y-2'>0</span>
+        <span className='absolute left-1/2 top-0 text-xs font-bold text-red-600 transform translate-x-2 translate-y-2'>
+          0
+        </span>
       </div>
     </div>
   )
