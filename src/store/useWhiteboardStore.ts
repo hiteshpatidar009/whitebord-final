@@ -25,6 +25,7 @@ interface WhiteboardState {
   textSelection: { start: number; end: number } | null;
   showStopwatch: boolean;
   showRuler: boolean;
+  showTriangle45: boolean;
   
   setTool: (tool: ToolType) => void;
   setSelectedId: (id: string | null) => void;
@@ -39,6 +40,7 @@ interface WhiteboardState {
   setCurrentPdfPage: (page: number | null) => void;
   setShowStopwatch: (show: boolean) => void;
   setShowRuler: (show: boolean) => void;
+  setShowTriangle45: (show: boolean) => void;
   
   addItem: (item: WhiteboardItem) => void;
   updateItem: (id: string, updates: Partial<WhiteboardItem>) => void;
@@ -78,6 +80,7 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   textSelection: null,
   showStopwatch: false,
   showRuler: false,
+  showTriangle45: false,
 
   setTool: (tool) => set({ tool }),
   setSelectedId: (selectedId) => set({ selectedId }),
@@ -91,6 +94,7 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   setCurrentPdfPage: (currentPdfPage) => set({ currentPdfPage }),
   setShowStopwatch: (showStopwatch) => set({ showStopwatch }),
   setShowRuler: (showRuler) => set({ showRuler }),
+  setShowTriangle45: (showTriangle45) => set({ showTriangle45 }),
 
   // --- UPDATED: Cache Busting Logic ---
   setBackgroundImage: (image) => {

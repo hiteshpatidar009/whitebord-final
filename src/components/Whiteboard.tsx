@@ -19,6 +19,7 @@ import type { Stroke, WhiteboardItem } from '../types'
 import { strokesToImage, getBoundingBox } from '../utils/canvasUtils'
 import { FONT_STACKS, FONTS } from './TextToolbar'
 import Ruler from './Ruler'
+import Triangle45 from './Triangle45'
 import ChromeWidget from './ChromeWidget'
 
 import { transcribeHandwriting } from '../services/geminiService'
@@ -391,7 +392,8 @@ export const Whiteboard: React.FC = () => {
     backgroundImage,
     groupItems,
     ungroupItems,
-    showRuler
+    showRuler,
+    showTriangle45
   } = useWhiteboardStore()
 
   const stageRef = useRef<Konva.Stage>(null)
@@ -2496,6 +2498,7 @@ export const Whiteboard: React.FC = () => {
       </Stage>
 
       {showRuler && <Ruler />}
+      {showTriangle45 && <Triangle45 />}
       {/* Chrome Widgets */}
       {chromeWidgets.map(widget => (
         <ChromeWidget
