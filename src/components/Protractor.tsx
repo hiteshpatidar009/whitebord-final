@@ -96,7 +96,7 @@ const Protractor: React.FC = () => {
           transform: `rotate(${rotation}deg)`,
           pointerEvents: 'auto'
         }}
->
+      >
         {/* Body */}
         <div className='relative w-full h-full bg-[#B9DEA5]/80 backdrop-blur-sm border-2 border-gray-900 rounded-t-full shadow-2xl overflow-hidden'>
           {/* Degree lines (touching arc) */}
@@ -118,8 +118,7 @@ const Protractor: React.FC = () => {
             className='absolute text-lg font-bold text-gray-900'
             style={{
               left: '10px',
-              bottom: '50%',
-              transform: 'translateY(50%)'
+              bottom: '5px'
             }}
           >
             0°
@@ -130,7 +129,7 @@ const Protractor: React.FC = () => {
             className='absolute text-lg font-bold text-gray-900'
             style={{
               left: '50%',
-              top: '10px',
+              top: '0px',
               transform: 'translateX(-50%)'
             }}
           >
@@ -142,8 +141,7 @@ const Protractor: React.FC = () => {
             className='absolute text-lg font-bold text-gray-900'
             style={{
               right: '10px',
-              bottom: '50%',
-              transform: 'translateY(50%)'
+              bottom: '5px'
             }}
           >
             180°
