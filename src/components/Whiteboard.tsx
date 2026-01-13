@@ -2142,194 +2142,6 @@ const getCursorStyle = () => {
       }}
     >
 
-      <Stage
-        ref={stageRef}
-        style={{ background: 'transparent', zIndex: 10 }}
-        width={stageSize.width}
-        height={stageSize.height}
-        onMouseDown={qModeActive ? (e) => e.evt.preventDefault() : handleMouseDown}
-        onMouseMove={qModeActive ? handleQMouseMove : handleMouseMove}
-        onMouseUp={qModeActive ? handleQMouseUp : handleMouseUp}
-        onTouchStart={handleMouseDown}
-        onTouchMove={handleMouseMove}
-        onTouchEnd={handleMouseUp}
-        onWheel={handleWheel}
-        onClick={(e) => {
-          // Deselect when clicking on empty canvas
-          if (e.target === e.target.getStage()) {
-            setSelectedId(null);
-          }
-        }}
-        onDblClick={handleCanvasDoubleClick}
-        onDblTap={handleCanvasDoubleClick}
-        draggable={tool === 'hand'}
-        x={stagePos.x}
-        y={stagePos.y}
-        scaleX={stageScale}
-        scaleY={stageScale}
-      >
-        <Layer>
-          {/* 1. Render Images at the bottom */}
-          {items.map((item) => {
-            if (item.type !== 'image') return null;
-            const commonProps = {
-              key: item.id,
-              id: item.id,
-              draggable: tool === 'select',
-              onClick: () => {
-                if (tool === 'select') {
-                  const currentSelected = selectedId ? selectedId.split(',') : [];
-                  if (currentSelected.includes(item.id)) {
-                    // Deselect if already selected
-                    const newSelected = currentSelected.filter(id => id !== item.id);
-                    setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
-                  } else {
-                    // Add to selection
-                    setSelectedId([...currentSelected, item.id].join(','));
-                  }
-                }
-              },
-              onTap: () => {
-                if (tool === 'select') {
-                  const currentSelected = selectedId ? selectedId.split(',') : [];
-                  if (currentSelected.includes(item.id)) {
-                    // Deselect if already selected
-                    const newSelected = currentSelected.filter(id => id !== item.id);
-                    setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
-                  } else {
-                    // Add to selection
-                    setSelectedId([...currentSelected, item.id].join(','));
-                  }
-                }
-              },
-              onTransformEnd: (e: any) => handleTransformEnd(e, item)
-            };
-            return <URLImage {...commonProps} image={item} />;
-          })}
-        </Layer>
-        
-        <Layer>
-          {/* 2. Render Highlighters and Highlighter-specific Eraser */}
-          {items.map((item) => {
-            if (item.type !== 'stroke') return null;
-            if (item.isHighlighter) {
-              if ((item as any)._hidden) return null;
-              return (
-                <Line 
-                  key={item.id + '-hl'} 
-                  id={item.id}
-                  draggable={tool === 'select'}
-                  onClick={() => {
-                    if (tool === 'select') {
-                      const currentSelected = selectedId ? selectedId.split(',') : [];
-                      
-                      if (currentSelected.includes(item.id)) {
-                        const newSelected = currentSelected.filter(id => id !== item.id);
-                        setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
-                      } else {
-                        setSelectedId([...currentSelected, item.id].join(','));
-                      }
-                    }
-                  }}
-                  onTap={() => {
-                    if (tool === 'select') {
-                      const currentSelected = selectedId ? selectedId.split(',') : [];
-                      if (currentSelected.includes(item.id)) {
-                        // Deselect if already selected
-                        const newSelected = currentSelected.filter(id => id !== item.id);
-                        setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
-                      } else {
-                        // Add to selection
-                        setSelectedId([...currentSelected, item.id].join(','));
-                      }
-                    }
-                  }}
-                  onTransformEnd={(e: any) => handleTransformEnd(e, item)}
-                  onDragStart={handleItemDragStart}
-                  onDragMove={handleItemDragMove}
-                  onDragEnd={(e: any) => handleItemDragEnd(e, item)}
-                  points={item.points} 
-                  stroke={item.color} 
-                  strokeWidth={item.size} 
-                  tension={0} 
-                  lineCap="round" 
-                  lineJoin="round" 
-                  opacity={0.4} 
-                  globalCompositeOperation="source-over" 
-                  perfectDrawEnabled={false}
-                  hitStrokeWidth={Math.max(10, item.size + 5)}
-                />
-              );
-            }
-            if (item.tool === 'highlighter-eraser') {
-               return (
-                <Line 
-                  key={item.id + '-hl-eraser'} 
-                  id={item.id}
-                  points={item.points} 
-                  stroke="#000000" 
-                  strokeWidth={item.size * 2 + 10} 
-                  tension={0} 
-                  lineCap="round" 
-                  lineJoin="round" 
-                  globalCompositeOperation="destination-out" 
-                  perfectDrawEnabled={false}
-                />
-               );
-            }
-            return null;
-          })}
-        </Layer>
-
-        <Layer>
-          {/* 3. Render everything else (Pen, Shapes, Text, Eraser) */}
-          {items.map((item) => {
-            if (item.type === 'image') return null;
-            if (item.type === 'stroke' && (item.isHighlighter || item.tool === 'highlighter-eraser')) return null;
-            return renderLayer3Item(item);
-          })}
-          
-          {selectionBox && <Rect x={selectionBox.x} y={selectionBox.y} width={selectionBox.width} height={selectionBox.height} stroke="#0099ff" strokeWidth={1} dash={[5, 5]} />}
-          <Line ref={previewLineRef} listening={false} tension={0} lineCap="round" lineJoin="round" stroke={color} strokeWidth={(tool === 'eraser' || tool === 'highlighter-eraser') ? size * 2 + 10 : size} visible={false} />
-          <Circle ref={cursorRef} listening={false} radius={size * 0.5} stroke="#ff1493" strokeWidth={2.5} fill="rgba(255, 20, 147, 0.15)" visible={tool === 'eraser' || tool === 'highlighter-eraser'} opacity={1} />
-          <Transformer ref={transformerRef} />
-        </Layer>
-      </Stage>
-
-      {/* HTML overlay for formatted text */}
-      {items.map((item) => {
-        if (item.type !== 'text' || editingTextId === item.id) return null;
-        
-        const hasFormatting = /<(b|strong|i|em|u|span)/.test(item.text);
-        if (!hasFormatting) return null;
-        
-        const screenX = item.x * stageScale + stagePos.x;
-        const screenY = item.y * stageScale + stagePos.y;
-        
-        return (
-          <div
-            key={`overlay-${item.id}-${Math.round(item.x)}-${Math.round(item.y)}`}
-            style={{
-              position: 'absolute',
-              left: screenX,
-              top: screenY,
-              width: item.width ? (item.width * stageScale) : (200 * stageScale),
-              fontSize: item.fontSize * stageScale,
-              fontFamily: item.fontFamily,
-              color: item.fill,
-              lineHeight: 1.4,
-              pointerEvents: 'none',
-              overflow: 'hidden',
-              wordWrap: 'break-word',
-              zIndex: 15,
-              userSelect: 'none',
-              touchAction: 'none'
-            }}
-            dangerouslySetInnerHTML={{ __html: item.text }}
-          />
-        );
-      })}
-
       {/* Chrome Widgets - Render BEFORE Stage */}
       {chromeWidgets.map((widget) => (
         <React.Fragment key={widget.id}>
@@ -2520,6 +2332,40 @@ const getCursorStyle = () => {
             <Transformer ref={transformerRef} />
           </Layer>
         </Stage>
+        
+        {/* HTML overlay for formatted text */}
+        {items.map((item) => {
+          if (item.type !== 'text' || editingTextId === item.id) return null;
+          
+          const hasFormatting = /<(b|strong|i|em|u|span)/.test(item.text);
+          if (!hasFormatting) return null;
+          
+          const screenX = item.x * stageScale + stagePos.x;
+          const screenY = item.y * stageScale + stagePos.y;
+          
+          return (
+            <div
+              key={`overlay-${item.id}-${Math.round(item.x)}-${Math.round(item.y)}`}
+              style={{
+                position: 'absolute',
+                left: screenX,
+                top: screenY,
+                width: item.width ? (item.width * stageScale) : (200 * stageScale),
+                fontSize: item.fontSize * stageScale,
+                fontFamily: item.fontFamily,
+                color: item.fill,
+                lineHeight: 1.4,
+                pointerEvents: 'none',
+                overflow: 'hidden',
+                wordWrap: 'break-word',
+                zIndex: 20,
+                userSelect: 'none',
+                touchAction: 'none'
+              }}
+              dangerouslySetInnerHTML={{ __html: item.text }}
+            />
+          );
+        })}
       </div>
 
     </div>

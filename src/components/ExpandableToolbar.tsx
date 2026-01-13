@@ -8,11 +8,13 @@ import {
   Ruler,
   Compass,
   Divide,
-  Square,
+  Circle,
+  Move,
   Globe,
   Dice3,
   Box,
-  Plus
+  Plus,
+  TriangleRight
 } from "lucide-react";
 
 type ExpandableToolbarProps = {
@@ -72,18 +74,20 @@ const ExpandableToolbar: React.FC<ExpandableToolbarProps> = ({ visible, onClose,
           </div>
 
         {/* ================= SECTION 2 (GEOMETRY) ================= */}
-          <div className="flex items-center gap-3 overflow-x-auto ">
+          <div className="flex items-center gap-3 hide-scrollbar overflow-x-auto ">
             <button onClick={onClose} className="text-gray-500">
               <Plus size={20} className="rotate-45" />
             </button>
-            <div className="inline-flex items-center gap-3 px-4 py-2 rounded-full bg-black text-white text-lg font-semibold">
+            <div className="inline whitespace-nowrap items-center gap-3 px-4  py-2 rounded-full bg-black text-white text-lg font-semibold">
             GEOMETRY TOOLS
           </div>
             <Pill icon={<Ruler size={18} />} label="Ruler" />
             <Pill icon={<Compass size={18} />} label="Compass" />
             <Pill icon={<Divide size={18} />} label="Divider" />
-            <Pill icon={<Square size={18} />} label="Set Square 60°" />
-            <Pill icon={<Square size={18} />} label="Set Square 45°" />
+            <Pill icon={<TriangleRight size={18} />} label="Set Square 60°" />
+            <Pill icon={<TriangleRight size={18} />} label="Set Square 45°" />
+            <Pill icon={<Circle size={18} />} label="Protactor" />
+            <Pill icon={<Move size={18} />} label="Number Line" />
           </div>
 
         {/* ================= SECTION 3 (3D) ================= */}
