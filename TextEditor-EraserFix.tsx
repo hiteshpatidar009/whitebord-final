@@ -54,11 +54,51 @@ export const TextEditor: React.FC<TextEditorProps> = ({
 
   // Apply format using execCommand
   const applyFormat = (command: string, value?: string) => {
-    document.execCommand('styleWithCSS', false, 'true');
-    document.execCommand(command, false, value);
-    if (contentRef.current) {
-        contentRef.current.focus();
+    if (!contentRef.current) return;
+    
+    // Save current selection
+    const selection = window.getSelection();
+    const range = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+    
+    // Focus the content first
+    contentRef.current.focus();
+    
+    // Restore selection if it existed
+    if (range && selection) {
+      selection.removeAllRanges();
+      selection.addRange(range);
     }
+    
+    // Apply formatting
+    document.execCommand('styleWithCSS', false, 'true');
+    const success = document.execCommand(command, false, value);
+    
+    // If execCommand failed, try alternative approach for bold/italic/underline
+    if (!success && ['bold', 'italic', 'underline'].includes(command)) {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0) {
+        const range = sel.getRangeAt(0);
+        const selectedText = range.toString();
+        
+        if (selectedText) {
+          const span = document.createElement('span');
+          if (command === 'bold') span.style.fontWeight = 'bold';
+          if (command === 'italic') span.style.fontStyle = 'italic';
+          if (command === 'underline') span.style.textDecoration = 'underline';
+          
+          try {
+            range.surroundContents(span);
+          } catch (e) {
+            span.innerHTML = selectedText;
+            range.deleteContents();
+            range.insertNode(span);
+          }
+        }
+      }
+    }
+    
+    // Ensure focus remains
+    contentRef.current.focus();
   };
 
   const updateFontSize = (delta: number) => {
@@ -348,7 +388,7 @@ export const TextEditor: React.FC<TextEditorProps> = ({
             lineHeight: item.lineHeight || 1.5,
             width: (item.width || isActive) ? '100%' : 'auto',
             height: (item.height || isActive) ? '100%' : 'auto',
-            overflow: 'hidden',
+            overflow: 'visible',
             boxSizing: 'border-box',
             wordWrap: 'break-word',
             overflowWrap: 'break-word',
@@ -357,9 +397,10 @@ export const TextEditor: React.FC<TextEditorProps> = ({
             display: 'block',
             padding: 0,
             margin: 0,
-            textAlign: 'justify',
+            textAlign: 'left',
             userSelect: isPanTool && !isEditing ? 'none' : 'auto',
             pointerEvents: 'auto',
+            position: 'relative',
           }}
           onPointerDown={(e) => {
             if (deletedRef.current) return;
@@ -474,21 +515,36 @@ export const TextEditor: React.FC<TextEditorProps> = ({
             <div className="w-px h-4 bg-gray-200 dark:bg-gray-600 mx-1"></div>
 
             <button 
-                onClick={() => applyFormat('bold')}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  applyFormat('bold');
+                }}
                 className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-700 dark:text-gray-200" 
                 title="Bold"
             >
                 <Bold size={16} />
             </button>
             <button 
-                onClick={() => applyFormat('italic')}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  applyFormat('italic');
+                }}
                 className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-700 dark:text-gray-200" 
                 title="Italic"
             >
                 <Italic size={16} />
             </button>
             <button 
-                onClick={() => applyFormat('underline')}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  applyFormat('underline');
+                }}
                 className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-700 dark:text-gray-200" 
                 title="Underline"
             >
