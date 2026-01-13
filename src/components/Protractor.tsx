@@ -205,7 +205,7 @@ const Protractor: React.FC = () => {
           {/* Resize */}
           <div
             onMouseDown={onResizeStart}
-            className='absolute bottom-2 left-1/2 -translate-x-1/2 w-20 h-4 bg-gray-900/80 rounded cursor-ew-resize'
+            className='absolute bottom-2 left-1/2 -translate-x-1/2 w-20 h-2 bg-gray-900/80 rounded cursor-ew-resize'
           />
         </div>
       </div>
