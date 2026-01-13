@@ -471,7 +471,7 @@ export const Toolbar: React.FC = () => {
 
       {/* Desktop: Horizontal toolbar at top */}
 
-      <div className="hidden sm:flex fixed left-1/2 transform -translate-x-1/2 scale-75 origin-top bg-white shadow-lg rounded-full px-6 py-3 flex items-center gap-4 z-50 border border-gray-200">
+      <div className=" fixed left-1/2 transform -translate-x-1/2 scale-75 origin-top bg-white shadow-lg rounded-full px-6 py-3 flex items-center gap-4 z-50 border border-gray-200">
 
 
     
