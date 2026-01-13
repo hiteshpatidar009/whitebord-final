@@ -96,7 +96,7 @@ const Protractor: React.FC = () => {
           transform: `rotate(${rotation}deg)`,
           pointerEvents: 'auto'
         }}
-      >
+>
         {/* Body */}
         <div className='relative w-full h-full bg-[#B9DEA5]/80 backdrop-blur-sm border-2 border-gray-900 rounded-t-full shadow-2xl overflow-hidden'>
           {/* Degree lines (touching arc) */}
@@ -113,14 +113,51 @@ const Protractor: React.FC = () => {
           ))}
 
           {/* ===== ARC-ALIGNED DEGREE NUMBERS ===== */}
-          {[0, 30, 60, 90, 120, 150, 180].map(deg => {
+          {/* 0 degree - left */}
+          <span
+            className='absolute text-lg font-bold text-gray-900'
+            style={{
+              left: '10px',
+              bottom: '50%',
+              transform: 'translateY(50%)'
+            }}
+          >
+            0°
+          </span>
+
+          {/* 90 degree - top */}
+          <span
+            className='absolute text-lg font-bold text-gray-900'
+            style={{
+              left: '50%',
+              top: '10px',
+              transform: 'translateX(-50%)'
+            }}
+          >
+            90°
+          </span>
+
+          {/* 180 degree - right */}
+          <span
+            className='absolute text-lg font-bold text-gray-900'
+            style={{
+              right: '10px',
+              bottom: '50%',
+              transform: 'translateY(50%)'
+            }}
+          >
+            180°
+          </span>
+
+          {/* Other degree markings */}
+          {[30, 60, 120, 150].map(deg => {
             const radius = 90
             const angle = ((deg - 180) * Math.PI) / 180
 
             return (
               <span
                 key={deg}
-                className='absolute text-[13px] font-semibold text-gray-900'
+                className='absolute text-sm font-semibold text-gray-900'
                 style={{
                   left: `calc(50% + ${radius * Math.cos(angle)}px)`,
                   bottom: `${radius * Math.sin(angle)}px`,
