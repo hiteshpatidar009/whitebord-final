@@ -22,7 +22,7 @@ type ExpandableToolbarProps = {
 };
 
 const ExpandableToolbar: React.FC<ExpandableToolbarProps> = ({ visible, onClose }) => {
-  const { setShowRuler, setShowTriangle45 } = useWhiteboardStore();
+  const { setShowRuler, setShowTriangle45, setShowTriangle60 } = useWhiteboardStore();
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   
   const handleRulerClick = () => {
@@ -34,6 +34,12 @@ const ExpandableToolbar: React.FC<ExpandableToolbarProps> = ({ visible, onClose 
   const handleTriangle45Click = () => {
     console.log('Triangle45 button clicked');
     setShowTriangle45(true);
+    onClose();
+  };
+
+  const handleTriangle60Click = () => {
+    console.log('Triangle60 button clicked');
+    setShowTriangle60(true);
     onClose();
   };
 
@@ -84,7 +90,7 @@ const ExpandableToolbar: React.FC<ExpandableToolbarProps> = ({ visible, onClose 
           <Pill icon={<Ruler size={18} />} label="Ruler" onClick={handleRulerClick} />
           <Pill icon={<Compass size={18} />} label="Compass" />
           <Pill icon={<Divide size={18} />} label="Divider" />
-          <Pill icon={<Square size={18} />} label="Set Square 60°" />
+          <Pill icon={<Square size={18} />} label="Set Square 60°" onClick={handleTriangle60Click} />
           <Pill icon={<Square size={18} />} label="Set Square 45°" onClick={handleTriangle45Click} />
         </div>
         <div className="flex items-center gap-3 overflow-x-auto">

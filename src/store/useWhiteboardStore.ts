@@ -26,6 +26,7 @@ interface WhiteboardState {
   showStopwatch: boolean;
   showRuler: boolean;
   showTriangle45: boolean;
+  showTriangle60: boolean;
   
   setTool: (tool: ToolType) => void;
   setSelectedId: (id: string | null) => void;
@@ -41,6 +42,7 @@ interface WhiteboardState {
   setShowStopwatch: (show: boolean) => void;
   setShowRuler: (show: boolean) => void;
   setShowTriangle45: (show: boolean) => void;
+  setShowTriangle60: (show: boolean) => void;
   
   addItem: (item: WhiteboardItem) => void;
   updateItem: (id: string, updates: Partial<WhiteboardItem>) => void;
@@ -81,6 +83,7 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   showStopwatch: false,
   showRuler: false,
   showTriangle45: false,
+  showTriangle60: false,
 
   setTool: (tool) => set({ tool }),
   setSelectedId: (selectedId) => set({ selectedId }),
@@ -95,6 +98,7 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   setShowStopwatch: (showStopwatch) => set({ showStopwatch }),
   setShowRuler: (showRuler) => set({ showRuler }),
   setShowTriangle45: (showTriangle45) => set({ showTriangle45 }),
+  setShowTriangle60: (showTriangle60) => set({ showTriangle60 }),
 
   // --- UPDATED: Cache Busting Logic ---
   setBackgroundImage: (image) => {
