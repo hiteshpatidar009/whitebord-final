@@ -76,10 +76,13 @@ const Protractor: React.FC = () => {
 
   return (
     <div
-      className='fixed inset-0 z-50'
+      className='fixed inset-0 z-[1000]'
       onMouseMove={onMouseMove}
       onMouseUp={stopAll}
       onMouseLeave={stopAll}
+      style={{
+        pointerEvents: dragging || resizing || rotating ? 'auto' : 'none'
+      }}
     >
       <div
         ref={ref}
