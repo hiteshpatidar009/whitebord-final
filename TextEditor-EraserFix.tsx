@@ -135,7 +135,7 @@ export const TextEditor: React.FC<TextEditorProps> = ({
     }
   };
 
-  // Sync content logic
+  // Sync content logic - preserve dimensions when syncing
   useLayoutEffect(() => {
     if (!contentRef.current || deletedRef.current) return;
 
@@ -150,13 +150,31 @@ export const TextEditor: React.FC<TextEditorProps> = ({
         // Clear selection when exiting edit mode
         window.getSelection()?.removeAllRanges();
     } 
-    // 2. Steady Inactive State: Sync from prop if different (External change)
-    else if (!isActive && contentRef.current.innerHTML !== item.text) {
+    // 2. Transition from Inactive -> Active: Sync content only if it's different
+    else if (!prevActiveRef.current && isActive && contentRef.current.innerHTML !== item.text) {
+        // Store current dimensions before content sync
+        const currentWidth = contentRef.current.offsetWidth;
+        const currentHeight = contentRef.current.offsetHeight;
+        
+        contentRef.current.innerHTML = item.text;
+        
+        // If item has explicit dimensions, ensure they're maintained after content sync
+        if (item.width && item.height) {
+            requestAnimationFrame(() => {
+                if (contentRef.current) {
+                    contentRef.current.style.width = '100%';
+                    contentRef.current.style.height = '100%';
+                }
+            });
+        }
+    }
+    // 3. Initial render: Set content if empty
+    else if (!prevActiveRef.current && !isActive && !contentRef.current.innerHTML && item.text) {
         contentRef.current.innerHTML = item.text;
     }
 
     prevActiveRef.current = isActive;
-  }, [item.text, isActive, handleDelete, onUpdate, item.id]);
+  }, [item.text, isActive, handleDelete, onUpdate, item.id, item.width, item.height]);
 
   // Reset editing state when inactive or tool changes
   useEffect(() => {
@@ -165,12 +183,17 @@ export const TextEditor: React.FC<TextEditorProps> = ({
     }
   }, [isActive, tool]);
 
-  // Focus when active and editing
+  // Focus when active and editing - preserve dimensions
   useEffect(() => {
       if (isActive && isEditing && contentRef.current && !deletedRef.current) {
+          // If item has explicit dimensions, ensure they're maintained when starting to edit
+          if (item.width && item.height) {
+              contentRef.current.style.width = '100%';
+              contentRef.current.style.height = '100%';
+          }
           contentRef.current.focus();
       }
-  }, [isActive, isEditing]);
+  }, [isActive, isEditing, item.width, item.height]);
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
       if (deletedRef.current) return;
@@ -251,8 +274,8 @@ export const TextEditor: React.FC<TextEditorProps> = ({
       setResizeStart({
           x: e.clientX,
           y: e.clientY,
-          width: item.width || 500,
-          height: item.height || 150,
+          width: item.width || (contentRef.current?.offsetWidth || 200),
+          height: item.height || (contentRef.current?.offsetHeight || 100),
           initialX: item.x,
           initialY: item.y,
       });
@@ -320,10 +343,10 @@ export const TextEditor: React.FC<TextEditorProps> = ({
       style={{
         left: screenX,
         top: screenY,
-        width: item.width ? `${item.width}px` : (isActive ? '500px' : 'auto'),
-        maxWidth: (!item.width && !isActive) ? '500px' : 'none',
-        height: item.height ? `${item.height}px` : (isActive ? '150px' : 'auto'),
+        width: item.width ? `${item.width}px` : 'auto',
+        height: item.height ? `${item.height}px` : 'auto',
         minWidth: '50px',
+        maxWidth: item.width ? 'none' : '500px',
         touchAction: 'none',
         boxSizing: 'border-box',
         pointerEvents: 'auto',
@@ -348,8 +371,8 @@ export const TextEditor: React.FC<TextEditorProps> = ({
             : 'border border-transparent hover:border-blue-200'
         }`}
         style={{
-          width: (item.width || isActive) ? '100%' : 'auto',
-          height: (item.height || isActive) ? '100%' : 'auto',
+          width: item.width ? '100%' : 'auto',
+          height: item.height ? '100%' : 'auto',
           overflow: 'visible',
           boxSizing: 'border-box',
           pointerEvents: 'auto',
@@ -386,8 +409,8 @@ export const TextEditor: React.FC<TextEditorProps> = ({
             fontStyle: item.fontStyle,
             textDecoration: item.textDecoration,
             lineHeight: item.lineHeight || 1.5,
-            width: (item.width || isActive) ? '100%' : 'auto',
-            height: (item.height || isActive) ? '100%' : 'auto',
+            width: item.width ? '100%' : 'auto',
+            height: item.height ? '100%' : 'auto',
             overflow: 'visible',
             boxSizing: 'border-box',
             wordWrap: 'break-word',

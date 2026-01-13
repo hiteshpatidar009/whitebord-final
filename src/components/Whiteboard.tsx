@@ -1,12 +1,12 @@
 
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { Stage, Layer, Line, Image as KonvaImage, Rect, Circle, RegularPolygon, Transformer, Text as KonvaText, Group } from 'react-konva';
+import { Stage, Layer, Line, Image as KonvaImage, Rect, Circle, RegularPolygon, Transformer, Text as KonvaText } from 'react-konva';
 import Konva from 'konva';
 import useImage from 'use-image';
 import { useWhiteboardStore } from '../store/useWhiteboardStore';
 import type { Stroke, WhiteboardItem } from '../types';
-import { strokesToImage, getBoundingBox } from '../utils/canvasUtils';
+import { getBoundingBox } from '../utils/canvasUtils';
 import { FONT_STACKS, FONTS } from './TextToolbar';
 import ChromeWidget from './ChromeWidget';
 
@@ -66,92 +66,7 @@ const simplifyDP = (points: { x: number; y: number }[], sqTolerance: number) => 
   return newPoints;
 };
 
-const isClosedShape = (pts: { x: number; y: number }[]) => {
-  if (pts.length < 3) return false;
-  const start = pts[0];
-  const end = pts[pts.length - 1];
-  const dist = Math.sqrt(getSqDist(start, end));
-  
-  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-  pts.forEach(p => {
-    minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
-    minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
-  });
-  const maxDim = Math.max(maxX - minX, maxY - minY);
-  
-  return dist < Math.max(50, maxDim * 0.2);
-};
-
 // --- COMPONENTS ---
-
-// Helper: Parse HTML and create text segments with formatting
-const parseHtmlToSegments = (html: string) => {
-  const div = document.createElement('div');
-  div.innerHTML = html;
-  
-  const segments: Array<{
-    text: string;
-    bold?: boolean;
-    italic?: boolean;
-    underline?: boolean;
-    color?: string;
-  }> = [];
-  
-  const traverse = (node: Node, inheritedStyle: any = {}) => {
-    if (node.nodeType === Node.TEXT_NODE) {
-      const text = node.textContent || '';
-      if (text) {
-        segments.push({ text, ...inheritedStyle });
-      }
-    } else if (node.nodeType === Node.ELEMENT_NODE) {
-      const element = node as HTMLElement;
-      const tagName = element.tagName.toLowerCase();
-      const style = { ...inheritedStyle };
-      
-      // Handle line breaks
-      if (tagName === 'br') {
-        segments.push({ text: '\n', ...inheritedStyle });
-        return;
-      }
-
-      // Block elements should often imply a newline if they aren't the first element
-      const isBlock = ['div', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li'].includes(tagName);
-      if (isBlock && segments.length > 0 && segments[segments.length - 1].text !== '\n') {
-        // Only add newline if we don't already have one
-        // segments.push({ text: '\n', ...inheritedStyle });
-      }
-      
-      // Apply formatting based on tags
-      if (tagName === 'b' || tagName === 'strong') {
-        style.bold = true;
-      } else if (tagName === 'i' || tagName === 'em') {
-        style.italic = true;
-      } else if (tagName === 'u') {
-        style.underline = true;
-      } else if (tagName === 'font') {
-        const color = element.getAttribute('color');
-        if (color) style.color = color;
-      }
-      
-      // Traverse children with inherited style
-      element.childNodes.forEach(child => traverse(child, style));
-
-      // After a block element, if there's more content, add a newline
-      if (isBlock) {
-        segments.push({ text: '\n', ...inheritedStyle });
-      }
-    }
-  };
-  
-  div.childNodes.forEach(node => traverse(node));
-  
-  // Clean up trailing newlines
-  while (segments.length > 0 && segments[segments.length - 1].text === '\n') {
-    segments.pop();
-  }
-  
-  return segments;
-};
 
 // Rich Text Component for Konva
 // const RichText: React.FC<{
@@ -220,8 +135,8 @@ const RichText: React.FC<{
   onDragMove?: (e: any) => void;
   onDragEnd?: (e: any) => void;
 }> = (props) => {
-  // Extract text and formatting info, memoized to detect changes
-  const { text, fontWeight, fontStyle, textDecoration } = React.useMemo(() => {
+  // Parse HTML to extract text and formatting
+  const { text, fontWeight, fontStyle, textDecoration, color } = React.useMemo(() => {
     const div = document.createElement('div');
     div.innerHTML = props.text;
     
@@ -230,15 +145,20 @@ const RichText: React.FC<{
     const hasItalic = /<(i|em)/.test(props.text);
     const hasUnderline = /<u/.test(props.text);
     
+    // Extract color from HTML (look for style="color:" or <font color="">)
+    const colorMatch = props.text.match(/(?:style="[^"]*color:\s*([^;"]+)|<font[^>]+color="([^"]+)")/);
+    const extractedColor = colorMatch ? (colorMatch[1] || colorMatch[2]) : null;
+    
     const plainText = div.textContent || div.innerText || '';
     
     return {
       text: plainText.replace(/\n\s*\n/g, '\n'),
       fontWeight: hasBold ? 'bold' : 'normal',
       fontStyle: hasItalic ? 'italic' : 'normal',
-      textDecoration: hasUnderline ? 'underline' : 'none'
+      textDecoration: hasUnderline ? 'underline' : 'none',
+      color: extractedColor || props.fill
     };
-  }, [props.text]);
+  }, [props.text, props.fill]);
 
   return (
     <KonvaText
@@ -248,7 +168,7 @@ const RichText: React.FC<{
       text={text}
       fontSize={props.fontSize}
       fontFamily={props.fontFamily}
-      fill={props.fill}
+      fill={color}
       fontStyle={`${fontStyle} ${fontWeight}`}
       textDecoration={textDecoration}
       width={props.width}
@@ -268,7 +188,7 @@ const RichText: React.FC<{
 };
 
 // URLImage component for loading images
-const URLImage = ({ image, onClick, onTap, draggable, onTransformEnd }: { image: any, onClick?: () => void, onTap?: () => void, draggable?: boolean, onTransformEnd?: (e: any) => void }) => {
+const URLImage = ({ image, onClick, onTap, draggable, onTransformEnd }: { image: any, onClick?: (e?: any) => void, onTap?: () => void, draggable?: boolean, onTransformEnd?: (e: any) => void }) => {
   const [img] = useImage(image.src);
   return (
     <KonvaImage
@@ -332,7 +252,7 @@ export const Whiteboard: React.FC = () => {
   const previewLineRef = useRef<Konva.Line>(null); 
   const cursorRef = useRef<Konva.Circle>(null);
   const lastEraserPosRef = useRef<{ x: number; y: number } | null>(null);
-  const lastRightClickTime = useRef<number>(0);
+  // const _lastRightClickTime = useRef<number>(0);
   const [selectionBox, setSelectionBox] = useState<{ x: number, y: number, width: number, height: number } | null>(null);
   const [chromeWidgets, setChromeWidgets] = useState<Array<{ id: string; x: number; y: number }>>([]);
 
@@ -811,7 +731,7 @@ export const Whiteboard: React.FC = () => {
 
     if (tool === 'text') {
       const targetId = e.target.id() || e.target.getParent()?.id();
-      const clickedItem = items.find(i => i.id === targetId);
+      const clickedItem = items.find(i => i.id === targetId!);
       
       if (clickedItem?.type === 'text') {
         // Select existing text
@@ -845,14 +765,14 @@ export const Whiteboard: React.FC = () => {
        
        // Apply fill to clicked item if no selection
        const id = shape.id() || shape.getParent()?.id();
-       const item = items.find(i => i && i.id === id);
+       const item = items.find(i => i && i.id === id!);
        if (item) {
            if (item.type === 'shape') {
                const transparentFill = hexToRgba(color, 0.6);
-               updateItem(id, { fill: transparentFill, opacity: 1 });
+               updateItem(id!, { fill: transparentFill, opacity: 1 });
                saveHistory();
            } else if (item.type === 'text') {
-               updateItem(id, { fill: color }); 
+               updateItem(id!, { fill: color }); 
                saveHistory();
            }
        }
@@ -862,15 +782,15 @@ export const Whiteboard: React.FC = () => {
     // Handle selection for all tools
     if (!clickedOnEmpty) {
       const targetId = e.target.id() || e.target.getParent()?.id();
-      if (targetId && tool === 'select') {
+      if (targetId! && tool === 'select') {
         const currentSelected = selectedId ? selectedId.split(',') : [];
         
         // Always add to selection without Ctrl requirement
-        if (currentSelected.includes(targetId)) {
-          const newSelected = currentSelected.filter(id => id !== targetId);
+        if (currentSelected.includes(targetId!)) {
+          const newSelected = currentSelected.filter(id => id !== targetId!);
           setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
         } else {
-          setSelectedId([...currentSelected, targetId].join(','));
+          setSelectedId([...currentSelected, targetId!].join(','));
         }
         return;
       }
@@ -1245,10 +1165,10 @@ const getCursorStyle = () => {
       isTransforming: true,
       targetId: itemId,
       startPos: { x: pos.x, y: pos.y },
-      startItemPos: { x: item.x || 0, y: item.y || 0 },
+      startItemPos: { x: (item as any).x || 0, y: (item as any).y || 0 },
       startItemSize: { 
-        width: item.width || (item.type === 'text' ? 100 : 50), 
-        height: item.height || (item.type === 'text' ? 50 : 50) 
+        width: (item as any).width || (item.type === 'text' ? 100 : 50), 
+        height: (item as any).height || (item.type === 'text' ? 50 : 50) 
       },
       mode
     };
@@ -1444,7 +1364,7 @@ const getCursorStyle = () => {
     container.style.display = 'flex';
     container.style.flexDirection = 'column';
     container.style.gap = '4px';
-    container.style.width = '350px';
+    container.style.width = `${Math.max(350, (textItem as any).width || 350)}px`; // Use existing width or default
     container.style.height = '250px';
     container.style.resize = 'both';
     container.style.overflow = 'hidden';
@@ -1655,10 +1575,9 @@ const getCursorStyle = () => {
     colorPicker.onchange = () => {
       const selection = window.getSelection();
       if (selection && selection.rangeCount > 0 && !selection.isCollapsed) {
+        // Change color of selected text only
+        document.execCommand('styleWithCSS', false, 'true');
         document.execCommand('foreColor', false, colorPicker.value);
-      } else {
-        editableDiv.style.color = colorPicker.value;
-        updateItem(textId, { fill: colorPicker.value });
       }
       editableDiv.focus();
     };
@@ -1735,8 +1654,6 @@ const getCursorStyle = () => {
     editableDiv.style.boxSizing = 'border-box';
     editableDiv.style.userSelect = 'text';
     editableDiv.style.webkitUserSelect = 'text';
-    editableDiv.style.mozUserSelect = 'text';
-    editableDiv.style.msUserSelect = 'text';
     editableDiv.style.flex = '1'; // Take remaining space
     
     // Prevent resize handles from interfering with text editing
@@ -1786,7 +1703,7 @@ const getCursorStyle = () => {
       
       updateItem(textId, {
         text: newText,
-        width: container.offsetWidth,
+        width: container.offsetWidth, // Keep the stretched container width
         x: canvasX,
         y: canvasY
       });
@@ -1981,8 +1898,8 @@ const getCursorStyle = () => {
         item.items?.forEach((childItem: WhiteboardItem) => {
           if (childItem.type === 'text' || childItem.type === 'image' || (childItem.type === 'shape' && childItem.shapeType !== 'line' && childItem.shapeType !== 'polygon')) {
             updateItem(childItem.id, { 
-              x: (childItem.x || 0) + dx, 
-              y: (childItem.y || 0) + dy 
+              x: ((childItem as any).x || 0) + dx, 
+              y: ((childItem as any).y || 0) + dy 
             });
           } else if (childItem.type === 'stroke' || (childItem.type === 'shape' && (childItem.shapeType === 'line' || childItem.shapeType === 'polygon'))) {
             const newPoints = (childItem.points || []).map((p: number, i: number) => 
@@ -2027,7 +1944,7 @@ const getCursorStyle = () => {
           fill="transparent"
           dash={[5, 5]}
           draggable={tool === 'select'}
-          onClick={(e: any) => {
+          onClick={() => {
             if (tool === 'select') {
               const currentSelected = selectedId ? selectedId.split(',') : [];
               
@@ -2072,7 +1989,7 @@ const getCursorStyle = () => {
             height={item.fontSize * 1.4 * 2}
             fill="transparent"
             draggable={tool === 'select' || tool === 'text'}
-            onClick={(e: any) => {
+            onClick={() => {
               if (tool === 'select' || tool === 'text') {
                 const currentSelected = selectedId ? selectedId.split(',') : [];
                 
@@ -2112,9 +2029,9 @@ const getCursorStyle = () => {
           fontSize={item.fontSize}
           fontFamily={item.fontFamily}
           fill={item.fill}
-          width={item.width}
+          width={item.width} // Use stretched width
           draggable={tool === 'select' || tool === 'text'}
-          onClick={(e: any) => {
+          onClick={() => {
             if (tool === 'select' || tool === 'text') {
               const currentSelected = selectedId ? selectedId.split(',') : [];
               
@@ -2148,7 +2065,7 @@ const getCursorStyle = () => {
       key: item.id,
       id: item.id,
       draggable: tool === 'select',
-      onClick: qModeActive ? () => {} : (e: any) => {
+      onClick: qModeActive ? () => {} : (_e: any) => {
         if (tool === 'select' || tool === 'text') {
           const currentSelected = selectedId ? selectedId.split(',') : [];
           
@@ -2160,7 +2077,7 @@ const getCursorStyle = () => {
           }
         }
       },
-      onMouseDown: qModeActive ? (e: any) => handleQMouseDown(e, item.id) : undefined,
+      onMouseDown: qModeActive ? (_e: any) => handleQMouseDown(_e, item.id) : undefined,
       onTap: () => {
         if (tool === 'select' || tool === 'text') {
           const currentSelected = selectedId ? selectedId.split(',') : [];
@@ -2258,7 +2175,7 @@ const getCursorStyle = () => {
               key: item.id,
               id: item.id,
               draggable: tool === 'select',
-              onClick: (e: any) => {
+              onClick: () => {
                 if (tool === 'select') {
                   const currentSelected = selectedId ? selectedId.split(',') : [];
                   if (currentSelected.includes(item.id)) {
@@ -2301,7 +2218,7 @@ const getCursorStyle = () => {
                   key={item.id + '-hl'} 
                   id={item.id}
                   draggable={tool === 'select'}
-                  onClick={(e: any) => {
+                  onClick={() => {
                     if (tool === 'select') {
                       const currentSelected = selectedId ? selectedId.split(',') : [];
                       
@@ -2395,7 +2312,7 @@ const getCursorStyle = () => {
               position: 'absolute',
               left: screenX,
               top: screenY,
-              width: (item.width || 200) * stageScale,
+              width: item.width ? (item.width * stageScale) : (200 * stageScale),
               fontSize: item.fontSize * stageScale,
               fontFamily: item.fontFamily,
               color: item.fill,

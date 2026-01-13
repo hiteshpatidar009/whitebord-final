@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { RotateCcw, RotateCw, Home } from "lucide-react";
+import { RotateCcw, Home } from "lucide-react";
 
 interface ChromeWidgetProps {
   id: string;
