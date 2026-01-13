@@ -148,28 +148,28 @@ const Protractor: React.FC = () => {
           </span>
 
           {/* 135 degree - right side */}
-          <span
+          {/* <span
             className='absolute text-lg font-bold text-gray-900'
             style={{
               right: '40px',
               top: '45%',
-              transform: 'translateY(-50%)'
+              transform: 'translateY(-50%) rotate(45deg)'
             }}
           >
             135°
-          </span>
+          </span> */}
 
           {/* 45 degree - left side */}
-          <span
+          {/* <span
             className='absolute text-lg font-bold text-gray-900'
             style={{
               left: '40px',
               top: '35%',
-              transform: 'translateY(-50%)'
+              transform: 'translateY(-50%) rotate(-45deg)'
             }}
           >
             45°
-          </span>
+          </span> */}
 
           {/* Other degree markings */}
           {[30, 60, 120, 150].map(deg => {
