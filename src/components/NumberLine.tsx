@@ -115,9 +115,20 @@ const NumberLine: React.FC = () => {
           {/* Right stretch handle */}
           <div
             onMouseDown={onStretchXStart}
-            className='absolute right-0 top-1/2 w-2 h-2 bg-black rounded-full cursor-ew-resize'
+            className='absolute right-0 top-1/2 w-4 h-4 bg-gray-800 text-white rounded-full cursor-ew-resize flex items-center justify-center text-sm font-bold'
             style={{ transform: 'translate(50%, -50%)' }}
-          />
+          >
+            ›
+          </div>
+
+          {/* Left stretch handle */}
+          <div
+            onMouseDown={onStretchXStart}
+            className='absolute left-0 top-1/2 w-4 h-4 bg-gray-800 text-white rounded-full cursor-ew-resize flex items-center justify-center text-sm font-bold'
+            style={{ transform: 'translate(-50%, -50%)' }}
+          >
+            ‹
+          </div>
         </div>
 
         {/* ================= Y AXIS ================= */}
@@ -150,9 +161,20 @@ const NumberLine: React.FC = () => {
           {/* Top stretch handle */}
           <div
             onMouseDown={onStretchYStart}
-            className='absolute top-0 left-1/2 w-4 h-4 bg-black rounded-full cursor-ns-resize'
+            className='absolute top-0 left-1/2 w-4 h-4 bg-gray-800 text-white rounded-full cursor-ns-resize flex items-center justify-center text-sm font-bold'
             style={{ transform: 'translate(-50%, -50%)' }}
-          />
+          >
+            ‹
+          </div>
+
+          {/* Bottom stretch handle */}
+          <div
+            onMouseDown={onStretchYStart}
+            className='absolute bottom-0 left-1/2 w-4 h-4 bg-gray-800 text-white rounded-full cursor-ns-resize flex items-center justify-center text-sm font-bold'
+            style={{ transform: 'translate(-50%, 50%)' }}
+          >
+            ›
+          </div>
         </div>
 
         {/* Origin */}
