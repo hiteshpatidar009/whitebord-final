@@ -128,7 +128,6 @@ const Triangle45: React.FC = () => {
               }}
             />
           ))}
-
           {/* Height scale */}
           {ticks.map(i => (
             <div
@@ -141,7 +140,6 @@ const Triangle45: React.FC = () => {
               }}
             />
           ))}
-
           {/* CM Numbers (base) */}
           {ticks
             .filter(i => i % 10 === 0)
@@ -154,32 +152,27 @@ const Triangle45: React.FC = () => {
                 {i / 10}
               </span>
             ))}
-
           {/* Angle badge */}
           <div className='absolute left-10 top-10 bg-gray-900/90 text-white px-3 py-1 rounded-lg text-sm font-bold shadow-lg'>
             {Math.round(rotation)}°
           </div>
-
           {/* 45° marking */}
-          <div className='absolute right-6 top-6 text-sm font-bold text-gray-900'>
+          <div className='absolute right-12 top-3 text-sm font-bold text-gray-900'>
             45°
           </div>
-
           {/* Close */}
           <button
             onClick={() => setShowTriangle45(false)}
-            className='absolute left-3 top-3 w-7 h-7 rounded-full bg-gray-800 text-white flex items-center justify-center border border-gray-700 hover:bg-gray-900'
+            className='absolute left-4 top-10 w-7 h-7 rounded-full bg-gray-800 text-white flex items-center justify-center border border-gray-700 hover:bg-gray-900'
           >
             ×
           </button>
-
           {/* Resize */}
           <div
             onMouseDown={onResizeStart}
             className='absolute right-3 bottom-3 w-4 h-14 bg-gray-900/80 cursor-ew-resize rounded shadow-inner'
             title='Resize'
           />
-
           {/* Rotate */}
           <div
             onMouseDown={onRotateStart}
