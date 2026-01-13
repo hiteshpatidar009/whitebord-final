@@ -1987,7 +1987,7 @@ const getCursorStyle = () => {
             x={item.x}
             y={item.y}
             width={item.width || 200}
-            height={item.fontSize * 1.4 * 2}
+            height={Math.max(item.fontSize * 1.4 * 4, item.fontSize * 1.4 * (item.text.split('\n').length || 1))}
             fill="transparent"
             draggable={tool === 'select' || tool === 'text'}
             onClick={() => {
