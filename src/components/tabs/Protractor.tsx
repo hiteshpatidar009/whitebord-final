@@ -80,9 +80,6 @@ const Protractor: React.FC = () => {
       onMouseMove={onMouseMove}
       onMouseUp={stopAll}
       onMouseLeave={stopAll}
-      style={{
-        pointerEvents: dragging || resizing || rotating ? 'auto' : 'none'
-      }}
     >
       <div
         ref={ref}
@@ -96,7 +93,7 @@ const Protractor: React.FC = () => {
           transform: `rotate(${rotation}deg)`,
           pointerEvents: 'auto'
         }}
->
+      >
         {/* Body */}
         <div className='relative w-full h-full bg-[#B9DEA5]/80 backdrop-blur-sm border-2 border-gray-900 rounded-t-full shadow-2xl overflow-hidden'>
           {/* Degree lines (touching arc) */}
@@ -118,8 +115,7 @@ const Protractor: React.FC = () => {
             className='absolute text-lg font-bold text-gray-900'
             style={{
               left: '10px',
-              bottom: '50%',
-              transform: 'translateY(50%)'
+              bottom: '0px'
             }}
           >
             0°
@@ -130,7 +126,7 @@ const Protractor: React.FC = () => {
             className='absolute text-lg font-bold text-gray-900'
             style={{
               left: '50%',
-              top: '10px',
+              top: '0px',
               transform: 'translateX(-50%)'
             }}
           >
@@ -142,12 +138,35 @@ const Protractor: React.FC = () => {
             className='absolute text-lg font-bold text-gray-900'
             style={{
               right: '10px',
-              bottom: '50%',
-              transform: 'translateY(50%)'
+              bottom: '0px'
             }}
           >
             180°
           </span>
+
+          {/* 135 degree - right side */}
+          {/* <span
+            className='absolute text-lg font-bold text-gray-900'
+            style={{
+              right: '40px',
+              top: '45%',
+              transform: 'translateY(-50%) rotate(45deg)'
+            }}
+          >
+            135°
+          </span> */}
+
+          {/* 45 degree - left side */}
+          {/* <span
+            className='absolute text-lg font-bold text-gray-900'
+            style={{
+              left: '40px',
+              top: '35%',
+              transform: 'translateY(-50%) rotate(-45deg)'
+            }}
+          >
+            45°
+          </span> */}
 
           {/* Other degree markings */}
           {[30, 60, 120, 150].map(deg => {
@@ -207,7 +226,7 @@ const Protractor: React.FC = () => {
           {/* Resize */}
           <div
             onMouseDown={onResizeStart}
-            className='absolute bottom-2 left-1/2 -translate-x-1/2 w-20 h-4 bg-gray-900/80 rounded cursor-ew-resize'
+            className='absolute bottom-2 left-1/2 -translate-x-1/2 w-20 h-2 bg-gray-900/80 rounded cursor-ew-resize'
           />
         </div>
       </div>
