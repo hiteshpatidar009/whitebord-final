@@ -106,7 +106,7 @@ const Protractor: React.FC = () => {
               className='absolute bottom-0 left-1/2 bg-gray-900 origin-bottom'
               style={{
                 width: '1px',
-                height: i % 10 === 0 ? '32%' : i % 5 === 0 ? '26%' : '18%',
+                height: i % 10 === 0 ? '100%' : i % 5 === 0 ? '75%' : '0%',
                 transform: `rotate(${i - 90}deg)`
               }}
             />
