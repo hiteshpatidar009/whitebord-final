@@ -28,7 +28,7 @@ type ExpandableToolbarProps = {
 
 const ExpandableToolbar: React.FC<ExpandableToolbarProps> = ({ visible, onClose, onChromeClick, onPcClick, onBeforePcClick }) => {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
-  const { setShowRuler, setShowTriangle45, setShowTriangle60, setShowProtractor } = useWhiteboardStore();
+  const { setShowRuler, setShowTriangle45, setShowTriangle60, setShowProtractor, setShowNumberLine } = useWhiteboardStore();
 
   const handlePcButtonClick = () => {
     if (onBeforePcClick) {
@@ -89,7 +89,7 @@ const ExpandableToolbar: React.FC<ExpandableToolbarProps> = ({ visible, onClose,
             <Pill icon={<TriangleRight size={18} />} label="Set Square 60°" onClick={() => setShowTriangle60(true)} />
             <Pill icon={<TriangleRight size={18} />} label="Set Square 45°" onClick={() => setShowTriangle45(true)} />
             <Pill icon={<Circle size={18} />} label="Protactor" onClick={() => setShowProtractor(true)} />
-            <Pill icon={<Move size={18} />} label="Number Line" />
+            <Pill icon={<Move size={18} />} label="Number Line" onClick={() => setShowNumberLine(true)} />
           </div>
 
         {/* ================= SECTION 3 (3D) ================= */}

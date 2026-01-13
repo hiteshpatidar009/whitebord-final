@@ -6,12 +6,12 @@ import FloatingStopwatch from './components/Stopwatch';
 import Ruler from './components/tabs/Ruler';
 import Triangle45 from './components/tabs/Triangle45';
 import Triangle60 from './components/tabs/Triangle60';
-import Protractor from './components/tabs/Protractor';
+import NumberLine from './components/tabs/NumberLine';
 import { useWhiteboardStore } from './store/useWhiteboardStore';
 
 
 function App() {
-  const { showRuler, showTriangle45, showTriangle60, showProtractor } = useWhiteboardStore();
+  const { showRuler, showTriangle45, showTriangle60, showProtractor, showNumberLine } = useWhiteboardStore();
   
   return (
     <div className="relative w-full h-screen overflow-hidden">
@@ -22,7 +22,7 @@ function App() {
       {showRuler && <Ruler />}
       {showTriangle45 && <Triangle45 />}
       {showTriangle60 && <Triangle60 />}
-      {showProtractor && <Protractor />}
+      {showNumberLine && <NumberLine />}
       <Whiteboard />
     </div>
   );
