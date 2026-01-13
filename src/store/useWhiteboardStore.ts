@@ -28,6 +28,7 @@ interface WhiteboardState {
   showTriangle45: boolean;
   showTriangle60: boolean;
   showProtractor: boolean;
+  showNumberLine: boolean;
   
   setTool: (tool: ToolType) => void;
   setSelectedId: (id: string | null) => void;
@@ -45,6 +46,7 @@ interface WhiteboardState {
   setShowTriangle45: (show: boolean) => void;
   setShowTriangle60: (show: boolean) => void;
   setShowProtractor: (show: boolean) => void;
+  setShowNumberLine: (show: boolean) => void;
   
   addItem: (item: WhiteboardItem) => void;
   updateItem: (id: string, updates: Partial<WhiteboardItem>) => void;
@@ -87,6 +89,7 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   showTriangle45: false,
   showTriangle60: false,
   showProtractor: false,
+  showNumberLine: false,
 
   setTool: (tool) => set({ tool }),
   setSelectedId: (selectedId) => set({ selectedId }),
@@ -103,6 +106,7 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   setShowTriangle45: (showTriangle45) => set({ showTriangle45 }),
   setShowTriangle60: (showTriangle60) => set({ showTriangle60 }),
   setShowProtractor: (showProtractor) => set({ showProtractor }),
+  setShowNumberLine: (showNumberLine) => set({ showNumberLine }),
 
   // --- UPDATED: Cache Busting Logic ---
   setBackgroundImage: (image) => {

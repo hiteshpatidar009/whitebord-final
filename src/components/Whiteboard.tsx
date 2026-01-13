@@ -22,6 +22,7 @@ import Ruler from './Ruler'
 import Triangle45 from './Triangle45'
 import Triangle60 from './Triangle60'
 import Protractor from './Protractor'
+import NumberLine from './NumberLine'
 import ChromeWidget from './ChromeWidget'
 
 import { transcribeHandwriting } from '../services/geminiService'
@@ -397,7 +398,8 @@ export const Whiteboard: React.FC = () => {
     showRuler,
     showTriangle45,
     showTriangle60,
-    showProtractor
+    showProtractor,
+    showNumberLine
   } = useWhiteboardStore()
 
   const stageRef = useRef<Konva.Stage>(null)
@@ -2505,6 +2507,7 @@ export const Whiteboard: React.FC = () => {
       {showTriangle45 && <Triangle45 />}
       {showTriangle60 && <Triangle60 />}
       {showProtractor && <Protractor />}
+      {showNumberLine && <NumberLine />}
       {/* Chrome Widgets */}
       {chromeWidgets.map(widget => (
         <ChromeWidget
