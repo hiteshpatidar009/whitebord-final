@@ -9,6 +9,7 @@ import type { Stroke, WhiteboardItem } from '../types';
 import { getBoundingBox } from '../utils/canvasUtils';
 import { FONT_STACKS, FONTS } from './TextToolbar';
 import ChromeWidget from './ChromeWidget';
+import Protractor from './tabs/Protractor';
 
 import { transcribeHandwriting } from '../services/geminiService';
 
@@ -226,6 +227,7 @@ export const Whiteboard: React.FC = () => {
     backgroundImage,
     groupItems,
     ungroupItems,
+    showProtractor,
   } = useWhiteboardStore();
 
   const stageRef = useRef<Konva.Stage>(null);
@@ -2367,6 +2369,9 @@ const getCursorStyle = () => {
           );
         })}
       </div>
+
+      {/* Geometry Tools */}
+      {showProtractor && <Protractor />}
 
     </div>
   );
