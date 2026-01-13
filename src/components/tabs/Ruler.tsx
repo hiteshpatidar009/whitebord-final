@@ -110,7 +110,7 @@ const Ruler: React.FC = () => {
 
   return (
     <div
-      className='absolute inset-0'
+      className='fixed inset-0 z-50'
       onMouseMove={onMouseMove}
       onMouseUp={stopAll}
       onMouseLeave={stopAll}

@@ -16,6 +16,7 @@ import {
   Plus,
   TriangleRight
 } from "lucide-react";
+import { useWhiteboardStore } from '../store/useWhiteboardStore';
 
 type ExpandableToolbarProps = {
   visible: boolean;
@@ -27,6 +28,7 @@ type ExpandableToolbarProps = {
 
 const ExpandableToolbar: React.FC<ExpandableToolbarProps> = ({ visible, onClose, onChromeClick, onPcClick, onBeforePcClick }) => {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const { setShowRuler, setShowTriangle45, setShowTriangle60, setShowProtractor } = useWhiteboardStore();
 
   const handlePcButtonClick = () => {
     if (onBeforePcClick) {
@@ -81,12 +83,12 @@ const ExpandableToolbar: React.FC<ExpandableToolbarProps> = ({ visible, onClose,
             <div className="inline whitespace-nowrap items-center gap-3 px-4  py-2 rounded-full bg-black text-white text-lg font-semibold">
             GEOMETRY TOOLS
           </div>
-            <Pill icon={<Ruler size={18} />} label="Ruler" />
+            <Pill icon={<Ruler size={18} />} label="Ruler" onClick={() => setShowRuler(true)} />
             <Pill icon={<Compass size={18} />} label="Compass" />
             <Pill icon={<Divide size={18} />} label="Divider" />
-            <Pill icon={<TriangleRight size={18} />} label="Set Square 60°" />
-            <Pill icon={<TriangleRight size={18} />} label="Set Square 45°" />
-            <Pill icon={<Circle size={18} />} label="Protactor" />
+            <Pill icon={<TriangleRight size={18} />} label="Set Square 60°" onClick={() => setShowTriangle60(true)} />
+            <Pill icon={<TriangleRight size={18} />} label="Set Square 45°" onClick={() => setShowTriangle45(true)} />
+            <Pill icon={<Circle size={18} />} label="Protactor" onClick={() => setShowProtractor(true)} />
             <Pill icon={<Move size={18} />} label="Number Line" />
           </div>
 
