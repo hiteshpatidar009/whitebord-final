@@ -118,7 +118,7 @@ const Protractor: React.FC = () => {
             className='absolute text-lg font-bold text-gray-900'
             style={{
               left: '10px',
-              bottom: '5px'
+              bottom: '0px'
             }}
           >
             0°
@@ -141,10 +141,34 @@ const Protractor: React.FC = () => {
             className='absolute text-lg font-bold text-gray-900'
             style={{
               right: '10px',
-              bottom: '5px'
+              bottom: '0px'
             }}
           >
             180°
+          </span>
+
+          {/* 135 degree - right side */}
+          <span
+            className='absolute text-lg font-bold text-gray-900'
+            style={{
+              right: '40px',
+              top: '45%',
+              transform: 'translateY(-50%)'
+            }}
+          >
+            135°
+          </span>
+
+          {/* 45 degree - left side */}
+          <span
+            className='absolute text-lg font-bold text-gray-900'
+            style={{
+              left: '40px',
+              top: '35%',
+              transform: 'translateY(-50%)'
+            }}
+          >
+            45°
           </span>
 
           {/* Other degree markings */}
