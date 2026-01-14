@@ -8,14 +8,14 @@ const Triangle45: React.FC = () => {
   const triangleRef = useRef<HTMLDivElement>(null)
 
   const [position, setPosition] = useState({ x: 250, y: 250 })
-  const [rotation, setRotation] = useState(0)
+  const [rotation, setRotation] = useState(-225) // Default -225° rotation
   const [size, setSize] = useState(320)
 
   const [dragging, setDragging] = useState(false)
   const [resizing, setResizing] = useState(false)
   const [rotating, setRotating] = useState(false)
 
-  const startRef = useRef({ x: 0, y: 0, size: 0, angle: 0 })
+  const startRef = useRef({ x: 0, y: 0, size: 0, rotation: 0, mouseAngle: 0 })
   const [ticks, setTicks] = useState<number[]>([])
 
   /* --------- Generate scale --------- */
@@ -48,8 +48,12 @@ const Triangle45: React.FC = () => {
     const cx = rect.left + rect.width / 2
     const cy = rect.top + rect.height / 2
 
-    startRef.current.angle =
-      Math.atan2(e.clientY - cy, e.clientX - cx) - rotation * (Math.PI / 180)
+    // Calculate initial mouse angle relative to center
+    startRef.current.mouseAngle =
+      Math.atan2(e.clientY - cy, e.clientX - cx) * (180 / Math.PI)
+
+    // Store current rotation
+    startRef.current.rotation = rotation
   }
 
   /* --------- Mouse Move --------- */
@@ -71,10 +75,16 @@ const Triangle45: React.FC = () => {
       const cx = rect.left + rect.width / 2
       const cy = rect.top + rect.height / 2
 
-      const angle =
-        Math.atan2(e.clientY - cy, e.clientX - cx) - startRef.current.angle
+      // Calculate current mouse angle
+      const currentMouseAngle =
+        Math.atan2(e.clientY - cy, e.clientX - cx) * (180 / Math.PI)
 
-      setRotation((angle * 180) / Math.PI)
+      // Calculate delta from initial mouse angle
+      const deltaAngle = currentMouseAngle - startRef.current.mouseAngle
+
+      // Apply delta to the stored initial rotation
+      const newRotation = startRef.current.rotation + deltaAngle
+      setRotation(newRotation)
     }
   }
 
@@ -83,6 +93,9 @@ const Triangle45: React.FC = () => {
     setResizing(false)
     setRotating(false)
   }
+
+  // Calculate display rotation - offset by -225 to show 0° initially
+  const displayRotation = (((rotation + 225) % 360) + 360) % 360
 
   const tickHeight = (i: number) => (i % 10 === 0 ? 16 : i % 5 === 0 ? 11 : 7)
 
@@ -152,9 +165,9 @@ const Triangle45: React.FC = () => {
                 {i / 10}
               </span>
             ))}
-          {/* Angle badge */}
+          {/* Angle badge - Show display rotation (0° initially) */}
           <div className='absolute left-6 top-24 bg-gray-900/90 text-white px-3 py-1 rounded-lg text-sm font-bold shadow-lg'>
-            {Math.round(rotation)}°
+            {Math.round(displayRotation)}°
           </div>
           {/* 45° marking */}
           <div className='absolute right-12 top-12 text-sm font-bold text-gray-900'>
