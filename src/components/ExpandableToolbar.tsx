@@ -70,9 +70,9 @@ const ExpandableToolbar: React.FC<ExpandableToolbarProps> = ({ visible, onClose,
               accept="image/png,image/jpeg,image/webp,application/pdf"
               onChange={handleFileChange}
             />
-            <Pill icon={<Smartphone size={18} />} label="App" />
-            <Pill icon={<LayoutGrid size={18} />} label="Widget" />
-            <Pill icon={<Camera size={18} />} label="Webcam" />
+            {/* <Pill icon={<Smartphone size={18} />} label="App" /> */}
+            {/* <Pill icon={<LayoutGrid size={18} />} label="Widget" /> */}
+            {/* <Pill icon={<Camera size={18} />} label="Webcam" /> */}
           </div>
 
         {/* ================= SECTION 2 (GEOMETRY) ================= */}
@@ -84,7 +84,7 @@ const ExpandableToolbar: React.FC<ExpandableToolbarProps> = ({ visible, onClose,
             GEOMETRY TOOLS
           </div>
             <Pill icon={<Ruler size={18} />} label="Ruler" onClick={() => setShowRuler(true)} />
-            <Pill icon={<Compass size={18} />} label="Compass" />
+            {/* <Pill icon={<Compass size={18} />} label="Compass" /> */}
             <Pill icon={<Divide size={18} />} label="Divider" onClick={() => setShowDivider(true)} />
             <Pill icon={<TriangleRight size={18} />} label="Set Square 60°" onClick={() => setShowTriangle60(true)} />
             <Pill icon={<TriangleRight size={18} />} label="Set Square 45°" onClick={() => setShowTriangle45(true)} />

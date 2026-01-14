@@ -77,8 +77,8 @@ const Divider: React.FC = () => {
     const centerX = position.x + 5
     const centerY = position.y + 5
     const currentAngleRad = angle * (Math.PI / 180)
-    const tipX = centerX + Math.sin(currentAngleRad) * length
-    const tipY = centerY + Math.cos(currentAngleRad) * length
+    const tipX = centerX + Math.sin(currentAngleRad) * (length + 9)
+    const tipY = centerY + Math.cos(currentAngleRad) * (length + 9)
 
     // Record FIRST point at current tip position
     drawingPoints.current.push(tipX, tipY)
@@ -121,8 +121,8 @@ const Divider: React.FC = () => {
 
       // Calculate new tip position
       const newAngleRad = newAngle * (Math.PI / 180)
-      const tipX = centerX + Math.sin(newAngleRad) * length
-      const tipY = centerY + Math.cos(newAngleRad) * length
+      const tipX = centerX + Math.sin(newAngleRad) * (length + 9)
+      const tipY = centerY + Math.cos(newAngleRad) * (length + 9)
 
       // Add point with throttling for smooth drawing
       const now = Date.now()
@@ -247,7 +247,7 @@ const Divider: React.FC = () => {
           {/* Left Arm (Fixed pivot) */}
           <DividerArm angle={angle} length={length} side='left' />
 
-          {/* Right Arm (Drawing arm) */}
+          {/* Right Arm (Drawing arm) - Always visible */}
           <DividerArm
             angle={angle}
             length={length}
