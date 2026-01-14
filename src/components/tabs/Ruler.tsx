@@ -142,12 +142,15 @@ const Ruler: React.FC = () => {
               const isHalfCm = tick % 5 === 0
               const position = getTickPosition(tick)
 
+              // Add 20px margin to the left for the first few ticks
+              const adjustedPosition = position + 20
+
               return (
                 <div
                   key={tick}
                   className='absolute flex flex-col items-center'
                   style={{
-                    left: `${position}px`,
+                    left: `${adjustedPosition}px`,
                     transform: 'translateX(-50%)'
                   }}
                 >
@@ -196,8 +199,8 @@ const Ruler: React.FC = () => {
           </div>
 
           {/* Close Button with better styling */}
-          <button 
-            className='absolute left-4 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-gray-800 hover:bg-gray-900 border-2 border-gray-700 text-white text-sm font-bold flex items-center justify-center shadow-md transition-all hover:scale-110 active:scale-95'
+          <button
+            className='absolute left-6 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-gray-800 hover:bg-gray-900 border-2 border-gray-700 text-white text-sm font-bold flex items-center justify-center shadow-md transition-all hover:scale-110 active:scale-95'
             onClick={() => setShowRuler(false)}
           >
             ×
