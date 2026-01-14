@@ -1,5 +1,5 @@
 // Divider.tsx
-import React, { useRef, useState } from 'react'
+import React, { useRef, useState, useEffect } from 'react'
 import DividerArm from './DividerArm'
 import { clamp } from './dividerMath'
 import { useWhiteboardStore } from '../../store/useWhiteboardStore'
@@ -24,10 +24,14 @@ const Divider: React.FC = () => {
     angle: 0,
     length: 0,
     clientX: 0,
-    clientY: 0
+    clientY: 0,
+    initialAngle: 0
   })
+
   const drawingPoints = useRef<number[]>([])
   const currentStrokeId = useRef<string | null>(null)
+  const lastPointTime = useRef<number>(0)
+  const isDrawingFromTip = useRef<boolean>(false)
 
   /* ---------- Drag ---------- */
   const onDragStart = (e: React.MouseEvent) => {
@@ -36,7 +40,7 @@ const Divider: React.FC = () => {
     start.current.y = e.clientY - position.y
   }
 
-  /* ---------- Rotate ---------- */
+  /* ---------- Rotate (Top Handle) ---------- */
   const onRotateStart = (e: React.MouseEvent) => {
     e.stopPropagation()
     setRotating(true)
@@ -52,22 +56,96 @@ const Divider: React.FC = () => {
     start.current.length = length
   }
 
-  /* ---------- Draw ---------- */
+  /* ---------- Draw (Right Tip Only) ---------- */
   const onDrawStart = (e: React.MouseEvent) => {
     e.stopPropagation()
+    e.preventDefault()
+
+    // Set drawing state
     setDrawing(true)
+    isDrawingFromTip.current = true
+
+    // Initialize drawing
     const id = uuidv4()
     currentStrokeId.current = id
     drawingPoints.current = []
 
-    // Also start rotating when drawing from the marker tip
-    setRotating(true)
+    // Clear any previous points
+    drawingPoints.current.length = 0
+
+    // Get current tip position
+    const centerX = position.x + 5
+    const centerY = position.y + 5
+    const currentAngleRad = angle * (Math.PI / 180)
+    const tipX = centerX + Math.sin(currentAngleRad) * length
+    const tipY = centerY + Math.cos(currentAngleRad) * length
+
+    // Record FIRST point at current tip position
+    drawingPoints.current.push(tipX, tipY)
+
+    // Set rotation start for smooth movement
     start.current.clientX = e.clientX
+    start.current.clientY = e.clientY
+    start.current.initialAngle =
+      Math.atan2(e.clientX - centerX, e.clientY - centerY) * (180 / Math.PI)
+
     start.current.angle = angle
+    lastPointTime.current = Date.now()
   }
 
   const onMouseMove = (e: React.MouseEvent) => {
-    let angleChanged = false
+    const centerX = position.x + 5
+    const centerY = position.y + 5
+
+    // Handle rotation from top handle
+    if (rotating && !drawing) {
+      const delta = e.clientX - start.current.clientX
+      const newAngle = clamp(start.current.angle + delta * 0.2, 5, 75)
+      setAngle(newAngle)
+    }
+
+    // Handle drawing from right tip
+    if (drawing && isDrawingFromTip.current) {
+      // Calculate angle based on mouse position relative to center
+      const deltaX = e.clientX - centerX
+      const deltaY = e.clientY - centerY
+
+      // Calculate new angle (in degrees)
+      let newAngle = Math.atan2(deltaX, deltaY) * (180 / Math.PI)
+
+      // Allow full 360-degree rotation for complete circles
+      // No clamping during drawing to enable full circles
+
+      // Update angle
+      setAngle(newAngle)
+
+      // Calculate new tip position
+      const newAngleRad = newAngle * (Math.PI / 180)
+      const tipX = centerX + Math.sin(newAngleRad) * length
+      const tipY = centerY + Math.cos(newAngleRad) * length
+
+      // Add point with throttling for smooth drawing
+      const now = Date.now()
+      if (now - lastPointTime.current > 16) {
+        // ~60fps
+        drawingPoints.current.push(tipX, tipY)
+        lastPointTime.current = now
+
+        // Save stroke progressively
+        if (currentStrokeId.current && drawingPoints.current.length >= 4) {
+          addItem({
+            type: 'stroke',
+            id: currentStrokeId.current,
+            tool: 'pen',
+            points: [...drawingPoints.current],
+            color: color,
+            size: 3,
+            isEraser: false,
+            isHighlighter: false
+          })
+        }
+      }
+    }
 
     if (dragging) {
       setPosition({
@@ -76,61 +154,52 @@ const Divider: React.FC = () => {
       })
     }
 
-    if (rotating) {
-      const delta = e.clientX - start.current.clientX
-      const newAngle = clamp(start.current.angle + delta * 0.2, 5, 75)
-      setAngle(newAngle)
-      angleChanged = true
-    }
-
     if (extending) {
       const delta = e.clientY - start.current.clientY
       setLength(clamp(start.current.length + delta, 120, 260))
     }
-
-    if (drawing && ref.current) {
-      // Calculate marker tip position
-      const rightArmAngle = angle * (Math.PI / 180)
-      const tipX = position.x + 5 + Math.sin(rightArmAngle) * length
-      const tipY = position.y + 5 + Math.cos(rightArmAngle) * length
-
-      // Add point to drawing
-      drawingPoints.current.push(tipX, tipY)
-
-      // Save stroke if we have enough points
-      if (currentStrokeId.current && drawingPoints.current.length >= 4) {
-        addItem({
-          type: 'stroke',
-          id: currentStrokeId.current,
-          tool: 'pen',
-          points: [...drawingPoints.current],
-          color: color,
-          size: 3,
-          isEraser: false,
-          isHighlighter: false
-        })
-      }
-
-      // If angle changed during drawing, also update the rotation start point
-      if (angleChanged) {
-        start.current.clientX = e.clientX
-        start.current.angle = angle
-      }
-    }
   }
 
   const stopAll = () => {
+    // Save final stroke when drawing stops
+    if (
+      drawing &&
+      currentStrokeId.current &&
+      drawingPoints.current.length >= 4
+    ) {
+      addItem({
+        type: 'stroke',
+        id: currentStrokeId.current,
+        tool: 'pen',
+        points: [...drawingPoints.current],
+        color: color,
+        size: 3,
+        isEraser: false,
+        isHighlighter: false
+      })
+      saveHistory()
+    }
+
     setDragging(false)
     setRotating(false)
     setExtending(false)
-
-    if (drawing) {
-      setDrawing(false)
-      drawingPoints.current = []
-      currentStrokeId.current = null
-      saveHistory()
-    }
+    setDrawing(false)
+    isDrawingFromTip.current = false
+    drawingPoints.current = []
+    currentStrokeId.current = null
   }
+
+  // Add global mouse up listener
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      if (drawing || rotating || dragging || extending) {
+        stopAll()
+      }
+    }
+
+    window.addEventListener('mouseup', handleGlobalMouseUp)
+    return () => window.removeEventListener('mouseup', handleGlobalMouseUp)
+  }, [drawing, rotating, dragging, extending])
 
   return (
     <div
@@ -154,7 +223,8 @@ const Divider: React.FC = () => {
           {/* Rotate handle */}
           <div
             onMouseDown={onRotateStart}
-            className='absolute -top-6 w-7 h-7 bg-gray-900 text-white rounded-full flex items-center justify-center cursor-pointer'
+            className='absolute -top-6 w-7 h-7 bg-gray-900 text-white rounded-full flex items-center justify-center cursor-pointer hover:bg-gray-700 transition-colors'
+            title='Rotate without drawing'
           >
             ⟳
           </div>
@@ -165,12 +235,16 @@ const Divider: React.FC = () => {
           {/* Extend handle */}
           <div
             onMouseDown={onExtendStart}
-            className='absolute top-0 left-1/2 -translate-x-1/2 w-7 h-7 bg-gray-900 text-white rounded-full flex items-center justify-center cursor-ns-resize z-10'
+            className='absolute top-0 left-1/2 -translate-x-1/2 w-7 h-7 bg-gray-900 text-white rounded-full flex items-center justify-center cursor-ns-resize z-10 hover:bg-gray-700 transition-colors'
+            title='Adjust length'
           >
             ⇳
           </div>
 
+          {/* Left Arm (Fixed pivot) */}
           <DividerArm angle={angle} length={length} side='left' />
+
+          {/* Right Arm (Drawing arm) */}
           <DividerArm
             angle={angle}
             length={length}
@@ -179,6 +253,17 @@ const Divider: React.FC = () => {
             isDrawing={drawing}
           />
         </div>
+
+        {/* Visual center point */}
+        <div className='absolute top-1/2 left-1/2 w-3 h-3 bg-blue-500 rounded-full -translate-x-1/2 -translate-y-1/2 opacity-70'></div>
+
+        {/* Drawing indicator */}
+        {drawing && (
+          <div className='absolute -top-12 left-1/2 -translate-x-1/2 bg-green-600 text-white px-3 py-1 rounded-lg text-sm font-medium shadow-lg flex items-center gap-2'>
+            <div className='w-2 h-2 bg-white rounded-full animate-pulse'></div>
+            Drawing Mode
+          </div>
+        )}
       </div>
     </div>
   )
