@@ -94,7 +94,7 @@ const Divider: React.FC = () => {
           {/* Extend handle */}
           <div
             onMouseDown={onExtendStart}
-            className='absolute -bottom-6 w-7 h-7 bg-gray-900 text-white rounded-full flex items-center justify-center cursor-ns-resize'
+            className='absolute top-center w-7 h-7 bg-gray-900 text-white rounded-full flex items-center justify-center cursor-ns-resize'
           >
             ⇳
           </div>

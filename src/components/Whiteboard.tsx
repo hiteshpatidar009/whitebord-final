@@ -10,6 +10,7 @@ import { getBoundingBox } from '../utils/canvasUtils';
 import { FONT_STACKS, FONTS } from './TextToolbar';
 import ChromeWidget from './ChromeWidget';
 import Protractor from './tabs/Protractor';
+import Divider from './Divider/Divider';
 
 import { transcribeHandwriting } from '../services/geminiService';
 
@@ -228,6 +229,7 @@ export const Whiteboard: React.FC = () => {
     groupItems,
     ungroupItems,
     showProtractor,
+    showDivider,
   } = useWhiteboardStore();
 
   const stageRef = useRef<Konva.Stage>(null);
@@ -2372,6 +2374,7 @@ const getCursorStyle = () => {
 
       {/* Geometry Tools */}
       {showProtractor && <Protractor />}
+      {showDivider && <Divider />}
 
     </div>
   );
