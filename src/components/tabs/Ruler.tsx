@@ -14,7 +14,14 @@ const Ruler: React.FC = () => {
   const [rotating, setRotating] = useState(false)
   const [tickMarks, setTickMarks] = useState<number[]>([])
 
-  const startRef = useRef({ x: 0, y: 0, width: 0, angle: 0 })
+  const startRef = useRef({
+    x: 0,
+    y: 0,
+    width: 0,
+    angle: 0,
+    pivotX: 0,
+    pivotY: 0
+  })
 
   // Generate tick marks based on width
   useEffect(() => {
@@ -49,11 +56,17 @@ const Ruler: React.FC = () => {
     setRotating(true)
 
     const rect = rulerRef.current!.getBoundingClientRect()
-    const cx = rect.left + rect.width / 2
-    const cy = rect.top + rect.height / 2
 
-    startRef.current.angle =
-      Math.atan2(e.clientY - cy, e.clientX - cx) - rotation * (Math.PI / 180)
+    // Use left-top corner as pivot point
+    const pivotX = rect.left
+    const pivotY = rect.top
+
+    // Calculate initial mouse angle relative to pivot point
+    const initialAngle = Math.atan2(e.clientY - pivotY, e.clientX - pivotX)
+
+    startRef.current.angle = initialAngle - rotation * (Math.PI / 180)
+    startRef.current.pivotX = pivotX
+    startRef.current.pivotY = pivotY
   }
 
   /* ---------------- Mouse Move ---------------- */
@@ -71,14 +84,16 @@ const Ruler: React.FC = () => {
     }
 
     if (rotating) {
-      const rect = rulerRef.current!.getBoundingClientRect()
-      const cx = rect.left + rect.width / 2
-      const cy = rect.top + rect.height / 2
+      // Calculate current mouse angle relative to the original pivot point
+      const currentAngle = Math.atan2(
+        e.clientY - startRef.current.pivotY,
+        e.clientX - startRef.current.pivotX
+      )
 
-      const angle =
-        Math.atan2(e.clientY - cy, e.clientX - cx) - startRef.current.angle
-
-      setRotation((angle * 180) / Math.PI)
+      // Calculate new rotation based on the initial angle
+      const newRotation =
+        (currentAngle - startRef.current.angle) * (180 / Math.PI)
+      setRotation(newRotation)
     }
   }
 
@@ -125,7 +140,9 @@ const Ruler: React.FC = () => {
           left: position.x,
           top: position.y,
           width,
+          // Apply transform-origin to rotate from left-top corner
           transform: `rotate(${rotation}deg)`,
+          transformOrigin: 'left top',
           pointerEvents: 'auto'
         }}
         className='absolute cursor-grab select-none'
