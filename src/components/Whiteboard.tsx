@@ -1647,6 +1647,26 @@ const getCursorStyle = () => {
     toolbar.appendChild(colorPicker);
     toolbar.appendChild(fontSelect);
     toolbar.appendChild(sizeInput);
+    
+    // Save button
+    const saveBtn = document.createElement('button');
+    saveBtn.innerHTML = 'Save';
+    saveBtn.style.padding = '4px 12px';
+    saveBtn.style.border = '1px solid #dee2e6';
+    saveBtn.style.borderRadius = '4px';
+    saveBtn.style.cursor = 'pointer';
+    saveBtn.style.background = '#28a745';
+    saveBtn.style.color = 'white';
+    saveBtn.style.fontSize = '12px';
+    saveBtn.style.fontWeight = '600';
+    saveBtn.style.marginLeft = 'auto';
+    saveBtn.title = 'Save and close';
+    saveBtn.onmousedown = (e) => e.preventDefault();
+    saveBtn.onclick = (e) => {
+      e.stopPropagation();
+      finishEditing();
+    };
+    toolbar.appendChild(saveBtn);
 
     // Create editable div instead of textarea for rich text support
     const editableDiv = document.createElement('div');
@@ -1749,7 +1769,9 @@ const getCursorStyle = () => {
     
     // Close editor when clicking outside (with proper cleanup)
     const handleClickOutside = (e: MouseEvent) => {
-      if (!container.contains(e.target as Node) && !textResizeStateRef.current.isDragging && !textResizeStateRef.current.isResizing) {
+      const target = e.target as HTMLElement;
+      const isCanvasClick = target.tagName === 'CANVAS' || target.closest('canvas');
+      if (!container.contains(target) && !textResizeStateRef.current.isDragging && !textResizeStateRef.current.isResizing && !isCanvasClick) {
         finishEditing();
       }
     };
@@ -1764,10 +1786,6 @@ const getCursorStyle = () => {
 
     // Handle keyboard shortcuts
     editableDiv.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        finishEditing();
-      }
       if (e.key === 'Escape') {
         finishEditing();
       }
