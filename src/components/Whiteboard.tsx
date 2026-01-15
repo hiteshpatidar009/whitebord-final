@@ -257,7 +257,7 @@ export const Whiteboard: React.FC = () => {
   const cursorRef = useRef<Konva.Circle>(null);
   const lastEraserPosRef = useRef<{ x: number; y: number } | null>(null);
   // const _lastRightClickTime = useRef<number>(0);
-  const [selectionBox, setSelectionBox] = useState<{ x: number, y: number, width: number, height: number } | null>(null);
+  const [selectionBox, setSelectionBox] = useState<{ x: number, y: number, width: number, height: number, isMultiSelect?: boolean } | null>(null);
   const [chromeWidgets, setChromeWidgets] = useState<Array<{ id: string; x: number; y: number; locked: boolean }>>([]);
 
   // Handwriting-specific state
@@ -355,6 +355,13 @@ export const Whiteboard: React.FC = () => {
         } else {
           transformerRef.current.enabledAnchors(['top-left', 'top-right', 'bottom-left', 'bottom-right', 'middle-left', 'middle-right', 'top-center', 'bottom-center']);
           transformerRef.current.rotateEnabled(true);
+        }
+        
+        // Enable dragging for multiple selections
+        if (selectedIds.length > 1) {
+          nodes.forEach(node => {
+            node.draggable(true);
+          });
         }
         
         transformerRef.current.getLayer()?.batchDraw();
@@ -724,8 +731,8 @@ export const Whiteboard: React.FC = () => {
         if (!isMultiSelect) {
           setSelectedId(null);
         }
-        // Start selection box
-        setSelectionBox({ x: pos.x, y: pos.y, width: 0, height: 0 });
+        // Start selection box with multiselect flag
+        setSelectionBox({ x: pos.x, y: pos.y, width: 0, height: 0, isMultiSelect });
     }
     
     // Early return for pan tool - let stage handle dragging
@@ -885,7 +892,8 @@ export const Whiteboard: React.FC = () => {
         x: selectionBox.x,
         y: selectionBox.y,
         width: newWidth,
-        height: newHeight
+        height: newHeight,
+        isMultiSelect: selectionBox.isMultiSelect
       });
       return;
     }
@@ -946,8 +954,15 @@ export const Whiteboard: React.FC = () => {
           }
         });
         
+        // Merge with existing selection if multiselect
         if (selectedItems.length > 0) {
-          setSelectedId(selectedItems.join(','));
+          if (selectionBox.isMultiSelect && selectedId) {
+            const currentSelected = selectedId.split(',');
+            const merged = [...new Set([...currentSelected, ...selectedItems])];
+            setSelectedId(merged.join(','));
+          } else {
+            setSelectedId(selectedItems.join(','));
+          }
         }
       }
       setSelectionBox(null);
@@ -1894,9 +1909,27 @@ const getCursorStyle = () => {
       const dx = node.x() - (dragStartPosRef.current?.x || node.x());
       const dy = node.y() - (dragStartPosRef.current?.y || node.y());
       
-      // Handle group item movement - move all items in the group
-      if (item.type === 'group') {
-        // Update group position
+      // Handle multiple selected items
+      if (selectedId && selectedId.includes(',')) {
+        const selectedIds = selectedId.split(',');
+        selectedIds.forEach(id => {
+          const selectedItem = items.find(i => i.id === id);
+          if (!selectedItem) return;
+          
+          if (selectedItem.type === 'text' || selectedItem.type === 'image' || selectedItem.type === 'group' || (selectedItem.type === 'shape' && selectedItem.shapeType !== 'line' && selectedItem.shapeType !== 'polygon')) {
+            updateItem(id, { 
+              x: ((selectedItem as any).x || 0) + dx, 
+              y: ((selectedItem as any).y || 0) + dy 
+            });
+          } else if (selectedItem.type === 'stroke' || (selectedItem.type === 'shape' && (selectedItem.shapeType === 'line' || selectedItem.shapeType === 'polygon'))) {
+            const newPoints = (selectedItem.points || []).map((p: number, i: number) => 
+              i % 2 === 0 ? p + dx : p + dy
+            );
+            updateItem(id, { points: newPoints });
+          }
+        });
+      } else if (item.type === 'group') {
+        // Handle group item movement - move all items in the group
         updateItem(item.id, { x: node.x(), y: node.y() });
         
         // Move all items in the group
@@ -2333,7 +2366,14 @@ const getCursorStyle = () => {
             {selectionBox && <Rect x={selectionBox.x} y={selectionBox.y} width={selectionBox.width} height={selectionBox.height} stroke="#0099ff" strokeWidth={1} dash={[5, 5]} />}
             <Line ref={previewLineRef} listening={false} tension={0} lineCap="round" lineJoin="round" stroke={color} strokeWidth={(tool === 'eraser' || tool === 'highlighter-eraser') ? size * 2 + 10 : size} visible={false} />
             <Circle ref={cursorRef} listening={false} radius={size * 0.5} stroke="#ff1493" strokeWidth={2.5} fill="rgba(255, 20, 147, 0.15)" visible={tool === 'eraser' || tool === 'highlighter-eraser'} opacity={1} />
-            <Transformer ref={transformerRef} />
+            <Transformer 
+              ref={transformerRef} 
+              onDragEnd={() => {
+                if (selectedId && selectedId.includes(',')) {
+                  saveHistory();
+                }
+              }}
+            />
           </Layer>
         </Stage>
         
@@ -2375,6 +2415,91 @@ const getCursorStyle = () => {
       {/* Geometry Tools */}
       {showProtractor && <Protractor />}
       {showDivider && <Divider />}
+
+      {/* Multi-selection drag button */}
+      {selectedId && selectedId.includes(',') && (() => {
+        const selectedIds = selectedId.split(',');
+        const stage = stageRef.current;
+        if (!stage) return null;
+        
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        selectedIds.forEach(id => {
+          const node = stage.findOne('#' + id);
+          if (node) {
+            const rect = node.getClientRect();
+            minX = Math.min(minX, rect.x);
+            minY = Math.min(minY, rect.y);
+            maxX = Math.max(maxX, rect.x + rect.width);
+            maxY = Math.max(maxY, rect.y + rect.height);
+          }
+        });
+        
+        const centerX = (minX + maxX) / 2;
+        const centerY = minY - 40;
+        
+        return (
+          <div
+            onMouseDown={(e) => {
+              e.preventDefault();
+              const stageRect = stage.container().getBoundingClientRect();
+              const startX = (e.clientX - stageRect.left - stagePos.x) / stageScale;
+              const startY = (e.clientY - stageRect.top - stagePos.y) / stageScale;
+              const initialItems = selectedIds.map(id => {
+                const item = items.find(i => i.id === id);
+                return item ? JSON.parse(JSON.stringify(item)) : null;
+              }).filter(Boolean);
+              
+              const handleMove = (e: MouseEvent) => {
+                const currentX = (e.clientX - stageRect.left - stagePos.x) / stageScale;
+                const currentY = (e.clientY - stageRect.top - stagePos.y) / stageScale;
+                const dx = currentX - startX;
+                const dy = currentY - startY;
+                
+                initialItems.forEach((initialItem: any) => {
+                  if (initialItem.type === 'text' || initialItem.type === 'image' || initialItem.type === 'group' || (initialItem.type === 'shape' && initialItem.shapeType !== 'line' && initialItem.shapeType !== 'polygon')) {
+                    updateItem(initialItem.id, { 
+                      x: initialItem.x + dx, 
+                      y: initialItem.y + dy 
+                    });
+                  } else if (initialItem.type === 'stroke' || (initialItem.type === 'shape' && (initialItem.shapeType === 'line' || initialItem.shapeType === 'polygon'))) {
+                    const newPoints = initialItem.points.map((p: number, i: number) => 
+                      i % 2 === 0 ? p + dx : p + dy
+                    );
+                    updateItem(initialItem.id, { points: newPoints });
+                  }
+                });
+              };
+              
+              const handleUp = () => {
+                saveHistory();
+                document.removeEventListener('mousemove', handleMove);
+                document.removeEventListener('mouseup', handleUp);
+              };
+              
+              document.addEventListener('mousemove', handleMove);
+              document.addEventListener('mouseup', handleUp);
+            }}
+            style={{
+              position: 'fixed',
+              left: centerX + 'px',
+              top: centerY + 'px',
+              background: '#0099ff',
+              color: 'white',       
+              padding: '10px 20px',
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontWeight: '600',
+              zIndex: 1000,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+              cursor: 'move',
+              userSelect: 'none',
+              border: '2px solid white'
+            }}
+          >
+            ⬍ Drag items
+          </div>
+        );
+      })()}
 
     </div>
   );
