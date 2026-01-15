@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Settings, Play, Pause , Square, Move, X} from "lucide-react";
+import { Settings, Play, Pause, Square, Move, X } from "lucide-react";
 import { useWhiteboardStore } from "../store/useWhiteboardStore";
 
 const FloatingStopwatch: React.FC = () => {
@@ -14,8 +14,8 @@ const FloatingStopwatch: React.FC = () => {
   const dragRef = useRef<HTMLDivElement | null>(null);
 
   const pos = useRef({
-    x: window.innerWidth / 2 - 180,
-    y: window.innerHeight / 2 - 120,
+    x: window.innerWidth / 2 - 160,
+    y: window.innerHeight / 2 - 100,
     dx: 0,
     dy: 0,
     dragging: false,
@@ -112,78 +112,83 @@ const FloatingStopwatch: React.FC = () => {
   return (
     <div
       ref={dragRef}
-      className="stopwatch-wrapper"
-      style={{
-        position: "fixed",
-        zIndex: 100,
-        left: pos.current.x,
-        top: pos.current.y,
-        background: "#b0d56f",
-        borderRadius: 24,
-        width: 400,
-        userSelect: "none",
-      }}
       onMouseDown={onMouseDown}
+      className="fixed z-[100] w-[320px] cursor-grab select-none rounded-2xl  "
+      style={{ left: pos.current.x, top: pos.current.y }}
     >
-      {/* TOP ICONS */}
-      <div className="top-icons">
-<Move size={27} className="text-gray-500 cursor-grab h-8 bg-[#fff] p-1 rounded-lg  active:cursor-grabbing" />
-
-        <span className="icon" onClick={() => setShowStopwatch(false)}><X size={24} className="text-gray-500 cursor-grab   bg-[#fff] mt-[0.8px]   active:cursor-grabbing" /></span>
+      {/* TOP BAR */}
+      <div className="flex justify-center gap-2 py-2">
+        <Move className="h-7 w-7 rounded-lg bg-white p-1 text-gray-500 active:cursor-grabbing" />
+        <button onClick={() => setShowStopwatch(false)}>
+          <X className="h-7 w-7 rounded-lg bg-white p-1 text-gray-500" />
+        </button>
       </div>
 
       {/* BODY */}
-      <div style={{ background: "#fff", borderRadius: "0 0 32px 32px", padding: 24 }}>
-        <div className="display">
+      <div className="rounded-b-2xl bg-white px-4 pb-4 pt-3">
+        {/* DISPLAY */}
+        <div className="flex justify-center gap-1 my-3">
           {digits.map((d, i) => (
             <React.Fragment key={i}>
-              <div className="digit-block">
-                {settings && <button onClick={() => updateDigit(i, 1)}>▲</button>}
-                <div className="digit">{d}</div>
-                {settings && <button onClick={() => updateDigit(i, -1)}>▼</button>}
+              <div className="flex flex-col items-center">
+                {settings && (
+                  <button
+                    onClick={() => updateDigit(i, 1)}
+                    className="mb-1 h-5 w-5 rounded-full bg-lime-500 text-xs text-white"
+                  >
+                    ▲
+                  </button>
+                )}
+
+                <div className="flex h-[56px] w-[38px] items-center justify-center rounded-md bg-black text-3xl font-bold text-yellow-300">
+                  {d}
+                </div>
+
+                {settings && (
+                  <button
+                    onClick={() => updateDigit(i, -1)}
+                    className="mt-1 h-5 w-5 rounded-full bg-lime-500 text-xs text-white"
+                  >
+                    ▼
+                  </button>
+                )}
               </div>
-              {(i === 1 || i === 3) && <span className="colon flex justify-center items-center w-7 text-black">:</span>}
+
+              {(i === 1 || i === 3) && (
+                <span className="mx-1 flex items-center text-xl font-bold text-black">
+                  :
+                </span>
+              )}
             </React.Fragment>
           ))}
         </div>
 
         {/* CONTROLS */}
-        <div className="controls ">
-          <button onClick={reset}> <Square size={20} fill="black" stroke="none"  /> </button>
+        <div className="flex items-center justify-center gap-4 rounded-xl bg-gray-200 py-2">
+          <button onClick={reset}>
+            <Square size={18} fill="black" stroke="none" />
+          </button>
 
-         <button style={{backgroundColor: "#D3D3D3",
-    borderRadius: "50%",
-    width: "48px",
-    height: "48px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center"
-         }}
-
-  onClick={() => {
-    // PAUSE
-    if (running) {
-      setRunning(false);
-      return;
-    }
-
-    // START FROM SETTINGS → COUNTDOWN
-    if (settings) {
-      setCountdown(true);
-      setSettings(false);
-    }
-
-    // START TIMER
-    setRunning(true);
-  }}
->
-{running ? (
-  <Pause size={24} fill="black" stroke="none" />
-) : (
-  <Play size={24} fill="black" stroke="none" />
-)}
-</button>
-
+          <button
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-300"
+            onClick={() => {
+              if (running) {
+                setRunning(false);
+                return;
+              }
+              if (settings) {
+                setCountdown(true);
+                setSettings(false);
+              }
+              setRunning(true);
+            }}
+          >
+            {running ? (
+              <Pause size={20} fill="black" stroke="none" />
+            ) : (
+              <Play size={20} fill="black" stroke="none" />
+            )}
+          </button>
 
           <button
             onClick={() => {
@@ -192,10 +197,8 @@ const FloatingStopwatch: React.FC = () => {
               setSettings((s) => !s);
             }}
           >
-              <Settings size={22} fill="black" stroke="lightgray"  />
+            <Settings size={18} />
           </button>
-
-          {/* <button onClick={() => setShowStopwatch(false)}>—</button> */}
         </div>
       </div>
     </div>

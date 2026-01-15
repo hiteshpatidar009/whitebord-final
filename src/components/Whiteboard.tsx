@@ -1,15 +1,17 @@
 
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { Stage, Layer, Line, Image as KonvaImage, Rect, Circle, RegularPolygon, Transformer, Text as KonvaText, Group } from 'react-konva';
+import { Stage, Layer, Line, Image as KonvaImage, Rect, Circle, RegularPolygon, Transformer, Text as KonvaText } from 'react-konva';
 import Konva from 'konva';
 import useImage from 'use-image';
 import { Unlock } from 'lucide-react';
 import { useWhiteboardStore } from '../store/useWhiteboardStore';
 import type { Stroke, WhiteboardItem } from '../types';
-import { strokesToImage, getBoundingBox } from '../utils/canvasUtils';
+import { getBoundingBox } from '../utils/canvasUtils';
 import { FONT_STACKS, FONTS } from './TextToolbar';
 import ChromeWidget from './ChromeWidget';
+import Protractor from './tabs/Protractor';
+import Divider from './Divider/Divider';
 
 import { transcribeHandwriting } from '../services/geminiService';
 
@@ -67,6 +69,7 @@ const simplifyDP = (points: { x: number; y: number }[], sqTolerance: number) => 
   return newPoints;
 };
 
+<<<<<<< HEAD
 const isClosedShape = (pts: { x: number; y: number }[]) => {
   if (pts.length < 3) return false;
   const start = pts[0];
@@ -154,7 +157,58 @@ const parseHtmlToSegments = (html: string) => {
   return segments;
 };
 
+=======
+// --- COMPONENTS ---
+
+>>>>>>> 3606bce4302fedcf9a815b996bb89aca140f809b
 // Rich Text Component for Konva
+// const RichText: React.FC<{
+//   id: string;
+//   x: number;
+//   y: number;
+//   text: string;
+//   fontSize: number;
+//   fontFamily: string;
+//   fill: string;
+//   width?: number;
+//   draggable?: boolean;
+//   onClick?: (e?: any) => void;
+//   onTap?: () => void;
+//   onDblClick?: () => void;
+//   onDblTap?: () => void;
+//   onTransformEnd?: (e: any) => void;
+//   onDragStart?: (e: any) => void;
+//   onDragMove?: (e: any) => void;
+//   onDragEnd?: (e: any) => void;
+// }> = (props) => {
+//   // Parse HTML and render multiple text elements for different formatting
+//   const segments = parseHtmlToSegments(props.text);
+  
+//   if (segments.length === 0) {
+//     // Fallback to plain text
+//     return (
+//       <KonvaText
+//         id={props.id}
+//         x={props.x}
+//         y={props.y}
+//         text={props.text}
+//         fontSize={props.fontSize}
+//         fontFamily={props.fontFamily}
+//         fill={props.fill}
+//         width={props.width}
+//         draggable={props.draggable}
+//         onClick={props.onClick}
+//         onTap={props.onTap}
+//         onDblClick={props.onDblClick}
+//         onDblTap={props.onDblTap}
+//         onTransformEnd={props.onTransformEnd}
+//         onDragStart={props.onDragStart}
+//         onDragMove={props.onDragMove}
+//         onDragEnd={props.onDragEnd}
+//       />
+//     );
+//   }
+
 const RichText: React.FC<{
   id: string;
   x: number;
@@ -174,6 +228,7 @@ const RichText: React.FC<{
   onDragMove?: (e: any) => void;
   onDragEnd?: (e: any) => void;
 }> = (props) => {
+<<<<<<< HEAD
   // Parse HTML and render multiple text elements for different formatting
   const segments = parseHtmlToSegments(props.text);
 
@@ -268,11 +323,47 @@ const RichText: React.FC<{
     });
   });
 
+=======
+  // Parse HTML to extract text and formatting
+  const { text, fontWeight, fontStyle, textDecoration, color } = React.useMemo(() => {
+    const div = document.createElement('div');
+    div.innerHTML = props.text;
+    
+    // Check for formatting
+    const hasBold = /<(b|strong)/.test(props.text);
+    const hasItalic = /<(i|em)/.test(props.text);
+    const hasUnderline = /<u/.test(props.text);
+    
+    // Extract color from HTML (look for style="color:" or <font color="">)
+    const colorMatch = props.text.match(/(?:style="[^"]*color:\s*([^;"]+)|<font[^>]+color="([^"]+)")/);
+    const extractedColor = colorMatch ? (colorMatch[1] || colorMatch[2]) : null;
+    
+    const plainText = div.textContent || div.innerText || '';
+    
+    return {
+      text: plainText.replace(/\n\s*\n/g, '\n'),
+      fontWeight: hasBold ? 'bold' : 'normal',
+      fontStyle: hasItalic ? 'italic' : 'normal',
+      textDecoration: hasUnderline ? 'underline' : 'none',
+      color: extractedColor || props.fill
+    };
+  }, [props.text, props.fill]);
+
+>>>>>>> 3606bce4302fedcf9a815b996bb89aca140f809b
   return (
-    <Group
+    <KonvaText
       id={props.id}
       x={props.x}
       y={props.y}
+      text={text}
+      fontSize={props.fontSize}
+      fontFamily={props.fontFamily}
+      fill={color}
+      fontStyle={`${fontStyle} ${fontWeight}`}
+      textDecoration={textDecoration}
+      width={props.width}
+      wrap="word"
+      lineHeight={1.4}
       draggable={props.draggable}
       onClick={props.onClick}
       onTap={props.onTap}
@@ -282,19 +373,12 @@ const RichText: React.FC<{
       onDragStart={props.onDragStart}
       onDragMove={props.onDragMove}
       onDragEnd={props.onDragEnd}
-    >
-      <Rect
-        width={totalWidth}
-        height={totalHeight}
-        fill="rgba(0,0,0,0)"
-      />
-      {renderedElements}
-    </Group>
+    />
   );
 };
 
 // URLImage component for loading images
-const URLImage = ({ image, onClick, onTap, draggable, onTransformEnd }: { image: any, onClick?: () => void, onTap?: () => void, draggable?: boolean, onTransformEnd?: (e: any) => void }) => {
+const URLImage = ({ image, onClick, onTap, draggable, onTransformEnd }: { image: any, onClick?: (e?: any) => void, onTap?: () => void, draggable?: boolean, onTransformEnd?: (e: any) => void }) => {
   const [img] = useImage(image.src);
   return (
     <KonvaImage
@@ -332,6 +416,8 @@ export const Whiteboard: React.FC = () => {
     backgroundImage,
     groupItems,
     ungroupItems,
+    showProtractor,
+    showDivider,
   } = useWhiteboardStore();
 
   const stageRef = useRef<Konva.Stage>(null);
@@ -358,8 +444,13 @@ export const Whiteboard: React.FC = () => {
   const previewLineRef = useRef<Konva.Line>(null);
   const cursorRef = useRef<Konva.Circle>(null);
   const lastEraserPosRef = useRef<{ x: number; y: number } | null>(null);
+<<<<<<< HEAD
   const lastRightClickTime = useRef<number>(0);
   const [selectionBox, setSelectionBox] = useState<{ x: number, y: number, width: number, height: number } | null>(null);
+=======
+  // const _lastRightClickTime = useRef<number>(0);
+  const [selectionBox, setSelectionBox] = useState<{ x: number, y: number, width: number, height: number, isMultiSelect?: boolean } | null>(null);
+>>>>>>> 3606bce4302fedcf9a815b996bb89aca140f809b
   const [chromeWidgets, setChromeWidgets] = useState<Array<{ id: string; x: number; y: number; locked: boolean }>>([]);
 
   // Handwriting-specific state
@@ -458,7 +549,18 @@ export const Whiteboard: React.FC = () => {
           transformerRef.current.enabledAnchors(['top-left', 'top-right', 'bottom-left', 'bottom-right', 'middle-left', 'middle-right', 'top-center', 'bottom-center']);
           transformerRef.current.rotateEnabled(true);
         }
+<<<<<<< HEAD
 
+=======
+        
+        // Enable dragging for multiple selections
+        if (selectedIds.length > 1) {
+          nodes.forEach(node => {
+            node.draggable(true);
+          });
+        }
+        
+>>>>>>> 3606bce4302fedcf9a815b996bb89aca140f809b
         transformerRef.current.getLayer()?.batchDraw();
       } else {
         transformerRef.current.nodes([]);
@@ -683,7 +785,7 @@ export const Whiteboard: React.FC = () => {
           x: centerX - 100,
           y: centerY - 16,
           text: text,
-          fontSize: 32,
+          fontSize: 44,
           fontFamily: 'Monotype Corsiva, "Brush Script MT", cursive',
           fill: color, // Store the color that was active when handwriting was created
           width: 400,
@@ -822,12 +924,21 @@ export const Whiteboard: React.FC = () => {
     if (!pos) return;
 
     if (clickedOnEmpty && tool === 'select') {
+<<<<<<< HEAD
       const isMultiSelect = (e.evt as MouseEvent).ctrlKey || (e.evt as MouseEvent).metaKey;
       if (!isMultiSelect) {
         setSelectedId(null);
       }
       // Start selection box
       setSelectionBox({ x: pos.x, y: pos.y, width: 0, height: 0 });
+=======
+        const isMultiSelect = (e.evt as MouseEvent).ctrlKey || (e.evt as MouseEvent).metaKey;
+        if (!isMultiSelect) {
+          setSelectedId(null);
+        }
+        // Start selection box with multiselect flag
+        setSelectionBox({ x: pos.x, y: pos.y, width: 0, height: 0, isMultiSelect });
+>>>>>>> 3606bce4302fedcf9a815b996bb89aca140f809b
     }
 
     // Early return for pan tool - let stage handle dragging
@@ -837,6 +948,7 @@ export const Whiteboard: React.FC = () => {
 
     if (tool === 'text') {
       const targetId = e.target.id() || e.target.getParent()?.id();
+<<<<<<< HEAD
       const clickedItem = items.find(i => i.id === targetId);
 
       if (clickedItem?.type === 'text') {
@@ -892,14 +1004,62 @@ export const Whiteboard: React.FC = () => {
         }
       }
       return;
+=======
+      const clickedItem = items.find(i => i.id === targetId!);
+      
+      if (clickedItem?.type === 'text') {
+        // Select existing text
+        setSelectedId(targetId!);
+      }
+      // For text tool, only select on single click - creation happens on double-click
+      return; 
+    }
+
+    if (tool === 'fill') {
+       const shape = e.target;
+       if (shape === stage) return;
+       
+       // Apply fill to selected items if any are selected
+       if (selectedId) {
+         const selectedIds = selectedId.split(',');
+         selectedIds.forEach(id => {
+           const item = items.find(i => i.id === id);
+           if (item) {
+             if (item.type === 'shape') {
+               const transparentFill = hexToRgba(color, 0.6);
+               updateItem(id, { fill: transparentFill, opacity: 1 });
+             } else if (item.type === 'text') {
+               updateItem(id, { fill: color });
+             }
+           }
+         });
+         saveHistory();
+         return;
+       }
+       
+       // Apply fill to clicked item if no selection
+       const id = shape.id() || shape.getParent()?.id();
+       const item = items.find(i => i && i.id === id!);
+       if (item) {
+           if (item.type === 'shape') {
+               const transparentFill = hexToRgba(color, 0.6);
+               updateItem(id!, { fill: transparentFill, opacity: 1 });
+               saveHistory();
+           } else if (item.type === 'text') {
+               updateItem(id!, { fill: color }); 
+               saveHistory();
+           }
+       }
+       return;
+>>>>>>> 3606bce4302fedcf9a815b996bb89aca140f809b
     }
 
     // Handle selection for all tools
     if (!clickedOnEmpty) {
       const targetId = e.target.id() || e.target.getParent()?.id();
-      if (targetId && tool === 'select') {
-        const isMultiSelect = (e.evt as MouseEvent).ctrlKey || (e.evt as MouseEvent).metaKey;
+      if (targetId! && tool === 'select') {
         const currentSelected = selectedId ? selectedId.split(',') : [];
+<<<<<<< HEAD
 
         if (isMultiSelect) {
           // Ctrl+click: toggle item
@@ -909,9 +1069,15 @@ export const Whiteboard: React.FC = () => {
           } else {
             setSelectedId([...currentSelected, targetId].join(','));
           }
+=======
+        
+        // Always add to selection without Ctrl requirement
+        if (currentSelected.includes(targetId!)) {
+          const newSelected = currentSelected.filter(id => id !== targetId!);
+          setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
+>>>>>>> 3606bce4302fedcf9a815b996bb89aca140f809b
         } else {
-          // Normal click: replace selection
-          setSelectedId(targetId);
+          setSelectedId([...currentSelected, targetId!].join(','));
         }
         return;
       }
@@ -939,7 +1105,7 @@ export const Whiteboard: React.FC = () => {
         tool,
         points: [pos.x, pos.y],
         color: '#000000',
-        size: size * 1.5,
+        size: size * 0.9,
         isEraser: true,
         isHighlighter: false
       });
@@ -1002,13 +1168,15 @@ export const Whiteboard: React.FC = () => {
         x: selectionBox.x,
         y: selectionBox.y,
         width: newWidth,
-        height: newHeight
+        height: newHeight,
+        isMultiSelect: selectionBox.isMultiSelect
       });
       return;
     }
 
     // Update cursor for eraser tools
     if (cursorRef.current) {
+<<<<<<< HEAD
       const isEraser = tool === 'eraser' || tool === 'highlighter-eraser';
       cursorRef.current.visible(isEraser);
       if (isEraser) {
@@ -1017,6 +1185,16 @@ export const Whiteboard: React.FC = () => {
         cursorRef.current.radius((size * 2.5) / 2);
         cursorRef.current.getLayer()?.batchDraw();
       }
+=======
+        const isEraser = tool === 'eraser' || tool === 'highlighter-eraser';
+        cursorRef.current.visible(isEraser);
+        if (isEraser) {
+            cursorRef.current.x(point.x);
+            cursorRef.current.y(point.y);
+            cursorRef.current.radius(size * 0.9);
+            cursorRef.current.getLayer()?.batchDraw();
+        }
+>>>>>>> 3606bce4302fedcf9a815b996bb89aca140f809b
     }
 
     // Only handle drawing if we're actually drawing and not using pan/select tools
@@ -1062,9 +1240,20 @@ export const Whiteboard: React.FC = () => {
             }
           }
         });
+<<<<<<< HEAD
 
+=======
+        
+        // Merge with existing selection if multiselect
+>>>>>>> 3606bce4302fedcf9a815b996bb89aca140f809b
         if (selectedItems.length > 0) {
-          setSelectedId(selectedItems.join(','));
+          if (selectionBox.isMultiSelect && selectedId) {
+            const currentSelected = selectedId.split(',');
+            const merged = [...new Set([...currentSelected, ...selectedItems])];
+            setSelectedId(merged.join(','));
+          } else {
+            setSelectedId(selectedItems.join(','));
+          }
         }
       }
       setSelectionBox(null);
@@ -1181,7 +1370,7 @@ export const Whiteboard: React.FC = () => {
       });
     } else if (item.type === 'text') {
       updatePayload.width = Math.max(30, node.width() * scaleX);
-      updatePayload.fontSize = Math.max(10, item.fontSize * scaleY);
+      // DO NOT scale fontSize - preserve layout-driven behavior
     } else if (item.type === 'image' || (item.type === 'shape' && item.shapeType === 'rect')) {
       updatePayload.width = Math.max(5, node.width() * scaleX);
       updatePayload.height = Math.max(5, node.height() * scaleY);
@@ -1201,7 +1390,12 @@ export const Whiteboard: React.FC = () => {
     saveHistory();
   };
 
+<<<<<<< HEAD
   const getCursorStyle = () => {
+=======
+const getCursorStyle = () => {
+    if (qModeActive) return { cursor: 'move' };
+>>>>>>> 3606bce4302fedcf9a815b996bb89aca140f809b
     if (tool === 'eraser' || tool === 'highlighter-eraser') return { cursor: 'none' };
     if (tool === 'fill') {
       const cursorSize = 24;
@@ -1222,6 +1416,243 @@ export const Whiteboard: React.FC = () => {
 
 
 
+  // Q-key transform mode state
+  const [qModeActive, setQModeActive] = useState(false);
+  const qTransformRef = useRef({
+    isTransforming: false,
+    targetId: '',
+    startPos: { x: 0, y: 0 },
+    startItemPos: { x: 0, y: 0 },
+    startItemSize: { width: 0, height: 0 },
+    mode: 'move' // 'move', 'resize', 'resize-center'
+  });
+
+  // Q-key event handlers
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'q' || e.key === 'Q') {
+        if (!qModeActive) {
+          setQModeActive(true);
+          document.body.style.userSelect = 'none';
+        }
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'q' || e.key === 'Q') {
+        setQModeActive(false);
+        qTransformRef.current.isTransforming = false;
+        document.body.style.userSelect = '';
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('keyup', handleKeyUp);
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [qModeActive]);
+
+  // Q-mode mouse handlers
+  const handleQMouseDown = useCallback((e: Konva.KonvaEventObject<MouseEvent>, itemId: string) => {
+    if (!qModeActive) return;
+    
+    e.evt.preventDefault();
+    e.evt.stopPropagation();
+    
+    const item = items.find(i => i.id === itemId);
+    if (!item) return;
+    
+    const stage = e.target.getStage();
+    const pos = stage?.getRelativePointerPosition();
+    if (!pos) return;
+    
+    // Determine transform mode based on modifier keys
+    let mode = 'move';
+    if (e.evt.shiftKey && e.evt.altKey) mode = 'resize-center';
+    else if (e.evt.shiftKey) mode = 'resize';
+    else if (e.evt.altKey) mode = 'resize-center';
+    
+    qTransformRef.current = {
+      isTransforming: true,
+      targetId: itemId,
+      startPos: { x: pos.x, y: pos.y },
+      startItemPos: { x: (item as any).x || 0, y: (item as any).y || 0 },
+      startItemSize: { 
+        width: (item as any).width || (item.type === 'text' ? 100 : 50), 
+        height: (item as any).height || (item.type === 'text' ? 50 : 50) 
+      },
+      mode
+    };
+  }, [qModeActive, items]);
+
+  const handleQMouseMove = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
+    if (!qModeActive || !qTransformRef.current.isTransforming) return;
+    
+    const stage = e.target.getStage();
+    const pos = stage?.getRelativePointerPosition();
+    if (!pos) return;
+    
+    const { targetId, startPos, startItemPos, startItemSize, mode } = qTransformRef.current;
+    const deltaX = pos.x - startPos.x;
+    const deltaY = pos.y - startPos.y;
+    
+    const item = items.find(i => i.id === targetId);
+    if (!item) return;
+    
+    // Handle text items separately - DOM container resize only
+    if (item.type === 'text' && (mode === 'resize' || mode === 'resize-center')) {
+      const container = document.querySelector('[data-text-editor]') as HTMLElement;
+      if (container) {
+        const minWidth = 300;
+        const minHeight = 200;
+        
+        let newWidth = startItemSize.width;
+        let newHeight = startItemSize.height;
+        
+        if (mode === 'resize') {
+          newWidth = Math.max(minWidth, startItemSize.width + deltaX);
+          newHeight = Math.max(minHeight, startItemSize.height + deltaY);
+        } else if (mode === 'resize-center') {
+          const scale = Math.max(0.1, 1 + deltaX / startItemSize.width);
+          newWidth = Math.max(minWidth, startItemSize.width * scale);
+          newHeight = Math.max(minHeight, startItemSize.height * scale);
+        }
+        
+        // Update DOM container dimensions
+        container.style.width = newWidth + 'px';
+        container.style.height = newHeight + 'px';
+        
+        // Force text layout recalculation (Premiere Pro-style)
+        const editableDiv = container.querySelector('[contenteditable]') as HTMLElement;
+        if (editableDiv) {
+          // Force reflow by changing container width temporarily
+          const tempWidth = container.style.width;
+          container.style.width = (newWidth - 1) + 'px';
+          container.offsetWidth; // Force layout
+          container.style.width = tempWidth;
+        }
+      }
+      return; // Exit early - no updateItem() for text resize
+    }
+    
+    // Handle all other items (including text move)
+    const updatePayload: any = {};
+    
+    if (mode === 'move') {
+      updatePayload.x = startItemPos.x + deltaX;
+      updatePayload.y = startItemPos.y + deltaY;
+    } else {
+      // For non-text items: normal scaling
+      if (mode === 'resize') {
+        const scaleX = Math.max(0.1, 1 + deltaX / startItemSize.width);
+        const scaleY = Math.max(0.1, 1 + deltaY / startItemSize.height);
+        updatePayload.width = Math.max(10, startItemSize.width * scaleX);
+        updatePayload.height = Math.max(10, startItemSize.height * scaleY);
+      } else if (mode === 'resize-center') {
+        const scale = Math.max(0.1, 1 + deltaX / startItemSize.width);
+        updatePayload.width = Math.max(10, startItemSize.width * scale);
+        updatePayload.height = Math.max(10, startItemSize.height * scale);
+        updatePayload.x = startItemPos.x - (updatePayload.width - startItemSize.width) / 2;
+        updatePayload.y = startItemPos.y - (updatePayload.height - startItemSize.height) / 2;
+      }
+    }
+    
+    if (Object.keys(updatePayload).length > 0) {
+      updateItem(targetId, updatePayload);
+    }
+  }, [qModeActive, updateItem, items]);
+
+  const handleQMouseUp = useCallback(() => {
+    if (qTransformRef.current.isTransforming) {
+      qTransformRef.current.isTransforming = false;
+      saveHistory();
+    }
+  }, [saveHistory]);
+
+  // Persistent resize state (outside startTextEditing to prevent recreation)
+  const textResizeStateRef = useRef({
+    isResizing: false,
+    direction: '',
+    startData: { x: 0, y: 0, width: 0, height: 0, left: 0, top: 0 },
+    isDragging: false
+  });
+
+  // Global resize handlers (persistent, attached once)
+  const handleTextResizeMove = useCallback((e: MouseEvent) => {
+    if (!textResizeStateRef.current.isResizing) return;
+    
+    const { startData, direction } = textResizeStateRef.current;
+    const deltaX = e.clientX - startData.x;
+    const deltaY = e.clientY - startData.y;
+    
+    let newWidth = startData.width;
+    let newHeight = startData.height;
+    let newLeft = startData.left;
+    let newTop = startData.top;
+    
+    const minWidth = 300;
+    const minHeight = 200;
+    
+    if (direction.includes('e')) {
+      newWidth = Math.max(minWidth, startData.width + deltaX);
+    }
+    if (direction.includes('w')) {
+      const proposedWidth = startData.width - deltaX;
+      if (proposedWidth >= minWidth) {
+        newWidth = proposedWidth;
+        newLeft = startData.left + deltaX;
+      }
+    }
+    if (direction.includes('s')) {
+      newHeight = Math.max(minHeight, startData.height + deltaY);
+    }
+    if (direction.includes('n')) {
+      const proposedHeight = startData.height - deltaY;
+      if (proposedHeight >= minHeight) {
+        newHeight = proposedHeight;
+        newTop = startData.top + deltaY;
+      }
+    }
+    
+    const container = document.querySelector('[data-text-editor]') as HTMLElement;
+    if (container) {
+      container.style.width = newWidth + 'px';
+      container.style.height = newHeight + 'px';
+      container.style.left = newLeft + 'px';
+      container.style.top = newTop + 'px';
+      
+      // Force text layout recalculation (Premiere Pro-style)
+      const editableDiv = container.querySelector('[contenteditable]') as HTMLElement;
+      if (editableDiv) {
+        // Force reflow by changing container width temporarily
+        const tempWidth = container.style.width;
+        container.style.width = (newWidth - 1) + 'px';
+        container.offsetWidth; // Force layout
+        container.style.width = tempWidth;
+      }
+    }
+  }, []);
+
+  const handleTextResizeEnd = useCallback(() => {
+    if (!textResizeStateRef.current.isResizing) return;
+    textResizeStateRef.current.isResizing = false;
+    textResizeStateRef.current.direction = '';
+    document.body.style.userSelect = '';
+  }, []);
+
+  // Attach global listeners once
+  useEffect(() => {
+    document.addEventListener('mousemove', handleTextResizeMove);
+    document.addEventListener('mouseup', handleTextResizeEnd);
+    
+    return () => {
+      document.removeEventListener('mousemove', handleTextResizeMove);
+      document.removeEventListener('mouseup', handleTextResizeEnd);
+    };
+  }, [handleTextResizeMove, handleTextResizeEnd]);
   // Text editing functions
   const startTextEditing = (textId: string) => {
     // Clean up any existing editing session first
@@ -1247,7 +1678,7 @@ export const Whiteboard: React.FC = () => {
     container.style.display = 'flex';
     container.style.flexDirection = 'column';
     container.style.gap = '4px';
-    container.style.width = '350px';
+    container.style.width = `${Math.max(350, (textItem as any).width || 350)}px`; // Use existing width or default
     container.style.height = '250px';
     container.style.resize = 'both';
     container.style.overflow = 'hidden';
@@ -1255,12 +1686,19 @@ export const Whiteboard: React.FC = () => {
     container.style.border = '2px solid #0099ff';
     container.style.borderRadius = '8px';
     container.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+<<<<<<< HEAD
 
     // Add resize handles for all corners
     container.style.position = 'relative';
 
     // Create resize handles for all corners and edges
     let isResizingBox = false;
+=======
+    
+    container.style.position = 'relative';
+    
+    // Create resize handles (using persistent state)
+>>>>>>> 3606bce4302fedcf9a815b996bb89aca140f809b
     const createResizeHandle = (position: string, cursor: string) => {
       const handle = document.createElement('div');
       handle.style.position = 'absolute';
@@ -1269,8 +1707,14 @@ export const Whiteboard: React.FC = () => {
       handle.style.background = '#0099ff';
       handle.style.cursor = cursor;
       handle.style.zIndex = '1001';
+<<<<<<< HEAD
 
       switch (position) {
+=======
+      handle.style.borderRadius = '2px';
+      
+      switch(position) {
+>>>>>>> 3606bce4302fedcf9a815b996bb89aca140f809b
         case 'nw': handle.style.top = '-5px'; handle.style.left = '-5px'; break;
         case 'ne': handle.style.top = '-5px'; handle.style.right = '-5px'; break;
         case 'sw': handle.style.bottom = '-5px'; handle.style.left = '-5px'; break;
@@ -1280,17 +1724,23 @@ export const Whiteboard: React.FC = () => {
         case 'w': handle.style.left = '-5px'; handle.style.top = '50%'; handle.style.transform = 'translateY(-50%)'; handle.style.width = '5px'; handle.style.height = '20px'; break;
         case 'e': handle.style.right = '-5px'; handle.style.top = '50%'; handle.style.transform = 'translateY(-50%)'; handle.style.width = '5px'; handle.style.height = '20px'; break;
       }
+<<<<<<< HEAD
 
       let isResizing = false;
       let startX = 0, startY = 0, startWidth = 0, startHeight = 0, startLeft = 0, startTop = 0;
 
+=======
+      
+>>>>>>> 3606bce4302fedcf9a815b996bb89aca140f809b
       handle.onmousedown = (e) => {
         e.stopPropagation();
-        isResizing = true;
-        isResizingBox = true;
-        startX = e.clientX;
-        startY = e.clientY;
+        e.preventDefault();
+        
+        // Use persistent state
+        textResizeStateRef.current.isResizing = true;
+        textResizeStateRef.current.direction = position;
         const rect = container.getBoundingClientRect();
+<<<<<<< HEAD
         startWidth = rect.width;
         startHeight = rect.height;
         startLeft = rect.left;
@@ -1330,12 +1780,27 @@ export const Whiteboard: React.FC = () => {
 
         document.addEventListener('mousemove', handleMouseMove);
         document.addEventListener('mouseup', handleMouseUp);
+=======
+        textResizeStateRef.current.startData = {
+          x: e.clientX,
+          y: e.clientY,
+          width: rect.width,
+          height: rect.height,
+          left: rect.left,
+          top: rect.top
+        };
+        
+        document.body.style.userSelect = 'none';
+>>>>>>> 3606bce4302fedcf9a815b996bb89aca140f809b
       };
 
       return handle;
     };
+<<<<<<< HEAD
 
     // Add all resize handles
+=======
+>>>>>>> 3606bce4302fedcf9a815b996bb89aca140f809b
     container.appendChild(createResizeHandle('nw', 'nw-resize'));
     container.appendChild(createResizeHandle('ne', 'ne-resize'));
     container.appendChild(createResizeHandle('sw', 'sw-resize'));
@@ -1354,20 +1819,45 @@ export const Whiteboard: React.FC = () => {
     toolbar.style.borderBottom = '1px solid #dee2e6';
     toolbar.style.cursor = 'move';
     toolbar.style.flexWrap = 'wrap';
+<<<<<<< HEAD
 
     // Make toolbar draggable
     let isDraggingBox = false;
     let dragOffset = { x: 0, y: 0 };
 
+=======
+    
+    // Make toolbar draggable with mutual exclusion from resizing
+>>>>>>> 3606bce4302fedcf9a815b996bb89aca140f809b
     toolbar.onmousedown = (e) => {
-      if (e.target === toolbar || (e.target as HTMLElement).parentElement === toolbar) {
-        isDraggingBox = true;
+      // Only allow dragging if not resizing and clicking on toolbar elements
+      if (!textResizeStateRef.current.isResizing && (e.target === toolbar || (e.target as HTMLElement).parentElement === toolbar)) {
+        textResizeStateRef.current.isDragging = true;
         const rect = container.getBoundingClientRect();
-        dragOffset.x = e.clientX - rect.left;
-        dragOffset.y = e.clientY - rect.top;
+        const dragOffset = { x: e.clientX - rect.left, y: e.clientY - rect.top };
         e.preventDefault();
+        
+        document.body.style.userSelect = 'none';
+        
+        const handleDragMove = (e: MouseEvent) => {
+          if (textResizeStateRef.current.isDragging && !textResizeStateRef.current.isResizing) {
+            container.style.left = `${e.clientX - dragOffset.x}px`;
+            container.style.top = `${e.clientY - dragOffset.y}px`;
+          }
+        };
+        
+        const handleDragEnd = () => {
+          textResizeStateRef.current.isDragging = false;
+          document.body.style.userSelect = '';
+          document.removeEventListener('mousemove', handleDragMove);
+          document.removeEventListener('mouseup', handleDragEnd);
+        };
+        
+        document.addEventListener('mousemove', handleDragMove);
+        document.addEventListener('mouseup', handleDragEnd);
       }
     };
+<<<<<<< HEAD
 
     document.onmousemove = (e) => {
       if (isDraggingBox) {
@@ -1382,14 +1872,45 @@ export const Whiteboard: React.FC = () => {
         isDraggingBox = false;
       }, 50);
     };
+=======
+>>>>>>> 3606bce4302fedcf9a815b996bb89aca140f809b
 
     // Helper function to apply formatting to selected text
     const applyFormatToSelection = (command: string) => {
       const selection = window.getSelection();
       if (selection && selection.rangeCount > 0 && !selection.isCollapsed) {
-        document.execCommand(command, false);
+        // Save the current range
+        const range = selection.getRangeAt(0);
+        const selectedText = range.toString();
+        
+        // Apply formatting using execCommand
+        document.execCommand('styleWithCSS', false, 'true');
+        const success = document.execCommand(command, false);
+        
+        // If execCommand failed, use manual DOM manipulation
+        if (!success && selectedText) {
+          const span = document.createElement('span');
+          if (command === 'bold') span.style.fontWeight = 'bold';
+          if (command === 'italic') span.style.fontStyle = 'italic';
+          if (command === 'underline') span.style.textDecoration = 'underline';
+          
+          try {
+            range.surroundContents(span);
+          } catch (e) {
+            span.innerHTML = selectedText;
+            range.deleteContents();
+            range.insertNode(span);
+          }
+          
+          // Restore selection
+          selection.removeAllRanges();
+          const newRange = document.createRange();
+          newRange.selectNodeContents(span);
+          selection.addRange(newRange);
+        }
       }
-      editableDiv.focus();
+      // Always refocus the editor
+      setTimeout(() => editableDiv.focus(), 0);
     };
 
     // Bold button
@@ -1461,10 +1982,9 @@ export const Whiteboard: React.FC = () => {
     colorPicker.onchange = () => {
       const selection = window.getSelection();
       if (selection && selection.rangeCount > 0 && !selection.isCollapsed) {
+        // Change color of selected text only
+        document.execCommand('styleWithCSS', false, 'true');
         document.execCommand('foreColor', false, colorPicker.value);
-      } else {
-        editableDiv.style.color = colorPicker.value;
-        updateItem(textId, { fill: colorPicker.value });
       }
       editableDiv.focus();
     };
@@ -1515,6 +2035,26 @@ export const Whiteboard: React.FC = () => {
     toolbar.appendChild(colorPicker);
     toolbar.appendChild(fontSelect);
     toolbar.appendChild(sizeInput);
+    
+    // Save button
+    const saveBtn = document.createElement('button');
+    saveBtn.innerHTML = 'Save';
+    saveBtn.style.padding = '4px 12px';
+    saveBtn.style.border = '1px solid #dee2e6';
+    saveBtn.style.borderRadius = '4px';
+    saveBtn.style.cursor = 'pointer';
+    saveBtn.style.background = '#28a745';
+    saveBtn.style.color = 'white';
+    saveBtn.style.fontSize = '12px';
+    saveBtn.style.fontWeight = '600';
+    saveBtn.style.marginLeft = 'auto';
+    saveBtn.title = 'Save and close';
+    saveBtn.onmousedown = (e) => e.preventDefault();
+    saveBtn.onclick = (e) => {
+      e.stopPropagation();
+      finishEditing();
+    };
+    toolbar.appendChild(saveBtn);
 
     // Create editable div instead of textarea for rich text support
     const editableDiv = document.createElement('div');
@@ -1528,16 +2068,36 @@ export const Whiteboard: React.FC = () => {
     editableDiv.style.outline = 'none';
     editableDiv.style.minWidth = '280px';
     editableDiv.style.minHeight = '100px';
-    editableDiv.style.maxHeight = '400px';
+    editableDiv.style.maxHeight = 'none'; // Allow unlimited height
     editableDiv.style.overflowY = 'auto';
+    editableDiv.style.overflowX = 'hidden'; // Prevent horizontal scroll
     editableDiv.style.padding = '12px';
     editableDiv.style.lineHeight = '1.4';
-    editableDiv.style.wordWrap = 'break-word';
+    editableDiv.style.overflowWrap = 'break-word';
+    editableDiv.style.whiteSpace = 'normal';
+    editableDiv.style.wordBreak = 'normal';
+    editableDiv.style.width = '100%';
+    editableDiv.style.height = '100%';
+    editableDiv.style.boxSizing = 'border-box';
     editableDiv.style.userSelect = 'text';
     editableDiv.style.webkitUserSelect = 'text';
+<<<<<<< HEAD
     editableDiv.style.mozUserSelect = 'text';
     editableDiv.style.msUserSelect = 'text';
 
+=======
+    editableDiv.style.flex = '1'; // Take remaining space
+    
+    // Prevent resize handles from interfering with text editing
+    editableDiv.addEventListener('pointerdown', (e) => {
+      // Allow text editing only if not resizing
+      if (textResizeStateRef.current.isResizing) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    });
+    
+>>>>>>> 3606bce4302fedcf9a815b996bb89aca140f809b
     // Add placeholder behavior
     if (!editableDiv.innerHTML.trim()) {
       editableDiv.innerHTML = '<span style="color: #999;">Type here...</span>';
@@ -1560,36 +2120,75 @@ export const Whiteboard: React.FC = () => {
       if (newText === '<span style="color: #999;">Type here...</span>' || !newText.trim()) {
         newText = 'Type here...';
       }
-      updateItem(textId, { text: newText });
+      
+      // Get the current container position and size
+      const rect = container.getBoundingClientRect();
+      const stageRect = stageRef.current?.container().getBoundingClientRect();
+      
+      let canvasX = textItem.x;
+      let canvasY = textItem.y;
+      
+      // If we have stage reference, calculate proper canvas coordinates
+      if (stageRect) {
+        canvasX = (rect.left - stageRect.left - stagePos.x) / stageScale;
+        canvasY = (rect.top - stageRect.top - stagePos.y) / stageScale;
+      }
+      
+      updateItem(textId, {
+        text: newText,
+        width: container.offsetWidth, // Keep the stretched container width
+        x: canvasX,
+        y: canvasY
+      });
+      
       if (container.parentNode) {
         document.body.removeChild(container);
       }
-      document.removeEventListener('click', handleClickOutside);
-      document.onmousemove = null;
-      document.onmouseup = null;
+      
+      // Clean up local event listeners only
+      cleanupEventListeners();
+      
+      // Reset persistent state
+      textResizeStateRef.current.isResizing = false;
+      textResizeStateRef.current.isDragging = false;
+      
+      // Re-enable text selection
+      document.body.style.userSelect = '';
+      document.body.style.webkitUserSelect = '';
+      
       setEditingTextId(null);
       setSelectedId(textId);
       saveHistory();
     };
+<<<<<<< HEAD
 
     // Close editor when clicking outside
+=======
+    
+    // Close editor when clicking outside (with proper cleanup)
+>>>>>>> 3606bce4302fedcf9a815b996bb89aca140f809b
     const handleClickOutside = (e: MouseEvent) => {
-      if (!container.contains(e.target as Node) && !isDraggingBox && !isResizingBox) {
+      const target = e.target as HTMLElement;
+      const isCanvasClick = target.tagName === 'CANVAS' || target.closest('canvas');
+      if (!container.contains(target) && !textResizeStateRef.current.isDragging && !textResizeStateRef.current.isResizing && !isCanvasClick) {
         finishEditing();
-        document.removeEventListener('click', handleClickOutside);
       }
     };
+<<<<<<< HEAD
 
+=======
+    
+    const cleanupEventListeners = () => {
+      document.removeEventListener('click', handleClickOutside);
+    };
+    
+>>>>>>> 3606bce4302fedcf9a815b996bb89aca140f809b
     setTimeout(() => {
       document.addEventListener('click', handleClickOutside);
     }, 100);
 
     // Handle keyboard shortcuts
     editableDiv.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        finishEditing();
-      }
       if (e.key === 'Escape') {
         finishEditing();
       }
@@ -1607,7 +2206,20 @@ export const Whiteboard: React.FC = () => {
         }
       }
     });
+<<<<<<< HEAD
 
+=======
+    
+    // Handle paste to ensure proper text wrapping
+    editableDiv.addEventListener('paste', (e) => {
+      e.preventDefault();
+      const text = e.clipboardData?.getData('text/plain') || '';
+      if (text) {
+        document.execCommand('insertText', false, text);
+      }
+    });
+    
+>>>>>>> 3606bce4302fedcf9a815b996bb89aca140f809b
     container.appendChild(toolbar);
     container.appendChild(editableDiv);
     document.body.appendChild(container);
@@ -1631,7 +2243,7 @@ export const Whiteboard: React.FC = () => {
   };
 
   const handleCanvasDoubleClick = (e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
-    // Only handle double-click on existing text items
+    // Handle double-click on existing text items only
     if (tool === 'text' || tool === 'select') {
       const stage = e.target.getStage();
       const clickedOnEmpty = e.target === stage;
@@ -1718,6 +2330,7 @@ export const Whiteboard: React.FC = () => {
   };
 
   const handleItemDragEnd = (e: Konva.KonvaEventObject<DragEvent>, item: any) => {
+<<<<<<< HEAD
     const node = e.target;
     const dx = node.x() - (dragStartPosRef.current?.x || node.x());
     const dy = node.y() - (dragStartPosRef.current?.y || node.y());
@@ -1733,6 +2346,58 @@ export const Whiteboard: React.FC = () => {
           updateItem(childItem.id, {
             x: (childItem.x || 0) + dx,
             y: (childItem.y || 0) + dy
+=======
+      const node = e.target;
+      const dx = node.x() - (dragStartPosRef.current?.x || node.x());
+      const dy = node.y() - (dragStartPosRef.current?.y || node.y());
+      
+      // Handle multiple selected items
+      if (selectedId && selectedId.includes(',')) {
+        const selectedIds = selectedId.split(',');
+        selectedIds.forEach(id => {
+          const selectedItem = items.find(i => i.id === id);
+          if (!selectedItem) return;
+          
+          if (selectedItem.type === 'text' || selectedItem.type === 'image' || selectedItem.type === 'group' || (selectedItem.type === 'shape' && selectedItem.shapeType !== 'line' && selectedItem.shapeType !== 'polygon')) {
+            updateItem(id, { 
+              x: ((selectedItem as any).x || 0) + dx, 
+              y: ((selectedItem as any).y || 0) + dy 
+            });
+          } else if (selectedItem.type === 'stroke' || (selectedItem.type === 'shape' && (selectedItem.shapeType === 'line' || selectedItem.shapeType === 'polygon'))) {
+            const newPoints = (selectedItem.points || []).map((p: number, i: number) => 
+              i % 2 === 0 ? p + dx : p + dy
+            );
+            updateItem(id, { points: newPoints });
+          }
+        });
+      } else if (item.type === 'group') {
+        // Handle group item movement - move all items in the group
+        updateItem(item.id, { x: node.x(), y: node.y() });
+        
+        // Move all items in the group
+        item.items?.forEach((childItem: WhiteboardItem) => {
+          if (childItem.type === 'text' || childItem.type === 'image' || (childItem.type === 'shape' && childItem.shapeType !== 'line' && childItem.shapeType !== 'polygon')) {
+            updateItem(childItem.id, { 
+              x: ((childItem as any).x || 0) + dx, 
+              y: ((childItem as any).y || 0) + dy 
+            });
+          } else if (childItem.type === 'stroke' || (childItem.type === 'shape' && (childItem.shapeType === 'line' || childItem.shapeType === 'polygon'))) {
+            const newPoints = (childItem.points || []).map((p: number, i: number) => 
+              i % 2 === 0 ? p + dx : p + dy
+            );
+            updateItem(childItem.id, { points: newPoints });
+          }
+        });
+      } else {
+        updateItem(item.id, { x: node.x(), y: node.y() });
+      }
+      
+      const stage = node.getStage();
+      if (stage) {
+          linkedErasersRef.current.forEach(id => {
+              const eraserNode = stage.findOne('#' + id);
+              if (eraserNode) updateItem(id, { x: eraserNode.x(), y: eraserNode.y() });
+>>>>>>> 3606bce4302fedcf9a815b996bb89aca140f809b
           });
         } else if (childItem.type === 'stroke' || (childItem.type === 'shape' && (childItem.shapeType === 'line' || childItem.shapeType === 'polygon'))) {
           const newPoints = (childItem.points || []).map((p: number, i: number) =>
@@ -1777,7 +2442,7 @@ export const Whiteboard: React.FC = () => {
           fill="transparent"
           dash={[5, 5]}
           draggable={tool === 'select'}
-          onClick={(e: any) => {
+          onClick={() => {
             if (tool === 'select') {
               const currentSelected = selectedId ? selectedId.split(',') : [];
 
@@ -1809,19 +2474,62 @@ export const Whiteboard: React.FC = () => {
         return null;
       }
 
+      // For formatted text, render invisible interaction rectangle
+      const hasFormatting = /<(b|strong|i|em|u|span)/.test(item.text);
+      if (hasFormatting) {
+        return (
+          <Rect
+            key={item.id}
+            id={item.id}
+            x={item.x}
+            y={item.y}
+            width={item.width || 200}
+            height={Math.max(item.fontSize * 1.4 * 4, item.fontSize * 1.4 * (item.text.split('\n').length || 1))}
+            fill="transparent"
+            draggable={tool === 'select' || tool === 'text'}
+            onClick={() => {
+              if (tool === 'select' || tool === 'text') {
+                const currentSelected = selectedId ? selectedId.split(',') : [];
+                
+                if (currentSelected.includes(item.id)) {
+                  const newSelected = currentSelected.filter(id => id !== item.id);
+                  setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
+                } else {
+                  setSelectedId([...currentSelected, item.id].join(','));
+                }
+              }
+            }}
+            onTap={() => {
+              if (tool === 'select' || tool === 'text') {
+                const currentSelected = selectedId ? selectedId.split(',') : [];
+                if (!currentSelected.includes(item.id)) {
+                  setSelectedId([...currentSelected, item.id].join(','));
+                }
+              }
+            }}
+            onDblClick={() => handleTextDoubleClick(item.id)}
+            onDblTap={() => handleTextDoubleClick(item.id)}
+            onTransformEnd={(e: any) => handleTransformEnd(e, item)}
+            onDragStart={handleItemDragStart}
+            onDragMove={handleItemDragMove}
+            onDragEnd={(e: any) => handleItemDragEnd(e, item)}
+          />
+        );
+      }
+
       return (
         <RichText
           key={item.id}
           id={item.id}
           x={item.x}
           y={item.y}
-          text={item.text}
+          text={item.text} // Keep HTML formatting
           fontSize={item.fontSize}
           fontFamily={item.fontFamily}
           fill={item.fill}
-          width={item.width}
+          width={item.width} // Use stretched width
           draggable={tool === 'select' || tool === 'text'}
-          onClick={(e: any) => {
+          onClick={() => {
             if (tool === 'select' || tool === 'text') {
               const currentSelected = selectedId ? selectedId.split(',') : [];
 
@@ -1855,7 +2563,7 @@ export const Whiteboard: React.FC = () => {
       key: item.id,
       id: item.id,
       draggable: tool === 'select',
-      onClick: (e: any) => {
+      onClick: qModeActive ? () => {} : (_e: any) => {
         if (tool === 'select' || tool === 'text') {
           const currentSelected = selectedId ? selectedId.split(',') : [];
 
@@ -1867,6 +2575,7 @@ export const Whiteboard: React.FC = () => {
           }
         }
       },
+      onMouseDown: qModeActive ? (_e: any) => handleQMouseDown(_e, item.id) : undefined,
       onTap: () => {
         if (tool === 'select' || tool === 'text') {
           const currentSelected = selectedId ? selectedId.split(',') : [];
@@ -1930,7 +2639,11 @@ export const Whiteboard: React.FC = () => {
       }}
     >
 
+<<<<<<< HEAD
       {/* Chrome Widgets */}
+=======
+      {/* Chrome Widgets - Render BEFORE Stage */}
+>>>>>>> 3606bce4302fedcf9a815b996bb89aca140f809b
       {chromeWidgets.map((widget) => (
         <React.Fragment key={widget.id}>
           <ChromeWidget
@@ -1943,6 +2656,7 @@ export const Whiteboard: React.FC = () => {
             onMove={(x, y) => setChromeWidgets(prev => prev.map(w => w.id === widget.id ? { ...w, x, y } : w))}
             onToggleLock={() => setChromeWidgets(prev => prev.map(w => w.id === widget.id ? { ...w, locked: !w.locked } : w))}
           />
+<<<<<<< HEAD
           {widget.locked && (
             <div
               style={{
@@ -1950,21 +2664,39 @@ export const Whiteboard: React.FC = () => {
                 left: widget.x + 60, // Offset to not overlap with close button
                 top: widget.y + 6,
                 zIndex: 60, // Higher than everything
+=======
+          {/* Floating Unlock Button when locked */}
+          {widget.locked && (
+            <div
+              style={{
+                position: 'absolute',
+                left: widget.x + 640,
+                top: widget.y + 10,
+                zIndex: 60,
+                pointerEvents: 'auto'
+>>>>>>> 3606bce4302fedcf9a815b996bb89aca140f809b
               }}
             >
               <button
                 onClick={() => setChromeWidgets(prev => prev.map(w => w.id === widget.id ? { ...w, locked: false } : w))}
+<<<<<<< HEAD
                 className="flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white rounded-full shadow-lg hover:bg-red-700 transition-colors text-sm font-medium border border-red-700"
                 style={{ cursor: 'pointer', pointerEvents: 'auto' }}
               >
                 <Unlock size={14} />
                 <span>Unlock Widget</span>
+=======
+                className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600"
+              >
+                Unlock
+>>>>>>> 3606bce4302fedcf9a815b996bb89aca140f809b
               </button>
             </div>
           )}
         </React.Fragment>
       ))}
 
+<<<<<<< HEAD
       <div style={{ position: 'absolute', inset: 0, zIndex: 10 }}>
         <Stage
           ref={stageRef}
@@ -1974,6 +2706,18 @@ export const Whiteboard: React.FC = () => {
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
+=======
+      {/* Stage Wrapper with higher z-index */}
+      <div style={{ position: 'absolute', inset: 0, zIndex: 10 }}>
+        <Stage
+          ref={stageRef}
+          style={{ background: 'transparent', zIndex: 10 }}
+          width={stageSize.width}
+          height={stageSize.height}
+          onMouseDown={qModeActive ? (e) => e.evt.preventDefault() : handleMouseDown}
+          onMouseMove={qModeActive ? handleQMouseMove : handleMouseMove}
+          onMouseUp={qModeActive ? handleQMouseUp : handleMouseUp}
+>>>>>>> 3606bce4302fedcf9a815b996bb89aca140f809b
           onTouchStart={handleMouseDown}
           onTouchMove={handleMouseMove}
           onTouchEnd={handleMouseUp}
@@ -2000,7 +2744,11 @@ export const Whiteboard: React.FC = () => {
                 key: item.id,
                 id: item.id,
                 draggable: tool === 'select',
+<<<<<<< HEAD
                 onClick: (e: any) => {
+=======
+                onClick: () => {
+>>>>>>> 3606bce4302fedcf9a815b996bb89aca140f809b
                   if (tool === 'select') {
                     const currentSelected = selectedId ? selectedId.split(',') : [];
                     if (currentSelected.includes(item.id)) {
@@ -2031,7 +2779,11 @@ export const Whiteboard: React.FC = () => {
               return <URLImage {...commonProps} image={item} />;
             })}
           </Layer>
+<<<<<<< HEAD
 
+=======
+          
+>>>>>>> 3606bce4302fedcf9a815b996bb89aca140f809b
           <Layer>
             {/* 2. Render Highlighters and Highlighter-specific Eraser */}
             {items.map((item) => {
@@ -2039,6 +2791,7 @@ export const Whiteboard: React.FC = () => {
               if (item.isHighlighter) {
                 if ((item as any)._hidden) return null;
                 return (
+<<<<<<< HEAD
                   <Line
                     key={item.id + '-hl'}
                     id={item.id}
@@ -2047,6 +2800,16 @@ export const Whiteboard: React.FC = () => {
                       if (tool === 'select') {
                         const currentSelected = selectedId ? selectedId.split(',') : [];
 
+=======
+                  <Line 
+                    key={item.id + '-hl'} 
+                    id={item.id}
+                    draggable={tool === 'select'}
+                    onClick={() => {
+                      if (tool === 'select') {
+                        const currentSelected = selectedId ? selectedId.split(',') : [];
+                        
+>>>>>>> 3606bce4302fedcf9a815b996bb89aca140f809b
                         if (currentSelected.includes(item.id)) {
                           const newSelected = currentSelected.filter(id => id !== item.id);
                           setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
@@ -2072,6 +2835,7 @@ export const Whiteboard: React.FC = () => {
                     onDragStart={handleItemDragStart}
                     onDragMove={handleItemDragMove}
                     onDragEnd={(e: any) => handleItemDragEnd(e, item)}
+<<<<<<< HEAD
                     points={item.points}
                     stroke={item.color}
                     strokeWidth={item.size}
@@ -2080,12 +2844,23 @@ export const Whiteboard: React.FC = () => {
                     lineJoin="round"
                     opacity={0.4}
                     globalCompositeOperation="source-over"
+=======
+                    points={item.points} 
+                    stroke={item.color} 
+                    strokeWidth={item.size} 
+                    tension={0} 
+                    lineCap="round" 
+                    lineJoin="round" 
+                    opacity={0.4} 
+                    globalCompositeOperation="source-over" 
+>>>>>>> 3606bce4302fedcf9a815b996bb89aca140f809b
                     perfectDrawEnabled={false}
                     hitStrokeWidth={Math.max(10, item.size + 5)}
                   />
                 );
               }
               if (item.tool === 'highlighter-eraser') {
+<<<<<<< HEAD
                 return (
                   <Line
                     key={item.id + '-hl-eraser'}
@@ -2100,6 +2875,22 @@ export const Whiteboard: React.FC = () => {
                     perfectDrawEnabled={false}
                   />
                 );
+=======
+                 return (
+                  <Line 
+                    key={item.id + '-hl-eraser'} 
+                    id={item.id}
+                    points={item.points} 
+                    stroke="#000000" 
+                    strokeWidth={item.size * 2 + 10} 
+                    tension={0} 
+                    lineCap="round" 
+                    lineJoin="round" 
+                    globalCompositeOperation="destination-out" 
+                    perfectDrawEnabled={false}
+                  />
+                 );
+>>>>>>> 3606bce4302fedcf9a815b996bb89aca140f809b
               }
               return null;
             })}
@@ -2112,6 +2903,7 @@ export const Whiteboard: React.FC = () => {
               if (item.type === 'stroke' && (item.isHighlighter || item.tool === 'highlighter-eraser')) return null;
               return renderLayer3Item(item);
             })}
+<<<<<<< HEAD
 
             {selectionBox && <Rect x={selectionBox.x} y={selectionBox.y} width={selectionBox.width} height={selectionBox.height} stroke="#0099ff" strokeWidth={1} dash={[5, 5]} />}
             <Line ref={previewLineRef} listening={false} tension={0} lineCap="round" lineJoin="round" stroke={color} strokeWidth={(tool === 'eraser' || tool === 'highlighter-eraser') ? size * 2 + 10 : size} visible={false} />
@@ -2121,6 +2913,147 @@ export const Whiteboard: React.FC = () => {
         </Stage>
 
       </div>
+=======
+            
+            {selectionBox && <Rect x={selectionBox.x} y={selectionBox.y} width={selectionBox.width} height={selectionBox.height} stroke="#0099ff" strokeWidth={1} dash={[5, 5]} />}
+            <Line ref={previewLineRef} listening={false} tension={0} lineCap="round" lineJoin="round" stroke={color} strokeWidth={(tool === 'eraser' || tool === 'highlighter-eraser') ? size * 2 + 10 : size} visible={false} />
+            <Circle ref={cursorRef} listening={false} radius={size * 0.5} stroke="#ff1493" strokeWidth={2.5} fill="rgba(255, 20, 147, 0.15)" visible={tool === 'eraser' || tool === 'highlighter-eraser'} opacity={1} />
+            <Transformer 
+              ref={transformerRef} 
+              onDragEnd={() => {
+                if (selectedId && selectedId.includes(',')) {
+                  saveHistory();
+                }
+              }}
+            />
+          </Layer>
+        </Stage>
+        
+        {/* HTML overlay for formatted text */}
+        {items.map((item) => {
+          if (item.type !== 'text' || editingTextId === item.id) return null;
+          
+          const hasFormatting = /<(b|strong|i|em|u|span)/.test(item.text);
+          if (!hasFormatting) return null;
+          
+          const screenX = item.x * stageScale + stagePos.x;
+          const screenY = item.y * stageScale + stagePos.y;
+          
+          return (
+            <div
+              key={`overlay-${item.id}-${Math.round(item.x)}-${Math.round(item.y)}`}
+              style={{
+                position: 'absolute',
+                left: screenX,
+                top: screenY,
+                width: item.width ? (item.width * stageScale) : (200 * stageScale),
+                fontSize: item.fontSize * stageScale,
+                fontFamily: item.fontFamily,
+                color: item.fill,
+                lineHeight: 1.4,
+                pointerEvents: 'none',
+                overflow: 'hidden',
+                wordWrap: 'break-word',
+                zIndex: 20,
+                userSelect: 'none',
+                touchAction: 'none'
+              }}
+              dangerouslySetInnerHTML={{ __html: item.text }}
+            />
+          );
+        })}
+      </div>
+
+      {/* Geometry Tools */}
+      {showProtractor && <Protractor />}
+      {showDivider && <Divider />}
+
+      {/* Multi-selection drag button */}
+      {selectedId && selectedId.includes(',') && (() => {
+        const selectedIds = selectedId.split(',');
+        const stage = stageRef.current;
+        if (!stage) return null;
+        
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        selectedIds.forEach(id => {
+          const node = stage.findOne('#' + id);
+          if (node) {
+            const rect = node.getClientRect();
+            minX = Math.min(minX, rect.x);
+            minY = Math.min(minY, rect.y);
+            maxX = Math.max(maxX, rect.x + rect.width);
+            maxY = Math.max(maxY, rect.y + rect.height);
+          }
+        });
+        
+        const centerX = (minX + maxX) / 2;
+        const centerY = minY - 40;
+        
+        return (
+          <div
+            onMouseDown={(e) => {
+              e.preventDefault();
+              const stageRect = stage.container().getBoundingClientRect();
+              const startX = (e.clientX - stageRect.left - stagePos.x) / stageScale;
+              const startY = (e.clientY - stageRect.top - stagePos.y) / stageScale;
+              const initialItems = selectedIds.map(id => {
+                const item = items.find(i => i.id === id);
+                return item ? JSON.parse(JSON.stringify(item)) : null;
+              }).filter(Boolean);
+              
+              const handleMove = (e: MouseEvent) => {
+                const currentX = (e.clientX - stageRect.left - stagePos.x) / stageScale;
+                const currentY = (e.clientY - stageRect.top - stagePos.y) / stageScale;
+                const dx = currentX - startX;
+                const dy = currentY - startY;
+                
+                initialItems.forEach((initialItem: any) => {
+                  if (initialItem.type === 'text' || initialItem.type === 'image' || initialItem.type === 'group' || (initialItem.type === 'shape' && initialItem.shapeType !== 'line' && initialItem.shapeType !== 'polygon')) {
+                    updateItem(initialItem.id, { 
+                      x: initialItem.x + dx, 
+                      y: initialItem.y + dy 
+                    });
+                  } else if (initialItem.type === 'stroke' || (initialItem.type === 'shape' && (initialItem.shapeType === 'line' || initialItem.shapeType === 'polygon'))) {
+                    const newPoints = initialItem.points.map((p: number, i: number) => 
+                      i % 2 === 0 ? p + dx : p + dy
+                    );
+                    updateItem(initialItem.id, { points: newPoints });
+                  }
+                });
+              };
+              
+              const handleUp = () => {
+                saveHistory();
+                document.removeEventListener('mousemove', handleMove);
+                document.removeEventListener('mouseup', handleUp);
+              };
+              
+              document.addEventListener('mousemove', handleMove);
+              document.addEventListener('mouseup', handleUp);
+            }}
+            style={{
+              position: 'fixed',
+              left: centerX + 'px',
+              top: centerY + 'px',
+              background: '#0099ff',
+              color: 'white',       
+              padding: '10px 20px',
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontWeight: '600',
+              zIndex: 1000,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+              cursor: 'move',
+              userSelect: 'none',
+              border: '2px solid white'
+            }}
+          >
+            ⬍ Drag items
+          </div>
+        );
+      })()}
+
+>>>>>>> 3606bce4302fedcf9a815b996bb89aca140f809b
     </div>
   );
 };

@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from "react";
+<<<<<<< HEAD
 import { RotateCcw, RotateCw, Home, Lock, Unlock } from "lucide-react";
+=======
+import { RotateCcw, Home, Lock, Unlock , CircleX as Cross } from "lucide-react";
+>>>>>>> 3606bce4302fedcf9a815b996bb89aca140f809b
 
 interface ChromeWidgetProps {
   id: string;
@@ -89,12 +93,19 @@ const ChromeWidget: React.FC<ChromeWidgetProps> = ({
         onMouseDown={handleMouseDown}
       >
         {/* Window controls */}
+<<<<<<< HEAD
         <div className="flex gap-1.5 mr-1">
           <button
             onClick={onClose}
             className="w-3.5 h-3.5 bg-red-500 rounded-full hover:bg-red-600 transition-colors shadow-sm"
             title="Close Widget"
           />
+=======
+        <div className="flex gap-1">
+          <Cross size={20}  onClick={onClose} className="text-red-500 cursor-pointer" />
+          {/* <span className="w-3 h-3 bg-yellow-500 rounded-full" />
+          <span className="w-3 h-3 bg-green-500 rounded-full" /> */}
+>>>>>>> 3606bce4302fedcf9a815b996bb89aca140f809b
         </div>
 
         {/* Lock/Unlock Toggle */}
@@ -113,10 +124,15 @@ const ChromeWidget: React.FC<ChromeWidgetProps> = ({
 
         {/* Navigation */}
         <button
+<<<<<<< HEAD
           onClick={() => setCurrentUrl(currentUrl)}
           className="p-1.5 hover:bg-white rounded-md text-gray-700 transition-colors"
           title="Refresh"
           disabled={locked}
+=======
+          onClick={() => setCurrentUrl(currentUrl + '?t=' + Date.now())}
+          className="p-1 hover:bg-gray-200 rounded"
+>>>>>>> 3606bce4302fedcf9a815b996bb89aca140f809b
         >
           <RotateCcw size={16} />
         </button>
@@ -128,6 +144,15 @@ const ChromeWidget: React.FC<ChromeWidgetProps> = ({
           disabled={locked}
         >
           <Home size={16} />
+        </button>
+
+        {/* Lock/Unlock Button */}
+        <button
+          onClick={onToggleLock}
+          className="p-1 hover:bg-gray-200 rounded"
+          style={{ pointerEvents: 'auto' }}
+        >
+          {locked ? <Lock size={14} /> : <Unlock size={14} />}
         </button>
 
         {/* Address Bar */}

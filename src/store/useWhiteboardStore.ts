@@ -24,6 +24,13 @@ interface WhiteboardState {
   currentPdfPage: number | null;
   textSelection: { start: number; end: number } | null;
   showStopwatch: boolean;
+  showTimer: boolean;
+  showRuler: boolean;
+  showTriangle45: boolean;
+  showTriangle60: boolean;
+  showProtractor: boolean;
+  showNumberLine: boolean;
+  showDivider: boolean;
   
   setTool: (tool: ToolType) => void;
   setSelectedId: (id: string | null) => void;
@@ -37,6 +44,13 @@ interface WhiteboardState {
   setPdfPages: (pages: string[]) => void;
   setCurrentPdfPage: (page: number | null) => void;
   setShowStopwatch: (show: boolean) => void;
+  setShowTimer: (show: boolean) => void;
+  setShowRuler: (show: boolean) => void;
+  setShowTriangle45: (show: boolean) => void;
+  setShowTriangle60: (show: boolean) => void;
+  setShowProtractor: (show: boolean) => void;
+  setShowNumberLine: (show: boolean) => void;
+  setShowDivider: (show: boolean) => void;
   
   addItem: (item: WhiteboardItem) => void;
   updateItem: (id: string, updates: Partial<WhiteboardItem>) => void;
@@ -56,7 +70,7 @@ interface WhiteboardState {
 export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   tool: 'pen',
   color: COLORS.red,
-  size: 32,
+  size: 44,
   items: [],
   history: [[]],
   historyStep: 0,
@@ -75,6 +89,13 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   currentPdfPage: null,
   textSelection: null,
   showStopwatch: false,
+  showTimer: false,
+  showRuler: false,
+  showTriangle45: false,
+  showTriangle60: false,
+  showProtractor: false,
+  showNumberLine: false,
+  showDivider: false,
 
   setTool: (tool) => set({ tool }),
   setSelectedId: (selectedId) => set({ selectedId }),
@@ -87,6 +108,13 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   setPdfPages: (pdfPages) => set({ pdfPages }),
   setCurrentPdfPage: (currentPdfPage) => set({ currentPdfPage }),
   setShowStopwatch: (showStopwatch) => set({ showStopwatch }),
+  setShowTimer: (showTimer) => set({ showTimer }),
+  setShowRuler: (showRuler) => set({ showRuler }),
+  setShowTriangle45: (showTriangle45) => set({ showTriangle45 }),
+  setShowTriangle60: (showTriangle60) => set({ showTriangle60 }),
+  setShowProtractor: (showProtractor) => set({ showProtractor }),
+  setShowNumberLine: (showNumberLine) => set({ showNumberLine }),
+  setShowDivider: (showDivider) => set({ showDivider }),
 
   // --- UPDATED: Cache Busting Logic ---
   setBackgroundImage: (image) => {

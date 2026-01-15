@@ -2,18 +2,22 @@ import React from "react";
 import {
   Chrome,
   Monitor,
-  Smartphone,
-  LayoutGrid,
-  Camera,
+    Smartphone,
+   LayoutGrid,
+    Timer,
   Ruler,
-  Compass,
+Camera,
   Divide,
-  Square,
+  Circle,
+  Move,
   Globe,
   Dice3,
-  Box,
-  Plus
+  // Box,
+  Watch,
+  Plus,
+  TriangleRight
 } from "lucide-react";
+import { useWhiteboardStore } from '../store/useWhiteboardStore';
 
 type ExpandableToolbarProps = {
   visible: boolean;
@@ -25,6 +29,7 @@ type ExpandableToolbarProps = {
 
 const ExpandableToolbar: React.FC<ExpandableToolbarProps> = ({ visible, onClose, onChromeClick, onPcClick, onBeforePcClick }) => {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const { setShowRuler, setShowTriangle45, setShowTriangle60, setShowProtractor, setShowNumberLine, setShowDivider, setShowStopwatch, setShowTimer } = useWhiteboardStore();
 
   const handlePcButtonClick = () => {
     if (onBeforePcClick) {
@@ -47,14 +52,14 @@ const ExpandableToolbar: React.FC<ExpandableToolbarProps> = ({ visible, onClose,
   return (
     <div className="fixed -top-0  left-1/2 -translate-x-1/2 z-[999]">
       {/* VERTICAL SCROLL CONTAINER */}
-      <div className="w-[90vw] max-w-[1360px] max-h-[64px] overflow-y-auto bg-white rounded-full shadow-lg border px-4 py-2 space-y-6">
+      <div className="w-[90vw] max-w-[1360px] max-h-[55px] overflow-y-auto bg-white rounded-full shadow-lg border px-4 py-1 space-y-6">
 
         {/* ================= SECTION 1 ================= */}
           <div className="flex items-center gap-5 overflow-x-auto ">
             <button onClick={onClose} className="text-gray-500">
               <Plus size={20} className="rotate-45" />
             </button>
-            <div className="inline-flex items-center gap-3 px-4 py-2 rounded-full bg-black text-white text-lg font-semibold">
+            <div className="inline-flex items-center gap-3 px-4 py-2 rounded-full bg-[#1000af] text-white text-lg font-semibold">
             Chrome | PC | App
           </div>
             <Pill icon={<Chrome size={18} />} label="Chrome" onClick={onChromeClick} />
@@ -66,24 +71,29 @@ const ExpandableToolbar: React.FC<ExpandableToolbarProps> = ({ visible, onClose,
               accept="image/png,image/jpeg,image/webp,application/pdf"
               onChange={handleFileChange}
             />
-            <Pill icon={<Smartphone size={18} />} label="App" />
             <Pill icon={<LayoutGrid size={18} />} label="Widget" />
             <Pill icon={<Camera size={18} />} label="Webcam" />
+            <Pill icon={<Timer size={18} />} label="Stopwatch" onClick={() => { setShowStopwatch(true); onClose(); }} />
+            <Pill icon={<Watch size={18} />} label="Timer" onClick={() => { setShowTimer(true); onClose(); }} />
+
+            <Pill icon={<Smartphone size={18} />} label="App" />
           </div>
 
         {/* ================= SECTION 2 (GEOMETRY) ================= */}
-          <div className="flex items-center gap-3 overflow-x-auto ">
+          <div className="flex items-center gap-3 hide-scrollbar overflow-x-auto ">
             <button onClick={onClose} className="text-gray-500">
               <Plus size={20} className="rotate-45" />
             </button>
-            <div className="inline-flex items-center gap-3 px-4 py-2 rounded-full bg-black text-white text-lg font-semibold">
+            <div className="inline whitespace-nowrap items-center gap-3 px-4  py-2 rounded-full bg-black text-white text-lg font-semibold">
             GEOMETRY TOOLS
           </div>
-            <Pill icon={<Ruler size={18} />} label="Ruler" />
-            <Pill icon={<Compass size={18} />} label="Compass" />
-            <Pill icon={<Divide size={18} />} label="Divider" />
-            <Pill icon={<Square size={18} />} label="Set Square 60°" />
-            <Pill icon={<Square size={18} />} label="Set Square 45°" />
+            <Pill icon={<Ruler size={18} />} label="Ruler" onClick={() => setShowRuler(true)} />
+            {/* <Pill icon={<Compass size={18} />} label="Compass" /> */}
+            <Pill icon={<Divide size={18} />} label="Divider" onClick={() => setShowDivider(true)} />
+            <Pill icon={<TriangleRight size={18} />} label="Set Square 60°" onClick={() => setShowTriangle60(true)} />
+            <Pill icon={<TriangleRight size={18} />} label="Set Square 45°" onClick={() => setShowTriangle45(true)} />
+            <Pill icon={<Circle size={18} />} label="Protactor" onClick={() => setShowProtractor(true)} />
+            <Pill icon={<Move size={18} />} label="Number Line" onClick={() => setShowNumberLine(true)} />
           </div>
 
         {/* ================= SECTION 3 (3D) ================= */}
@@ -96,7 +106,7 @@ const ExpandableToolbar: React.FC<ExpandableToolbarProps> = ({ visible, onClose,
           </div>
             <Pill icon={<Dice3 size={18} />} label="3D Dice" />
             <Pill icon={<Globe size={18} />} label="3D Globe" />
-            <Pill icon={<Box size={18} />} label="3D Box" />
+            {/* <Pill icon={<Box size={18} />} label="3D Box" /> */}
           </div>
         </div>
       </div>
