@@ -303,21 +303,21 @@ export const Toolbar: React.FC = () => {
 
   // --- FILE IMPORT HANDLER ---
   const handleFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Restore fullscreen if it was active before file picker
-    if (wasInFullscreenRef.current && !document.fullscreenElement) {
-      try {
-        // @ts-ignore
-        await document.documentElement.requestFullscreen({ navigationUI: "hide" });
-      } catch (err) {
-        console.error("Failed to restore fullscreen", err);
-      }
-      wasInFullscreenRef.current = false;
-    } else if (document.fullscreenElement) {
-       wasInFullscreenRef.current = false;
-    }
-
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Restore fullscreen immediately after file selection
+    if (wasInFullscreenRef.current && !document.fullscreenElement) {
+      setTimeout(async () => {
+        try {
+          // @ts-ignore
+          await document.documentElement.requestFullscreen({ navigationUI: "hide" });
+        } catch (err) {
+          console.error("Failed to restore fullscreen", err);
+        }
+      }, 100);
+      wasInFullscreenRef.current = false;
+    }
 
     // Reset the input value so the same file can be selected again if needed
     if (fileInputRef.current) fileInputRef.current.value = '';

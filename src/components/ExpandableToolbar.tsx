@@ -29,9 +29,18 @@ type ExpandableToolbarProps = {
 
 const ExpandableToolbar: React.FC<ExpandableToolbarProps> = ({ visible, onClose, onChromeClick, onPcClick, onBeforePcClick }) => {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const wasFullscreenRef = React.useRef(false);
   const { setShowRuler, setShowTriangle45, setShowTriangle60, setShowProtractor, setShowNumberLine, setShowDivider, setShowStopwatch, setShowTimer } = useWhiteboardStore();
 
+  const isFullscreen = () => document.fullscreenElement !== null;
+  
+  const enterFullscreen = () => {
+    const el = document.documentElement;
+    if (el.requestFullscreen) el.requestFullscreen();
+  };
+
   const handlePcButtonClick = () => {
+    wasFullscreenRef.current = isFullscreen();
     if (onBeforePcClick) {
       onBeforePcClick();
     }
@@ -43,7 +52,13 @@ const ExpandableToolbar: React.FC<ExpandableToolbarProps> = ({ visible, onClose,
     if (file && onPcClick) {
       onPcClick(file);
     }
-    // Reset input so same file can be picked again
+    
+    if (wasFullscreenRef.current) {
+      setTimeout(() => {
+        enterFullscreen();
+      }, 100);
+    }
+    
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
