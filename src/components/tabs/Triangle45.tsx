@@ -124,7 +124,11 @@ const Triangle45: React.FC = () => {
       >
         {/* Triangle body */}
         <div
-          className='relative w-full h-full bg-[#B9DEA5]/80 backdrop-blur-sm border-2 border-gray-800 shadow-2xl'
+          className='relative w-full h-full 
+             bg-[#05FF29]/10 
+             backdrop-blur-sm 
+             border-[2.5px] border-black 
+             shadow-2xl'
           style={{
             clipPath: 'polygon(0 0, 100% 100%, 0 100%)'
           }}
@@ -166,7 +170,10 @@ const Triangle45: React.FC = () => {
               </span>
             ))}
           {/* Angle badge - Show display rotation (0° initially) - Rotated 90° anticlockwise */}
-          <div className='absolute left-6 top-24 bg-gray-900/90 text-white px-3 py-1 rounded-lg text-sm font-bold shadow-lg' style={{ transform: 'rotate(-90deg)' }}>
+          <div
+            className='absolute left-6 top-24 bg-gray-900/90 text-white px-3 py-1 rounded-lg text-sm font-bold shadow-lg'
+            style={{ transform: 'rotate(-90deg)' }}
+          >
             {Math.round(displayRotation)}°
           </div>
           {/* 45° marking */}
