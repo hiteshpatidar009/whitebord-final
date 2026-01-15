@@ -67,7 +67,7 @@ const Ruler: React.FC = () => {
 
     if (resizing) {
       const delta = e.clientX - startRef.current.x
-      setWidth(Math.max(250, Math.min(1000, startRef.current.width + delta)))
+      setWidth(Math.max(250, Math.min(1400, startRef.current.width + delta)))
     }
 
     if (rotating) {
@@ -150,6 +150,7 @@ const Ruler: React.FC = () => {
               const position = getTickPosition(tick)
 
               // Add 20px margin to the left for the first few ticks
+              const RIGHT_PADDING = 30
               const adjustedPosition = position + 20
 
               return (
