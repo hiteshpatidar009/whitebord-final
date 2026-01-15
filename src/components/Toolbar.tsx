@@ -15,7 +15,8 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.vers
 export const Toolbar: React.FC = () => {
   const { 
     tool, setTool, color, setColor, size, setSize, undo, redo, saveHistory, clear, addItem, backgroundImage, setBackgroundImage, setPdfPages, setCurrentPdfPage, copy, paste,
-    textOptions, setSelectedId,
+    textOptions,
+    //  setSelectedId,
     //  showStopwatch, setShowStopwatch
   } = useWhiteboardStore();
   
@@ -245,17 +246,17 @@ export const Toolbar: React.FC = () => {
 
       if (e.ctrlKey || e.metaKey) {
         if (e.key === 'z') {
+          e.preventDefault();
           e.shiftKey ? redo() : undo();
-          e.preventDefault();
         } else if (e.key === 'y') {
+          e.preventDefault();
           redo();
-          e.preventDefault();
         } else if (e.key === 'c') {
+          e.preventDefault();
           copy();
-          e.preventDefault();
         } else if (e.key === 'v') {
-          paste();
           e.preventDefault();
+          paste();
         }
       } else {
         switch (e.key.toLowerCase()) {
@@ -270,7 +271,7 @@ export const Toolbar: React.FC = () => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [setTool, undo, redo, copy, paste]);
+  }, [setTool, undo, redo, copy, paste, handleToolClick]);
 
   // --- PDF CONVERSION HELPER ---
   const convertPdfToImages = async (file: File): Promise<string[]> => {

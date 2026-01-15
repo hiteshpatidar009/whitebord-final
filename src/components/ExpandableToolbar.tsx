@@ -2,17 +2,18 @@ import React from "react";
 import {
   Chrome,
   Monitor,
-  // Smartphone,
-  // LayoutGrid,
+    Smartphone,
+   LayoutGrid,
     Timer,
   Ruler,
-  // Compass,
+Camera,
   Divide,
   Circle,
   Move,
   Globe,
   Dice3,
-  Box,
+  // Box,
+  Watch,
   Plus,
   TriangleRight
 } from "lucide-react";
@@ -28,7 +29,7 @@ type ExpandableToolbarProps = {
 
 const ExpandableToolbar: React.FC<ExpandableToolbarProps> = ({ visible, onClose, onChromeClick, onPcClick, onBeforePcClick }) => {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
-  const { setShowRuler, setShowTriangle45, setShowTriangle60, setShowProtractor, setShowNumberLine, setShowDivider, setShowStopwatch } = useWhiteboardStore();
+  const { setShowRuler, setShowTriangle45, setShowTriangle60, setShowProtractor, setShowNumberLine, setShowDivider, setShowStopwatch, setShowTimer } = useWhiteboardStore();
 
   const handlePcButtonClick = () => {
     if (onBeforePcClick) {
@@ -70,9 +71,12 @@ const ExpandableToolbar: React.FC<ExpandableToolbarProps> = ({ visible, onClose,
               accept="image/png,image/jpeg,image/webp,application/pdf"
               onChange={handleFileChange}
             />
-            <Pill icon={<Timer size={18} />} label="Stopwatch" onClick={() => setShowStopwatch(true)} />
-            {/* <Pill icon={<LayoutGrid size={18} />} label="Widget" /> */}
-            {/* <Pill icon={<Camera size={18} />} label="Webcam" /> */}
+            <Pill icon={<LayoutGrid size={18} />} label="Widget" />
+            <Pill icon={<Camera size={18} />} label="Webcam" />
+            <Pill icon={<Timer size={18} />} label="Stopwatch" onClick={() => { setShowStopwatch(true); onClose(); }} />
+            <Pill icon={<Watch size={18} />} label="Timer" onClick={() => { setShowTimer(true); onClose(); }} />
+
+            <Pill icon={<Smartphone size={18} />} label="App" />
           </div>
 
         {/* ================= SECTION 2 (GEOMETRY) ================= */}
@@ -80,7 +84,7 @@ const ExpandableToolbar: React.FC<ExpandableToolbarProps> = ({ visible, onClose,
             <button onClick={onClose} className="text-gray-500">
               <Plus size={20} className="rotate-45" />
             </button>
-            <div className="inline whitespace-nowrap items-center gap-3 px-4  py-2 rounded-full bg-[#1000af] text-white text-lg font-semibold">
+            <div className="inline whitespace-nowrap items-center gap-3 px-4  py-2 rounded-full bg-black text-white text-lg font-semibold">
             GEOMETRY TOOLS
           </div>
             <Pill icon={<Ruler size={18} />} label="Ruler" onClick={() => setShowRuler(true)} />
@@ -97,12 +101,12 @@ const ExpandableToolbar: React.FC<ExpandableToolbarProps> = ({ visible, onClose,
             <button onClick={onClose} className="text-gray-500">
               <Plus size={20} className="rotate-45" />
             </button>
-            <div className="inline-flex items-center gap-3 px-4 py-2 rounded-full bg-[#1000af] text-white text-lg font-semibold">
+            <div className="inline-flex items-center gap-3 px-4 py-2 rounded-full bg-black text-white text-lg font-semibold">
             3D & OTHER TOOLS
           </div>
             <Pill icon={<Dice3 size={18} />} label="3D Dice" />
             <Pill icon={<Globe size={18} />} label="3D Globe" />
-            <Pill icon={<Box size={18} />} label="3D Box" />
+            {/* <Pill icon={<Box size={18} />} label="3D Box" /> */}
           </div>
         </div>
       </div>

@@ -11,7 +11,6 @@ import { FONT_STACKS, FONTS } from './TextToolbar';
 import ChromeWidget from './ChromeWidget';
 import Protractor from './tabs/Protractor';
 import Divider from './Divider/Divider';
-import Stopwatch from './Stopwatch';
 
 import { transcribeHandwriting } from '../services/geminiService';
 
@@ -231,8 +230,6 @@ export const Whiteboard: React.FC = () => {
     ungroupItems,
     showProtractor,
     showDivider,
-    showStopwatch,
-    setShowStopwatch,
   } = useWhiteboardStore();
 
   const stageRef = useRef<Konva.Stage>(null);
@@ -825,7 +822,7 @@ export const Whiteboard: React.FC = () => {
         tool,
         points: [pos.x, pos.y],
         color: '#000000',
-        size: size * 1.5,
+        size: size * 0.9,
         isEraser: true,
         isHighlighter: false
       });
@@ -900,7 +897,7 @@ export const Whiteboard: React.FC = () => {
         if (isEraser) {
             cursorRef.current.x(point.x);
             cursorRef.current.y(point.y);
-            cursorRef.current.radius(size * 0.6);
+            cursorRef.current.radius(size * 0.9);
             cursorRef.current.getLayer()?.batchDraw();
         }
     }
@@ -2378,7 +2375,6 @@ const getCursorStyle = () => {
       {/* Geometry Tools */}
       {showProtractor && <Protractor />}
       {showDivider && <Divider />}
-      {showStopwatch && <Stopwatch onClose={() => setShowStopwatch(false)} />}
 
     </div>
   );

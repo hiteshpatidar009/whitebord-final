@@ -24,6 +24,7 @@ interface WhiteboardState {
   currentPdfPage: number | null;
   textSelection: { start: number; end: number } | null;
   showStopwatch: boolean;
+  showTimer: boolean;
   showRuler: boolean;
   showTriangle45: boolean;
   showTriangle60: boolean;
@@ -43,6 +44,7 @@ interface WhiteboardState {
   setPdfPages: (pages: string[]) => void;
   setCurrentPdfPage: (page: number | null) => void;
   setShowStopwatch: (show: boolean) => void;
+  setShowTimer: (show: boolean) => void;
   setShowRuler: (show: boolean) => void;
   setShowTriangle45: (show: boolean) => void;
   setShowTriangle60: (show: boolean) => void;
@@ -87,6 +89,7 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   currentPdfPage: null,
   textSelection: null,
   showStopwatch: false,
+  showTimer: false,
   showRuler: false,
   showTriangle45: false,
   showTriangle60: false,
@@ -105,6 +108,7 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   setPdfPages: (pdfPages) => set({ pdfPages }),
   setCurrentPdfPage: (currentPdfPage) => set({ currentPdfPage }),
   setShowStopwatch: (showStopwatch) => set({ showStopwatch }),
+  setShowTimer: (showTimer) => set({ showTimer }),
   setShowRuler: (showRuler) => set({ showRuler }),
   setShowTriangle45: (showTriangle45) => set({ showTriangle45 }),
   setShowTriangle60: (showTriangle60) => set({ showTriangle60 }),
