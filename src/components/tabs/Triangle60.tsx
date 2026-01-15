@@ -94,8 +94,8 @@ const Triangle60: React.FC = () => {
     setRotating(false)
   }
 
-  // Calculate display rotation (0° to 360° range)
-  const displayRotation = ((rotation % 360) + 360) % 360
+  // Calculate display rotation (0° to 360° range) with 0° at the current position
+  const displayRotation = (((rotation + 330) % 360) + 360) % 360
 
   const tickHeight = (i: number) => (i % 10 === 0 ? 16 : i % 5 === 0 ? 11 : 7)
 
@@ -177,14 +177,9 @@ const Triangle60: React.FC = () => {
             {Math.round(displayRotation)}°
           </div>
 
-          {/* 30° marking (at top-left corner) */}
-          <div className='absolute left-3 top-3 text-sm font-bold text-gray-900'>
-            30°
-          </div>
-
           {/* 60° marking (at bottom-left corner) */}
           <div className='absolute left-3 bottom-3 text-sm font-bold text-gray-900'>
-            30°
+            60°
           </div>
 
           {/* 90° marking (at right angle) */}
