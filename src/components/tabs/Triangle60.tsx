@@ -2,28 +2,20 @@ import React, { useRef, useState, useEffect } from 'react'
 import { useWhiteboardStore } from '../../store/useWhiteboardStore'
 
 const CM_IN_PX = 37.8
-const INITIAL_ROTATION = -330 // keeps triangle orientation same, but display starts from 0°
 
 const Triangle60: React.FC = () => {
   const { setShowTriangle60 } = useWhiteboardStore()
   const triangleRef = useRef<HTMLDivElement>(null)
 
   const [position, setPosition] = useState({ x: 300, y: 250 })
-  const [rotation, setRotation] = useState(INITIAL_ROTATION)
+  const [rotation, setRotation] = useState(-330) // Default -330° rotation
   const [size, setSize] = useState(320)
 
   const [dragging, setDragging] = useState(false)
   const [resizing, setResizing] = useState(false)
   const [rotating, setRotating] = useState(false)
 
-  const startRef = useRef({
-    x: 0,
-    y: 0,
-    size: 0,
-    rotation: 0,
-    mouseAngle: 0
-  })
-
+  const startRef = useRef({ x: 0, y: 0, size: 0, rotation: 0, mouseAngle: 0 })
   const [ticks, setTicks] = useState<number[]>([])
 
   /* --------- Generate scale --------- */
@@ -56,9 +48,11 @@ const Triangle60: React.FC = () => {
     const cx = rect.left + rect.width / 2
     const cy = rect.top + rect.height / 2
 
+    // Calculate initial mouse angle relative to center
     startRef.current.mouseAngle =
       Math.atan2(e.clientY - cy, e.clientX - cx) * (180 / Math.PI)
 
+    // Store current rotation
     startRef.current.rotation = rotation
   }
 
@@ -81,11 +75,16 @@ const Triangle60: React.FC = () => {
       const cx = rect.left + rect.width / 2
       const cy = rect.top + rect.height / 2
 
+      // Calculate current mouse angle
       const currentMouseAngle =
         Math.atan2(e.clientY - cy, e.clientX - cx) * (180 / Math.PI)
 
+      // Calculate delta from initial mouse angle
       const deltaAngle = currentMouseAngle - startRef.current.mouseAngle
-      setRotation(startRef.current.rotation + deltaAngle)
+
+      // Apply delta to the stored initial rotation
+      const newRotation = startRef.current.rotation + deltaAngle
+      setRotation(newRotation)
     }
   }
 
@@ -95,8 +94,8 @@ const Triangle60: React.FC = () => {
     setRotating(false)
   }
 
-  /* --------- Display angle starts from 0 --------- */
-  const displayRotation = (((rotation - INITIAL_ROTATION) % 360) + 360) % 360
+  // Calculate display rotation (0° to 360° range)
+  const displayRotation = ((rotation % 360) + 360) % 360
 
   const tickHeight = (i: number) => (i % 10 === 0 ? 16 : i % 5 === 0 ? 11 : 7)
 
@@ -117,20 +116,20 @@ const Triangle60: React.FC = () => {
           left: position.x,
           top: position.y,
           width: size,
-          height: size * Math.tan((30 * Math.PI) / 180),
-          transform: `rotate(${rotation}deg)`,
+          height: size * Math.tan((30 * Math.PI) / 180), // Height for 30-60-90 triangle
+          transform: `rotate(${rotation}deg)`, // Apply actual rotation
           pointerEvents: 'auto'
         }}
         className='absolute cursor-grab select-none'
       >
-        {/* Triangle body */}
+        {/* Triangle body - 30-60-90 triangle */}
         <div
           className='relative w-full h-full bg-[#B9DEA5]/80 backdrop-blur-sm border-2 border-gray-800 shadow-2xl'
           style={{
-            clipPath: 'polygon(0 0, 100% 0, 0 100%)'
+            clipPath: 'polygon(0 0, 100% 0, 0 100%)' // Right triangle with 30-60-90 angles
           }}
         >
-          {/* Base scale */}
+          {/* Base scale (horizontal) */}
           {ticks.map(i => (
             <div
               key={`base-${i}`}
@@ -143,7 +142,7 @@ const Triangle60: React.FC = () => {
             />
           ))}
 
-          {/* Height scale */}
+          {/* Height scale (vertical) */}
           {ticks.map(i => (
             <div
               key={`height-${i}`}
@@ -156,7 +155,7 @@ const Triangle60: React.FC = () => {
             />
           ))}
 
-          {/* CM Numbers */}
+          {/* CM Numbers (base) */}
           {ticks
             .filter(i => i % 10 === 0)
             .map(i => (
@@ -169,27 +168,27 @@ const Triangle60: React.FC = () => {
               </span>
             ))}
 
-          {/* Center angle badge (starts from 0°) */}
+          {/* Angle badge - Show display rotation (0° initially) */}
           <div className='absolute left-16 top-7 bg-gray-900/90 text-white px-3 py-1 rounded-lg text-sm font-bold shadow-lg'>
             {Math.round(displayRotation)}°
           </div>
 
-          {/* 30° on slanted edge */}
-          <div className='absolute right-10 top-10 text-sm font-bold text-gray-900 rotate-[30deg]'>
+          {/* 30° marking (at top-left corner) */}
+          <div className='absolute left-3 top-3 text-sm font-bold text-gray-900'>
             30°
           </div>
 
-          {/* 30° at left bottom */}
+          {/* 60° marking (at bottom-left corner) */}
           <div className='absolute left-3 bottom-3 text-sm font-bold text-gray-900'>
             30°
           </div>
 
-          {/* 90° marking */}
+          {/* 90° marking (at right angle) */}
           <div className='absolute right-3 top-3 text-sm font-bold text-gray-900'>
             90°
           </div>
 
-          {/* Square angle */}
+          {/* Square angle indicator */}
           <div className='absolute right-4 top-4 w-4 h-4 border-2 border-gray-900 border-t-0 border-l-0' />
 
           {/* Close */}
@@ -203,14 +202,15 @@ const Triangle60: React.FC = () => {
           {/* Resize */}
           <div
             onMouseDown={onResizeStart}
-            className='absolute left-7 bottom-10 w-4 h-14 bg-gray-900/80 cursor-ew-resize rounded shadow-inner'
+            className='absolute left-7 bottom-10 w-4 h-14 bg-gray-900/80 cursor-ew-resize rounded shadow-inner origin-center'
+            style={{ transform: 'rotate(0deg)' }}
             title='Resize'
           />
 
           {/* Rotate */}
           <div
             onMouseDown={onRotateStart}
-            className='absolute left-12 bottom-10 w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center cursor-pointer shadow-lg hover:bg-gray-800'
+            className='absolute left-12 bottom-11 w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center cursor-pointer shadow-lg hover:bg-gray-800'
             title='Rotate'
           >
             ⟳

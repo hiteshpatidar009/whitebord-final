@@ -165,8 +165,8 @@ const Triangle45: React.FC = () => {
                 {i / 10}
               </span>
             ))}
-          {/* Angle badge - Show display rotation (0° initially) */}
-          <div className='absolute left-6 top-24 bg-gray-900/90 text-white px-3 py-1 rounded-lg text-sm font-bold shadow-lg'>
+          {/* Angle badge - Show display rotation (0° initially) - Rotated 90° anticlockwise */}
+          <div className='absolute left-6 top-24 bg-gray-900/90 text-white px-3 py-1 rounded-lg text-sm font-bold shadow-lg' style={{ transform: 'rotate(-90deg)' }}>
             {Math.round(displayRotation)}°
           </div>
           {/* 45° marking */}
