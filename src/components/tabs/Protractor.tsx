@@ -43,7 +43,11 @@ const Protractor: React.FC = () => {
     e.preventDefault()
     e.stopPropagation()
     setIsResizing(true)
-    dragStart.current = { ...dragStart.current, x: e.clientX, initialSize: size }
+    dragStart.current = {
+      ...dragStart.current,
+      x: e.clientX,
+      initialSize: size
+    }
   }
 
   const handleRotateStart = (e: React.MouseEvent) => {
@@ -53,8 +57,12 @@ const Protractor: React.FC = () => {
     // Pivot is stable at position + size/2
     const cx = position.x + size / 2
     const cy = position.y + size / 2
-    const currentAngle = Math.atan2(e.clientY - cy, e.clientX - cx) * (180 / Math.PI)
-    dragStart.current = { ...dragStart.current, initialRotation: rotation - currentAngle }
+    const currentAngle =
+      Math.atan2(e.clientY - cy, e.clientX - cx) * (180 / Math.PI)
+    dragStart.current = {
+      ...dragStart.current,
+      initialRotation: rotation - currentAngle
+    }
   }
 
   /* ================= ARM INTERACTION HANDLERS ================= */
@@ -77,13 +85,17 @@ const Protractor: React.FC = () => {
       } else if (isResizing) {
         const delta = e.clientX - dragStart.current.x
         // Limit size
-        const newSize = Math.max(200, Math.min(800, dragStart.current.initialSize + delta * 2))
+        const newSize = Math.max(
+          200,
+          Math.min(800, dragStart.current.initialSize + delta * 2)
+        )
         setSize(newSize)
       } else if (isRotating) {
         // Pivot is stable at position + size/2
         const cx = position.x + size / 2
         const cy = position.y + size / 2
-        const angle = Math.atan2(e.clientY - cy, e.clientX - cx) * (180 / Math.PI)
+        const angle =
+          Math.atan2(e.clientY - cy, e.clientX - cx) * (180 / Math.PI)
         setRotation(angle + dragStart.current.initialRotation)
       } else if (draggingArm) {
         // Pivot is stable at position + size/2
@@ -91,7 +103,8 @@ const Protractor: React.FC = () => {
         const cy = position.y + size / 2
 
         // Mouse angle in screen calculation
-        let mouseAngle = Math.atan2(e.clientY - cy, e.clientX - cx) * (180 / Math.PI)
+        let mouseAngle =
+          Math.atan2(e.clientY - cy, e.clientX - cx) * (180 / Math.PI)
 
         // Adjust for protractor's own rotation
         // Correct for screen rotation
@@ -101,8 +114,8 @@ const Protractor: React.FC = () => {
         while (localAngle < 0) localAngle += 360
         while (localAngle >= 360) localAngle -= 360
 
-        // Clamp to semi-circle (0 to 180) for UX? 
-        // Actually typically protractors are 0-180. 
+        // Clamp to semi-circle (0 to 180) for UX?
+        // Actually typically protractors are 0-180.
         // In local coords: 0 (Right) -> -90 (Up) -> 180 (Left).
         // Let's model local coordinates as: 0° = Right, 180° = Left. Positive Counter-Clockwise.
         // Screen Y is down, so atan2 returns positive for down, negative for up.
@@ -122,9 +135,9 @@ const Protractor: React.FC = () => {
         let deg = Math.atan2(-localDy, localDx) * (180 / Math.PI)
         if (deg < 0) deg += 360
 
-        // Clamp to 0-180 logic (approximate for usability). 
+        // Clamp to 0-180 logic (approximate for usability).
         // Actually let's just let it be free but snap/clamp if needed.
-        // The protractor is a semi-circle. It exists in Y < 0 (locally). 
+        // The protractor is a semi-circle. It exists in Y < 0 (locally).
         // So expected angles are 0 to 180.
         if (deg > 180) {
           // If dragging below, clamp to nearest side
@@ -150,8 +163,15 @@ const Protractor: React.FC = () => {
       window.removeEventListener('mousemove', handleMouseMove)
       window.removeEventListener('mouseup', handleMouseUp)
     }
-  }, [isDragging, isResizing, isRotating, draggingArm, size, rotation, position])
-
+  }, [
+    isDragging,
+    isResizing,
+    isRotating,
+    draggingArm,
+    size,
+    rotation,
+    position
+  ])
 
   // -- Rendering Helpers --
 
@@ -195,9 +215,11 @@ const Protractor: React.FC = () => {
       ticks.push(
         <line
           key={`tick-${i}`}
-          x1={p1.x} y1={p1.y}
-          x2={p2.x} y2={p2.y}
-          stroke={isMajor ? "#000" : "#666"}
+          x1={p1.x}
+          y1={p1.y}
+          x2={p2.x}
+          y2={p2.y}
+          stroke={isMajor ? '#000' : '#666'}
           strokeWidth={isMajor ? 1.5 : 1}
         />
       )
@@ -211,10 +233,10 @@ const Protractor: React.FC = () => {
             x={pText.x}
             y={pText.y}
             fontSize={10}
-            fontWeight="600"
-            textAnchor="middle"
-            dominantBaseline="middle"
-            fill="#333"
+            fontWeight='600'
+            textAnchor='middle'
+            dominantBaseline='middle'
+            fill='#333'
             transform={`rotate(${90 - i} ${pText.x} ${pText.y})`} // Rotate text to follow curve
           >
             {i}
@@ -231,7 +253,8 @@ const Protractor: React.FC = () => {
 
     const innerRadius = rOuter - 50
 
-    for (let i = 0; i <= 180; i += 10) { // Only every 10 for inner to reduce clutter
+    for (let i = 0; i <= 180; i += 10) {
+      // Only every 10 for inner to reduce clutter
       const val = 180 - i
       const pText = degToSvg(i, innerRadius)
       ticks.push(
@@ -240,9 +263,9 @@ const Protractor: React.FC = () => {
           x={pText.x}
           y={pText.y}
           fontSize={9}
-          textAnchor="middle"
-          dominantBaseline="middle"
-          fill="#DC2626" // Red color for inner scale
+          textAnchor='middle'
+          dominantBaseline='middle'
+          fill='#DC2626' // Red color for inner scale
           transform={`rotate(${90 - i} ${pText.x} ${pText.y})`}
         >
           {val}
@@ -263,7 +286,7 @@ const Protractor: React.FC = () => {
   return (
     <div
       ref={ref}
-      className="fixed z-[1000] select-none"
+      className='fixed z-[1000] select-none'
       style={{
         left: position.x,
         top: position.y,
@@ -276,67 +299,75 @@ const Protractor: React.FC = () => {
     >
       {/* Main Body */}
       <div
-        className="absolute inset-0 cursor-grab active:cursor-grabbing"
+        className='absolute inset-0 cursor-grab active:cursor-grabbing'
         onMouseDown={handleMouseDown}
         style={{ pointerEvents: 'auto' }}
       >
         <svg
-          width="100%"
-          height="100%"
+          width='100%'
+          height='100%'
           viewBox={`0 0 ${size} ${size / 2}`}
           style={{ overflow: 'visible' }}
         >
-          {/* Background Glass Semicircle */}
+          {/* Background Glass Semicircle - UPDATED TO MATCH THEME */}
           <path
-            d={`M 0,${size / 2} A ${size / 2},${size / 2} 0 0,1 ${size},${size / 2} Z`}
-            fill="rgba(255, 255, 255, 0.6)"
-            stroke="rgba(0,0,0,0.2)"
-            strokeWidth="1"
-            className="backdrop-blur-md"
+            d={`M 0,${size / 2} A ${size / 2},${size / 2} 0 0,1 ${size},${
+              size / 2
+            } Z`}
+            fill='rgba(5, 255, 41, 0.1)' // #05FF29 with 10% opacity
+            stroke='#000'
+            strokeWidth='2.5'
+            className='backdrop-blur-sm'
           />
 
           {/* Scales */}
           {renderTicks()}
 
           {/* Pivot Point */}
-          <circle cx={size / 2} cy={size / 2} r={5} fill="#000" />
+          <circle cx={size / 2} cy={size / 2} r={5} fill='#000' />
 
           {/* Arm 1 (Blue) */}
           <line
-            x1={size / 2} y1={size / 2}
-            x2={pArm1.x} y2={pArm1.y}
-            stroke="#2563EB"
-            strokeWidth="3"
-            strokeLinecap="round"
+            x1={size / 2}
+            y1={size / 2}
+            x2={pArm1.x}
+            y2={pArm1.y}
+            stroke='#2563EB'
+            strokeWidth='3'
+            strokeLinecap='round'
           />
           {/* Arm 1 Handle */}
           <circle
-            cx={pArm1.x} cy={pArm1.y}
+            cx={pArm1.x}
+            cy={pArm1.y}
             r={10}
-            fill="#2563EB"
-            className="cursor-pointer hover:scale-110 transition-transform protractor-control"
-            onMouseDown={(e) => handleArmMouseDown(e, 1)}
-            stroke="#FFF"
-            strokeWidth="2"
+            fill='#2563EB'
+            className='cursor-pointer hover:scale-110 transition-transform protractor-control'
+            onMouseDown={e => handleArmMouseDown(e, 1)}
+            stroke='#FFF'
+            strokeWidth='2'
           />
 
           {/* Arm 2 (Red) */}
           <line
-            x1={size / 2} y1={size / 2}
-            x2={pArm2.x} y2={pArm2.y}
-            stroke="#DC2626"
-            strokeWidth="3"
-            strokeLinecap="round"
+            x1={size / 2}
+            y1={size / 2}
+            x2={pArm2.x}
+            y2={pArm2.y}
+            stroke='#DC2626'
+            strokeWidth='3'
+            strokeLinecap='round'
           />
           {/* Arm 2 Handle */}
           <circle
-            cx={pArm2.x} cy={pArm2.y}
+            cx={pArm2.x}
+            cy={pArm2.y}
             r={10}
-            fill="#DC2626"
-            className="cursor-pointer hover:scale-110 transition-transform protractor-control"
-            onMouseDown={(e) => handleArmMouseDown(e, 2)}
-            stroke="#FFF"
-            strokeWidth="2"
+            fill='#DC2626'
+            className='cursor-pointer hover:scale-110 transition-transform protractor-control'
+            onMouseDown={e => handleArmMouseDown(e, 2)}
+            stroke='#FFF'
+            strokeWidth='2'
           />
 
           {/* Angle Display Arc */}
@@ -344,19 +375,17 @@ const Protractor: React.FC = () => {
         </svg>
 
         {/* Live Angle Display Box (Floating at Center) */}
-        <div
-          className="absolute left-1/2 bottom-2 -translate-x-1/2 bg-gray-900/90 text-white px-3 py-1 rounded-full text-sm font-bold shadow-lg pointer-events-none"
-        >
+        <div className='absolute left-1/2 bottom-2 -translate-x-1/2 bg-gray-900/90 text-white px-3 py-1 rounded-full text-sm font-bold shadow-lg pointer-events-none'>
           {displayAngle}°
         </div>
       </div>
 
       {/* Controls Layout (Buttons) */}
 
-      {/* Close Button */}
+      {/* Close Button - UPDATED TO MATCH THEME */}
       <button
-        className="absolute -top-4 left-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-red-500 text-white flex items-center justify-center shadow-lg hover:bg-red-600 protractor-control pointer-events-auto"
-        onClick={(e) => {
+        className='absolute -top-4 left-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-gray-800 text-white flex items-center justify-center shadow-lg hover:bg-gray-900 border border-gray-700 protractor-control pointer-events-auto'
+        onClick={e => {
           e.preventDefault()
           e.stopPropagation()
           setShowProtractor(false)
@@ -365,27 +394,40 @@ const Protractor: React.FC = () => {
         ×
       </button>
 
-      {/* Resize Handle (Bottom Right corner area) */}
+      {/* Resize Handle (Bottom Right corner area) - UPDATED TO MATCH THEME */}
       <div
-        className="absolute bottom-0 right-0 translate-x-1/2 translate-y-1/2 w-8 h-8 bg-white border-2 border-gray-400 rounded-full cursor-se-resize flex items-center justify-center shadow-sm protractor-control pointer-events-auto"
+        className='absolute bottom-0 right-0 translate-x-1/2 translate-y-1/2 w-8 h-8 bg-gray-800/80 border-2 border-gray-700 rounded-full cursor-se-resize flex items-center justify-center shadow-lg protractor-control pointer-events-auto hover:bg-gray-900'
         onMouseDown={handleResizeStart}
       >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-          <path d="M15 3h6v6M9 21H3v-6" />
+        <svg
+          width='14'
+          height='14'
+          viewBox='0 0 24 24'
+          fill='none'
+          stroke='white'
+          strokeWidth='3'
+        >
+          <path d='M15 3h6v6M9 21H3v-6' />
         </svg>
       </div>
 
-      {/* Rotate Handle (Bottom Left corner area) */}
+      {/* Rotate Handle (Bottom Left corner area) - UPDATED TO MATCH THEME */}
       <div
-        className="absolute bottom-0 left-0 -translate-x-1/2 translate-y-1/2 w-8 h-8 bg-white border-2 border-gray-400 rounded-full cursor-move flex items-center justify-center shadow-sm protractor-control pointer-events-auto"
+        className='absolute bottom-0 left-0 -translate-x-1/2 translate-y-1/2 w-8 h-8 bg-gray-800/80 border-2 border-gray-700 rounded-full cursor-move flex items-center justify-center shadow-lg protractor-control pointer-events-auto hover:bg-gray-900'
         onMouseDown={handleRotateStart}
       >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-          <path d="M3 3v5h5" />
+        <svg
+          width='16'
+          height='16'
+          viewBox='0 0 24 24'
+          fill='none'
+          stroke='white'
+          strokeWidth='2.5'
+        >
+          <path d='M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8' />
+          <path d='M3 3v5h5' />
         </svg>
       </div>
-
     </div>
   )
 }
