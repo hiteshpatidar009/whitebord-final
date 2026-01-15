@@ -124,9 +124,13 @@ const Triangle60: React.FC = () => {
       >
         {/* Triangle body - 30-60-90 triangle */}
         <div
-          className='relative w-full h-full bg-[#B9DEA5]/80 backdrop-blur-sm border-2 border-gray-800 shadow-2xl'
+          className='relative w-full h-full 
+             bg-[#05FF29]/10
+             backdrop-blur-sm
+             border-[2.5px] border-black 
+             shadow-2xl'
           style={{
-            clipPath: 'polygon(0 0, 100% 0, 0 100%)' // Right triangle with 30-60-90 angles
+            clipPath: 'polygon(0 0, 100% 0, 0 100%)'
           }}
         >
           {/* Base scale (horizontal) */}
