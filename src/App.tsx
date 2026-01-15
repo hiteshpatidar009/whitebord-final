@@ -3,6 +3,7 @@ import { Toolbar } from './components/Toolbar';
 import { ShapeToolbar } from './components/ShapeToolbar';
 import { PdfViewer } from './components/PdfViewer';
 import FloatingStopwatch from './components/Stopwatch';
+import Timer from './components/GlassClock';
 import Ruler from './components/tabs/Ruler';
 import Triangle45 from './components/tabs/Triangle45';
 import Triangle60 from './components/tabs/Triangle60';
@@ -19,6 +20,7 @@ function App() {
       <ShapeToolbar />
       <PdfViewer />
       <FloatingStopwatch />
+      <Timer />
       {showRuler && <Ruler />}
       {showTriangle45 && <Triangle45 />}
       {showTriangle60 && <Triangle60 />}
