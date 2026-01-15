@@ -131,7 +131,14 @@ const Ruler: React.FC = () => {
         className='absolute cursor-grab select-none'
       >
         {/* Ruler Body with realistic look */}
-        <div className='relative h-28 rounded-xl bg-[#B9DEA5] border-2 border-gray-800 shadow-2xl shadow-gray-900/30 flex items-center overflow-hidden'>
+        <div
+          className='relative h-28 rounded-xl 
+  bg-[#05FF29]/10 
+  backdrop-blur-sm 
+  border-[2.5px] border-black 
+  shadow-2xl 
+  flex items-center overflow-hidden'
+        >
           {/* Top edge highlight */}
           <div className='absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-white/20 to-transparent'></div>
 
