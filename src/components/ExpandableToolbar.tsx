@@ -2,11 +2,11 @@ import React from "react";
 import {
   Chrome,
   Monitor,
-  Smartphone,
-  LayoutGrid,
-  Camera,
+  // Smartphone,
+  // LayoutGrid,
+    Timer,
   Ruler,
-  Compass,
+  // Compass,
   Divide,
   Circle,
   Move,
@@ -28,7 +28,7 @@ type ExpandableToolbarProps = {
 
 const ExpandableToolbar: React.FC<ExpandableToolbarProps> = ({ visible, onClose, onChromeClick, onPcClick, onBeforePcClick }) => {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
-  const { setShowRuler, setShowTriangle45, setShowTriangle60, setShowProtractor, setShowNumberLine, setShowDivider } = useWhiteboardStore();
+  const { setShowRuler, setShowTriangle45, setShowTriangle60, setShowProtractor, setShowNumberLine, setShowDivider, setShowStopwatch } = useWhiteboardStore();
 
   const handlePcButtonClick = () => {
     if (onBeforePcClick) {
@@ -51,14 +51,14 @@ const ExpandableToolbar: React.FC<ExpandableToolbarProps> = ({ visible, onClose,
   return (
     <div className="fixed -top-0  left-1/2 -translate-x-1/2 z-[999]">
       {/* VERTICAL SCROLL CONTAINER */}
-      <div className="w-[90vw] max-w-[1360px] max-h-[64px] overflow-y-auto bg-white rounded-full shadow-lg border px-4 py-2 space-y-6">
+      <div className="w-[90vw] max-w-[1360px] max-h-[55px] overflow-y-auto bg-white rounded-full shadow-lg border px-4 py-1 space-y-6">
 
         {/* ================= SECTION 1 ================= */}
           <div className="flex items-center gap-5 overflow-x-auto ">
             <button onClick={onClose} className="text-gray-500">
               <Plus size={20} className="rotate-45" />
             </button>
-            <div className="inline-flex items-center gap-3 px-4 py-2 rounded-full bg-black text-white text-lg font-semibold">
+            <div className="inline-flex items-center gap-3 px-4 py-2 rounded-full bg-[#1000af] text-white text-lg font-semibold">
             Chrome | PC | App
           </div>
             <Pill icon={<Chrome size={18} />} label="Chrome" onClick={onChromeClick} />
@@ -70,7 +70,7 @@ const ExpandableToolbar: React.FC<ExpandableToolbarProps> = ({ visible, onClose,
               accept="image/png,image/jpeg,image/webp,application/pdf"
               onChange={handleFileChange}
             />
-            {/* <Pill icon={<Smartphone size={18} />} label="App" /> */}
+            <Pill icon={<Timer size={18} />} label="Stopwatch" onClick={() => setShowStopwatch(true)} />
             {/* <Pill icon={<LayoutGrid size={18} />} label="Widget" /> */}
             {/* <Pill icon={<Camera size={18} />} label="Webcam" /> */}
           </div>
@@ -80,7 +80,7 @@ const ExpandableToolbar: React.FC<ExpandableToolbarProps> = ({ visible, onClose,
             <button onClick={onClose} className="text-gray-500">
               <Plus size={20} className="rotate-45" />
             </button>
-            <div className="inline whitespace-nowrap items-center gap-3 px-4  py-2 rounded-full bg-black text-white text-lg font-semibold">
+            <div className="inline whitespace-nowrap items-center gap-3 px-4  py-2 rounded-full bg-[#1000af] text-white text-lg font-semibold">
             GEOMETRY TOOLS
           </div>
             <Pill icon={<Ruler size={18} />} label="Ruler" onClick={() => setShowRuler(true)} />
@@ -97,7 +97,7 @@ const ExpandableToolbar: React.FC<ExpandableToolbarProps> = ({ visible, onClose,
             <button onClick={onClose} className="text-gray-500">
               <Plus size={20} className="rotate-45" />
             </button>
-            <div className="inline-flex items-center gap-3 px-4 py-2 rounded-full bg-black text-white text-lg font-semibold">
+            <div className="inline-flex items-center gap-3 px-4 py-2 rounded-full bg-[#1000af] text-white text-lg font-semibold">
             3D & OTHER TOOLS
           </div>
             <Pill icon={<Dice3 size={18} />} label="3D Dice" />

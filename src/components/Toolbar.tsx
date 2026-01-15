@@ -2,7 +2,7 @@ import React, { useRef, useEffect } from 'react';
 import { useWhiteboardStore } from '../store/useWhiteboardStore';
 import { v4 as uuidv4 } from 'uuid';
 import { 
-  Pen, Hand, Eraser, Shapes, Type, Undo, Redo, FileUp, MousePointer2, PenLine, Trash2, Image as ImageIcon, Highlighter, PaintBucket, Maximize2, Upload, X, Timer , Plus
+  Pen, Hand, Eraser, Shapes, Type, Undo, Redo, FileUp, MousePointer2, PenLine, Trash2, Image as ImageIcon, Highlighter, PaintBucket, Maximize2, Upload, X , Plus
 } from 'lucide-react';
 import ExpandableToolbar from "./ExpandableToolbar";
 import { COLORS, type ToolType } from '../types';
@@ -15,7 +15,8 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.vers
 export const Toolbar: React.FC = () => {
   const { 
     tool, setTool, color, setColor, size, setSize, undo, redo, saveHistory, clear, addItem, backgroundImage, setBackgroundImage, setPdfPages, setCurrentPdfPage, copy, paste,
-    textOptions, setSelectedId, showStopwatch, setShowStopwatch
+    textOptions, setSelectedId,
+    //  showStopwatch, setShowStopwatch
   } = useWhiteboardStore();
   
   // const handleToolClick = (toolId: ToolType) => {
@@ -563,13 +564,13 @@ export const Toolbar: React.FC = () => {
             <Trash2 size={20} />
           </button>
 
-          <button 
+          {/* <button 
             onClick={() => setShowStopwatch(!showStopwatch)} 
             className={`p-2 rounded-full transition-colors ${showStopwatch ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-100 text-gray-600'}`} 
             title="Stopwatch"
           >
             <Timer size={20} />
-          </button>
+          </button> */}
 
           <div className="relative">
             <button 
