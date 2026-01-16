@@ -116,7 +116,8 @@ const Triangle60: React.FC = () => {
           left: position.x,
           top: position.y,
           width: size,
-          height: size * Math.tan((30 * Math.PI) / 180), // Height for 30-60-90 triangle
+          height: size * Math.tan((30 * Math.PI) / 180), // Height for 30-60-
+          //  triangle
           transform: `rotate(${rotation}deg)`, // Apply actual rotation
           pointerEvents: 'auto'
         }}
@@ -147,17 +148,21 @@ const Triangle60: React.FC = () => {
           ))}
 
           {/* Height scale (vertical) - Left Edge */}
-          {ticks.filter(i => (i * CM_IN_PX) / 10 <= size * Math.tan((30 * Math.PI) / 180)).map(i => (
-            <div
-              key={`height-${i}`}
-              className='absolute left-0 bg-gray-900'
-              style={{
-                top: `${(i * CM_IN_PX) / 10}px`,
-                height: '1px',
-                width: tickHeight(i)
-              }}
-            />
-          ))}
+          {ticks
+            .filter(
+              i => (i * CM_IN_PX) / 10 <= size * Math.tan((30 * Math.PI) / 180)
+            )
+            .map(i => (
+              <div
+                key={`height-${i}`}
+                className='absolute left-0 bg-gray-900'
+                style={{
+                  top: `${(i * CM_IN_PX) / 10}px`,
+                  height: '1px',
+                  width: tickHeight(i)
+                }}
+              />
+            ))}
 
           {/* CM Numbers (base) - Horizontal Edge (Top) */}
           {ticks
@@ -174,11 +179,18 @@ const Triangle60: React.FC = () => {
                 {i / 10}
               </span>
             ))}
-          <span className='absolute top-6 left-2 text-[10px] font-bold text-gray-900'>cm</span>
+          <span className='absolute top-6 left-2 text-[10px] font-bold text-gray-900'>
+            cm
+          </span>
 
           {/* CM Numbers (height) - Vertical Edge (Left) */}
           {ticks
-            .filter(i => i % 10 === 0 && i !== 0 && (i * CM_IN_PX) / 10 <= size * Math.tan((30 * Math.PI) / 180))
+            .filter(
+              i =>
+                i % 10 === 0 &&
+                i !== 0 &&
+                (i * CM_IN_PX) / 10 <= size * Math.tan((30 * Math.PI) / 180)
+            )
             .map(i => (
               <span
                 key={`num-height-${i}`}
@@ -208,11 +220,6 @@ const Triangle60: React.FC = () => {
             60°
           </div>
 
-          {/* 90° marking (at top-left) */}
-          <div className='absolute left-6 top-6 text-sm font-bold text-gray-900'>
-            90°
-          </div>
-
           {/* 30° marking (at top-right) */}
           <div className='absolute right-12 top-2 text-sm font-bold text-gray-900'>
             30°
@@ -224,7 +231,11 @@ const Triangle60: React.FC = () => {
           {/* Close */}
           <button
             onClick={() => setShowTriangle60(false)}
-            className='absolute left-16 top-10 w-7 h-7 rounded-full bg-gray-800 text-white flex items-center justify-center border border-gray-700 hover:bg-gray-900'
+            className='absolute left-12 bottom-24 h-7 w-7 rounded-full
+             bg-gray-800 text-white flex items-center justify-center
+             border border-gray-700 shadow-md
+             hover:bg-gray-900 hover:scale-110 active:scale-95'
+            title='Close'
           >
             ×
           </button>
@@ -232,7 +243,7 @@ const Triangle60: React.FC = () => {
           {/* Resize */}
           <div
             onMouseDown={onResizeStart}
-            className='absolute right-10 top-0 w-4 h-14 bg-gray-900/80 cursor-ew-resize rounded shadow-inner origin-center'
+            className='absolute right-12 top-[-10px] w-4 h-14 cursor-ew-resize rounded bg-gray-900/80 shadow-inner origin-center'
             style={{ transform: 'rotate(90deg)' }}
             title='Resize'
           />
