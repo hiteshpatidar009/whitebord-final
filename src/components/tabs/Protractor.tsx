@@ -22,6 +22,8 @@ const Protractor: React.FC = () => {
   const [draggingArm, setDraggingArm] = useState<1 | 2 | null>(null)
 
   const dragStart = useRef({ x: 0, y: 0, initialSize: 0, initialRotation: 0 })
+  const lastAngleUpdate = useRef<number>(0)
+  const animationFrameRef = useRef<number | null>(null)
 
   /* ================= TOOL TRANSFORM HANDLERS ================= */
 
@@ -71,83 +73,88 @@ const Protractor: React.FC = () => {
     e.preventDefault() // Important to stop browser drag/select behavior
     e.stopPropagation()
     setDraggingArm(armIndex)
+    lastAngleUpdate.current = Date.now()
+  }
+
+  /* ================= CALCULATE ANGLE FOR ARM ================= */
+
+  const calculateAngle = (clientX: number, clientY: number): number => {
+    const cx = position.x + size / 2
+    const cy = position.y + size / 2
+
+    // Calculate vector from pivot to mouse
+    const dx = clientX - cx
+    const dy = clientY - cy
+
+    // Rotate vector by -rotation to align with protractor
+    const rad = -rotation * (Math.PI / 180)
+    const localDx = dx * Math.cos(rad) - dy * Math.sin(rad)
+    const localDy = dx * Math.sin(rad) + dy * Math.cos(rad)
+
+    // Calculate angle with smoothing
+    let deg = Math.atan2(-localDy, localDx) * (180 / Math.PI)
+    if (deg < 0) deg += 360
+
+    // Clamp to protractor range (0-180)
+    if (deg > 180) {
+      // If dragging below, snap to nearest side with some hysteresis
+      if (deg > 270) deg = 0
+      else deg = 180
+    }
+
+    // Apply rounding to reduce jitter
+    return Math.round(deg / 0.5) * 0.5 // Round to nearest 0.5 degree
   }
 
   /* ================= GLOBAL MOUSE HANDLERS ================= */
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      if (isDragging) {
-        setPosition({
-          x: e.clientX - dragStart.current.x,
-          y: e.clientY - dragStart.current.y
-        })
-      } else if (isResizing) {
-        const delta = e.clientX - dragStart.current.x
-        // Limit size
-        const newSize = Math.max(
-          200,
-          Math.min(800, dragStart.current.initialSize + delta * 2)
-        )
-        setSize(newSize)
-      } else if (isRotating) {
-        // Pivot is stable at position + size/2
-        const cx = position.x + size / 2
-        const cy = position.y + size / 2
-        const angle =
-          Math.atan2(e.clientY - cy, e.clientX - cx) * (180 / Math.PI)
-        setRotation(angle + dragStart.current.initialRotation)
-      } else if (draggingArm) {
-        // Pivot is stable at position + size/2
-        const cx = position.x + size / 2
-        const cy = position.y + size / 2
-
-        // Mouse angle in screen calculation
-        let mouseAngle =
-          Math.atan2(e.clientY - cy, e.clientX - cx) * (180 / Math.PI)
-
-        // Adjust for protractor's own rotation
-        // Correct for screen rotation
-        let localAngle = mouseAngle - rotation
-
-        // Normalize to 0-360
-        while (localAngle < 0) localAngle += 360
-        while (localAngle >= 360) localAngle -= 360
-
-        // Clamp to semi-circle (0 to 180) for UX?
-        // Actually typically protractors are 0-180.
-        // In local coords: 0 (Right) -> -90 (Up) -> 180 (Left).
-        // Let's model local coordinates as: 0° = Right, 180° = Left. Positive Counter-Clockwise.
-        // Screen Y is down, so atan2 returns positive for down, negative for up.
-        // We need to invert Y for standard math.
-
-        // Let's re-calculate more carefully.
-        // Vector from Pivot to Mouse
-        const dx = e.clientX - cx
-        const dy = e.clientY - cy
-
-        // Rotate vector by -rotation to align with protractor
-        const rad = -rotation * (Math.PI / 180)
-        const localDx = dx * Math.cos(rad) - dy * Math.sin(rad)
-        const localDy = dx * Math.sin(rad) + dy * Math.cos(rad)
-
-        // Now atan2(-localDy, localDx) because typically Up is +Y in math, but -Y in screen
-        let deg = Math.atan2(-localDy, localDx) * (180 / Math.PI)
-        if (deg < 0) deg += 360
-
-        // Clamp to 0-180 logic (approximate for usability).
-        // Actually let's just let it be free but snap/clamp if needed.
-        // The protractor is a semi-circle. It exists in Y < 0 (locally).
-        // So expected angles are 0 to 180.
-        if (deg > 180) {
-          // If dragging below, clamp to nearest side
-          if (deg > 270) deg = 0
-          else deg = 180
-        }
-
-        if (draggingArm === 1) setAngle1(Math.round(deg))
-        else setAngle2(Math.round(deg))
+      // Cancel any pending animation frame
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current)
       }
+
+      // Use requestAnimationFrame for smooth updates
+      animationFrameRef.current = requestAnimationFrame(() => {
+        if (isDragging) {
+          setPosition({
+            x: e.clientX - dragStart.current.x,
+            y: e.clientY - dragStart.current.y
+          })
+        } else if (isResizing) {
+          const delta = e.clientX - dragStart.current.x
+          // Limit size
+          const newSize = Math.max(
+            200,
+            Math.min(800, dragStart.current.initialSize + delta * 2)
+          )
+          setSize(newSize)
+        } else if (isRotating) {
+          // Pivot is stable at position + size/2
+          const cx = position.x + size / 2
+          const cy = position.y + size / 2
+          const angle =
+            Math.atan2(e.clientY - cy, e.clientX - cx) * (180 / Math.PI)
+          setRotation(angle + dragStart.current.initialRotation)
+        } else if (draggingArm) {
+          // Throttle angle updates to reduce jitter
+          const now = Date.now()
+          if (now - lastAngleUpdate.current < 16) {
+            // ~60fps
+            return
+          }
+          lastAngleUpdate.current = now
+
+          const newAngle = calculateAngle(e.clientX, e.clientY)
+
+          if (draggingArm === 1) {
+            setAngle1(newAngle)
+          } else {
+            setAngle2(newAngle)
+          }
+        }
+      })
     }
 
     const handleMouseUp = () => {
@@ -155,13 +162,21 @@ const Protractor: React.FC = () => {
       setIsResizing(false)
       setIsRotating(false)
       setDraggingArm(null)
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current)
+        animationFrameRef.current = null
+      }
     }
 
     window.addEventListener('mousemove', handleMouseMove)
     window.addEventListener('mouseup', handleMouseUp)
+
     return () => {
       window.removeEventListener('mousemove', handleMouseMove)
       window.removeEventListener('mouseup', handleMouseUp)
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current)
+      }
     }
   }, [
     isDragging,
@@ -177,29 +192,21 @@ const Protractor: React.FC = () => {
 
   // Radius calculations
   const rOuter = size / 2
-  const rInner = rOuter - 90 // Space for ticks
 
   // Convert degrees to SVG coordinates (0 at right, 180 at left, counter-clockwise)
-  // cx, cy are at (size/2, size/2) in SVG viewbox, but since it's a semicircle we can make viewbox different
-  // Let's make viewBox correspond to the full width and half height.
-  // ViewBox: 0 0 size (size/2)
-  // Pivot: (size/2, size/2)
   const pivotX = size / 2
   const pivotY = size / 2
 
   const degToSvg = (deg: number, radius: number) => {
-    // 0 deg = Right (1, 0)
-    // 90 deg = Up (0, -1)
-    // 180 deg = Left (-1, 0)
     const rad = (deg * Math.PI) / 180
     return {
-      x: pivotX + radius * Math.cos(-rad), // -rad because Y is down in SVG
+      x: pivotX + radius * Math.cos(-rad),
       y: pivotY + radius * Math.sin(-rad)
     }
   }
 
-  // Generate ticks
-  const renderTicks = () => {
+  // Generate ticks with memoization to prevent unnecessary re-renders
+  const renderTicks = React.useMemo(() => {
     const ticks = []
     // Outer scale 0 to 180
     for (let i = 0; i <= 180; i++) {
@@ -237,7 +244,7 @@ const Protractor: React.FC = () => {
             textAnchor='middle'
             dominantBaseline='middle'
             fill='#333'
-            transform={`rotate(${90 - i} ${pText.x} ${pText.y})`} // Rotate text to follow curve
+            transform={`rotate(${90 - i} ${pText.x} ${pText.y})`}
           >
             {i}
           </text>
@@ -245,16 +252,9 @@ const Protractor: React.FC = () => {
       }
     }
 
-    // Inner scale 180 to 0 (Decreasing CCW, i.e. 0 at Left, 180 at Right)
-    // Actually typically inner scale goes 180 (left) to 0 (right)? Or 0 (left) to 180 (right)?
-    // Standard protractor:
-    // Outer: 0 (Right) -> 180 (Left)
-    // Inner: 180 (Right) -> 0 (Left)
-
+    // Inner scale
     const innerRadius = rOuter - 50
-
     for (let i = 0; i <= 180; i += 10) {
-      // Only every 10 for inner to reduce clutter
       const val = 180 - i
       const pText = degToSvg(i, innerRadius)
       ticks.push(
@@ -265,7 +265,7 @@ const Protractor: React.FC = () => {
           fontSize={9}
           textAnchor='middle'
           dominantBaseline='middle'
-          fill='#DC2626' // Red color for inner scale
+          fill='#DC2626'
           transform={`rotate(${90 - i} ${pText.x} ${pText.y})`}
         >
           {val}
@@ -274,7 +274,7 @@ const Protractor: React.FC = () => {
     }
 
     return ticks
-  }
+  }, [rOuter])
 
   const armLength = rOuter + 40 // Extend beyond the protractor body
   const pArm1 = degToSvg(angle1, armLength)
@@ -294,7 +294,7 @@ const Protractor: React.FC = () => {
         height: size / 2,
         transform: `rotate(${rotation}deg)`,
         transformOrigin: 'bottom center',
-        pointerEvents: 'none' // The container itself passes through, children catch events
+        pointerEvents: 'none'
       }}
     >
       {/* Main Body */}
@@ -309,19 +309,19 @@ const Protractor: React.FC = () => {
           viewBox={`0 0 ${size} ${size / 2}`}
           style={{ overflow: 'visible' }}
         >
-          {/* Background Glass Semicircle - UPDATED TO MATCH THEME */}
+          {/* Background Glass Semicircle */}
           <path
             d={`M 0,${size / 2} A ${size / 2},${size / 2} 0 0,1 ${size},${
               size / 2
             } Z`}
-            fill='rgba(5, 255, 41, 0.1)' // #05FF29 with 10% opacity
+            fill='rgba(5, 255, 41, 0.1)'
             stroke='#000'
             strokeWidth='2.5'
             className='backdrop-blur-sm'
           />
 
           {/* Scales */}
-          {renderTicks()}
+          {renderTicks}
 
           {/* Pivot Point */}
           <circle cx={size / 2} cy={size / 2} r={5} fill='#000' />
@@ -336,13 +336,13 @@ const Protractor: React.FC = () => {
             strokeWidth='3'
             strokeLinecap='round'
           />
-          {/* Arm 1 Handle */}
+          {/* Arm 1 Handle - Reduced hover effect to prevent visual noise */}
           <circle
             cx={pArm1.x}
             cy={pArm1.y}
             r={10}
             fill='#2563EB'
-            className='cursor-pointer hover:scale-110 transition-transform protractor-control'
+            className='cursor-pointer protractor-control transition-opacity duration-100'
             onMouseDown={e => handleArmMouseDown(e, 1)}
             stroke='#FFF'
             strokeWidth='2'
@@ -358,31 +358,28 @@ const Protractor: React.FC = () => {
             strokeWidth='3'
             strokeLinecap='round'
           />
-          {/* Arm 2 Handle */}
+          {/* Arm 2 Handle - Reduced hover effect to prevent visual noise */}
           <circle
             cx={pArm2.x}
             cy={pArm2.y}
             r={10}
             fill='#DC2626'
-            className='cursor-pointer hover:scale-110 transition-transform protractor-control'
+            className='cursor-pointer protractor-control transition-opacity duration-100'
             onMouseDown={e => handleArmMouseDown(e, 2)}
             stroke='#FFF'
             strokeWidth='2'
           />
-
-          {/* Angle Display Arc */}
-          {/* Optional: Draw a small arc between lines to show measured angle */}
         </svg>
 
-        {/* Live Angle Display Box (Floating at Center) */}
+        {/* Live Angle Display Box */}
         <div className='absolute left-1/2 bottom-2 -translate-x-1/2 bg-gray-900/90 text-white px-3 py-1 rounded-full text-sm font-bold shadow-lg pointer-events-none'>
           {displayAngle}°
         </div>
       </div>
 
-      {/* Controls Layout (Buttons) */}
+      {/* Controls */}
 
-      {/* Close Button - UPDATED TO MATCH THEME */}
+      {/* Close Button */}
       <button
         className='absolute -top-4 left-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-gray-800 text-white flex items-center justify-center shadow-lg hover:bg-gray-900 border border-gray-700 protractor-control pointer-events-auto'
         onClick={e => {
@@ -394,7 +391,7 @@ const Protractor: React.FC = () => {
         ×
       </button>
 
-      {/* Resize Handle (Bottom Right corner area) - UPDATED TO MATCH THEME */}
+      {/* Resize Handle */}
       <div
         className='absolute bottom-0 right-0 translate-x-1/2 translate-y-1/2 w-8 h-8 bg-gray-800/80 border-2 border-gray-700 rounded-full cursor-se-resize flex items-center justify-center shadow-lg protractor-control pointer-events-auto hover:bg-gray-900'
         onMouseDown={handleResizeStart}
@@ -411,7 +408,7 @@ const Protractor: React.FC = () => {
         </svg>
       </div>
 
-      {/* Rotate Handle (Bottom Left corner area) - UPDATED TO MATCH THEME */}
+      {/* Rotate Handle */}
       <div
         className='absolute bottom-0 left-0 -translate-x-1/2 translate-y-1/2 w-8 h-8 bg-gray-800/80 border-2 border-gray-700 rounded-full cursor-move flex items-center justify-center shadow-lg protractor-control pointer-events-auto hover:bg-gray-900'
         onMouseDown={handleRotateStart}
