@@ -232,6 +232,11 @@ export const Whiteboard: React.FC = () => {
     showDivider,
   } = useWhiteboardStore();
 
+  // --- PAN STATE ---
+  const isPanningRef = useRef(false);
+  const panStartRef = useRef<{ x: number; y: number } | null>(null);
+  const panOriginRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+
   const stageRef = useRef<Konva.Stage>(null);
   const transformerRef = useRef<Konva.Transformer>(null);
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
@@ -726,6 +731,14 @@ export const Whiteboard: React.FC = () => {
     const pos = stage?.getRelativePointerPosition();
     if (!pos) return;
 
+    // --- PAN TOOL LOGIC ---
+    if (tool === 'hand') {
+      isPanningRef.current = true;
+      panStartRef.current = { x: (e.evt as MouseEvent).clientX, y: (e.evt as MouseEvent).clientY };
+      panOriginRef.current = { x: stagePos.x, y: stagePos.y };
+      return;
+    }
+
     if (clickedOnEmpty && tool === 'select') {
         const isMultiSelect = (e.evt as MouseEvent).ctrlKey || (e.evt as MouseEvent).metaKey;
         if (!isMultiSelect) {
@@ -734,29 +747,19 @@ export const Whiteboard: React.FC = () => {
         // Start selection box with multiselect flag
         setSelectionBox({ x: pos.x, y: pos.y, width: 0, height: 0, isMultiSelect });
     }
-    
-    // Early return for pan tool - let stage handle dragging
-    if (tool === 'hand') {
-      return;
-    }
 
     if (tool === 'text') {
       const targetId = e.target.id() || e.target.getParent()?.id();
       const clickedItem = items.find(i => i.id === targetId!);
-      
       if (clickedItem?.type === 'text') {
-        // Select existing text
         setSelectedId(targetId!);
       }
-      // For text tool, only select on single click - creation happens on double-click
-      return; 
+      return;
     }
 
     if (tool === 'fill') {
        const shape = e.target;
        if (shape === stage) return;
-       
-       // Apply fill to selected items if any are selected
        if (selectedId) {
          const selectedIds = selectedId.split(',');
          selectedIds.forEach(id => {
@@ -773,8 +776,6 @@ export const Whiteboard: React.FC = () => {
          saveHistory();
          return;
        }
-       
-       // Apply fill to clicked item if no selection
        const id = shape.id() || shape.getParent()?.id();
        const item = items.find(i => i && i.id === id!);
        if (item) {
@@ -790,13 +791,10 @@ export const Whiteboard: React.FC = () => {
        return;
     }
 
-    // Handle selection for all tools
     if (!clickedOnEmpty) {
       const targetId = e.target.id() || e.target.getParent()?.id();
       if (targetId! && tool === 'select') {
         const currentSelected = selectedId ? selectedId.split(',') : [];
-        
-        // Always add to selection without Ctrl requirement
         if (currentSelected.includes(targetId!)) {
           const newSelected = currentSelected.filter(id => id !== targetId!);
           setSelectedId(newSelected.length > 0 ? newSelected.join(',') : null);
@@ -836,19 +834,13 @@ export const Whiteboard: React.FC = () => {
        return;
     }
 
-    // Handle handwriting as normal strokes with thinner width
     if (tool === 'handwriting') {
       isHandwritingActive.current = true;
       handwritingStrokesRef.current.push(id);
-      
-      // Clear any existing timer
       if (handwritingTimerRef.current) {
         clearTimeout(handwritingTimerRef.current);
       }
-      
-      // Use thinner stroke width for handwriting (3px default)
       const handwritingWidth = Math.max(2, Math.min(size * 0.1, 4));
-      
       addItem({
         type: 'stroke', 
         id, 
@@ -861,7 +853,6 @@ export const Whiteboard: React.FC = () => {
       });
       return;
     }
-    
     addItem({
       type: 'stroke', 
       id, 
@@ -876,13 +867,24 @@ export const Whiteboard: React.FC = () => {
 
  const handleMouseMove = (e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
     e.evt.preventDefault();
-    
     // Guard: Never process canvas events if target is text
     if ((e.evt.target as HTMLElement)?.dataset?.type === 'text') return;
-    
     const stage = e.target.getStage();
     const point = stage?.getRelativePointerPosition();
     if (!point) return;
+
+    // --- PAN TOOL LOGIC ---
+    if (tool === 'hand' && isPanningRef.current && panStartRef.current) {
+      const clientX = (e.evt as MouseEvent).clientX;
+      const clientY = (e.evt as MouseEvent).clientY;
+      const dx = clientX - panStartRef.current.x;
+      const dy = clientY - panStartRef.current.y;
+      setStagePos({
+        x: panOriginRef.current.x + dx,
+        y: panOriginRef.current.y + dy,
+      });
+      return;
+    }
 
     // Handle selection box dragging
     if (selectionBox && tool === 'select') {
@@ -926,6 +928,14 @@ export const Whiteboard: React.FC = () => {
   };
 
  const handleMouseUp = () => {
+    // --- PAN TOOL LOGIC ---
+    if (tool === 'hand' && isPanningRef.current) {
+      isPanningRef.current = false;
+      panStartRef.current = null;
+      panOriginRef.current = { x: stagePos.x, y: stagePos.y };
+      return;
+    }
+
     // Handle selection box completion
     if (selectionBox && tool === 'select') {
       const stage = stageRef.current;
@@ -937,8 +947,6 @@ export const Whiteboard: React.FC = () => {
           width: Math.abs(selectionBox.width),
           height: Math.abs(selectionBox.height)
         };
-        
-        // Find items within selection box
         items.forEach(item => {
           const node = stage.findOne('#' + item.id);
           if (node) {
@@ -953,8 +961,6 @@ export const Whiteboard: React.FC = () => {
             }
           }
         });
-        
-        // Merge with existing selection if multiselect
         if (selectedItems.length > 0) {
           if (selectionBox.isMultiSelect && selectedId) {
             const currentSelected = selectedId.split(',');
@@ -975,22 +981,17 @@ export const Whiteboard: React.FC = () => {
 
     saveHistory();
     const strokeId = currentStrokeId.current;
-    
     if (!strokeId) return;
 
-    // Handle handwriting recognition timer
     if (tool === 'handwriting' && isHandwritingActive.current) {
-      // Clear existing timer
       if (handwritingTimerRef.current) {
         clearTimeout(handwritingTimerRef.current);
       }
-      
-      // Set new timer for recognition
       handwritingTimerRef.current = setTimeout(() => {
         if (isHandwritingActive.current) {
           processHandwritingStrokes();
         }
-      }, 1500); // Wait 1.5 seconds after last stroke
+      }, 1500);
     }
 
     if (tool === 'shape') {
@@ -998,7 +999,6 @@ export const Whiteboard: React.FC = () => {
         processShape(strokeId);
       }, 500);
     }
-    
     currentStrokeId.current = null;
 };
 
@@ -2044,6 +2044,7 @@ const getCursorStyle = () => {
             width={item.width || 200}
             height={Math.max(item.fontSize * 1.4 * 4, item.fontSize * 1.4 * (item.text.split('\n').length || 1))}
             fill="transparent"
+            listening={tool === 'select' || tool === 'text'}
             draggable={tool === 'select' || tool === 'text'}
             onClick={() => {
               if (tool === 'select' || tool === 'text') {
@@ -2407,9 +2408,9 @@ const getCursorStyle = () => {
           
           return (
             <div
-              key={`overlay-${item.id}-${Math.round(item.x)}-${Math.round(item.y)}`}
+              key={`overlay-${item.id}`}
               style={{
-                position: 'absolute',
+                position: 'fixed',
                 left: screenX,
                 top: screenY,
                 width: item.width ? (item.width * stageScale) : (200 * stageScale),
