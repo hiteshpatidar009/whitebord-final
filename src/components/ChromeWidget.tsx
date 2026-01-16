@@ -92,21 +92,33 @@ const ChromeSearchWidget: React.FC<Props> = ({
 
   const dragging = useRef(false);
   const offset = useRef({ x: 0, y: 0 });
+  const resizing = useRef(false);
+  const [size, setSize] = useState({ width: 900, height: 520 });
 
   /* ================= DRAG ================= */
   const onMouseDown = (e: React.MouseEvent) => {
     if (locked) return;
     if ((e.target as HTMLElement).tagName === "INPUT") return;
+    if ((e.target as HTMLElement).classList.contains('resize-handle')) return;
     dragging.current = true;
     offset.current = { x: e.clientX - x, y: e.clientY - y };
   };
 
   useEffect(() => {
     const move = (e: MouseEvent) => {
-      if (!dragging.current) return;
-      onMove(e.clientX - offset.current.x, e.clientY - offset.current.y);
+      if (dragging.current) {
+        onMove(e.clientX - offset.current.x, e.clientY - offset.current.y);
+      }
+      if (resizing.current) {
+        const newWidth = Math.max(600, e.clientX - x);
+        const newHeight = Math.max(400, e.clientY - y);
+        setSize({ width: newWidth, height: newHeight });
+      }
     };
-    const up = () => (dragging.current = false);
+    const up = () => {
+      dragging.current = false;
+      resizing.current = false;
+    };
 
     document.addEventListener("mousemove", move);
     document.addEventListener("mouseup", up);
@@ -114,7 +126,7 @@ const ChromeSearchWidget: React.FC<Props> = ({
       document.removeEventListener("mousemove", move);
       document.removeEventListener("mouseup", up);
     };
-  }, [onMove]);
+  }, [onMove, x, y]);
 
   /* ================= ERROR HANDLING ================= */
   const handleSearchError = (errorType: SearchError['type'], data?: any): SearchError => {
@@ -672,8 +684,8 @@ const ChromeSearchWidget: React.FC<Props> = ({
       style={{
         left: x,
         top: y,
-        width: 900,
-        height: 520,
+        width: size.width,
+        height: size.height,
         zIndex: locked ? 5 : 50,
         pointerEvents: locked ? "none" : "auto",
       }}
@@ -749,8 +761,11 @@ const ChromeSearchWidget: React.FC<Props> = ({
         {activeView !== "home" && activeView !== 'error' && (
           <button
             onClick={() => {
-              // setActiveView("home");
-              setActiveView("results")
+              if (activeView === "results") {
+                setActiveView("home");
+              } else {
+                setActiveView("results");
+              }
               setActiveUrl(null);
               setVideoId(null);
               setError(null);
@@ -792,7 +807,7 @@ const ChromeSearchWidget: React.FC<Props> = ({
 
         {activeView === "youtubePlayer" && videoId && (
           <div className="w-full h-full flex flex-col">
-            <div className="p-2 border-b bg-gray-50 flex items-center justify-between">
+            {/* <div className="p-2 border-b bg-gray-50 flex items-center justify-between">
               <span className="text-sm text-gray-600 truncate flex-1 mr-2">
                 Educational Video Player
               </span>
@@ -802,7 +817,7 @@ const ChromeSearchWidget: React.FC<Props> = ({
               >
                 ← Back to videos
               </button>
-            </div>
+            </div> */}
             <iframe
               className="w-full flex-1"
               src={`https://www.youtube.com/embed/${videoId}?autoplay=1&modestbranding=1&rel=0&fs=1`}
@@ -829,6 +844,18 @@ const ChromeSearchWidget: React.FC<Props> = ({
         
         {activeView === "error" && <ErrorView />}
       </div>
+      
+      {/* Resize handle */}
+      <div
+        className="resize-handle absolute bottom-0 right-0 w-4 h-4 cursor-se-resize"
+        onMouseDown={(e) => {
+          e.stopPropagation();
+          resizing.current = true;
+        }}
+        style={{
+          background: 'linear-gradient(135deg, transparent 50%, #cbd5e0 50%)',
+        }}
+      />
     </div>
   );
 };
