@@ -5,7 +5,7 @@ interface ArmProps {
   angle: number
   length: number
   side: 'left' | 'right'
-  onMouseDown?: (e: React.MouseEvent) => void
+  onMouseDown?: (e: React.MouseEvent | React.TouchEvent) => void
   isDrawing?: boolean
 }
 
@@ -41,6 +41,7 @@ const DividerArm: React.FC<ArmProps> = ({
       {side === 'right' && (
         <div
           onMouseDown={onMouseDown}
+          onTouchStart={onMouseDown}
           className='absolute -bottom-3 left-1/2 w-6 h-6 rounded-full z-30 transition-all duration-150 hover:scale-110 active:scale-95'
           style={{
             transform: 'translateX(-50%)',

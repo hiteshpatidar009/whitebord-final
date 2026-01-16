@@ -1,8 +1,9 @@
 import React, { useRef, useState, useEffect } from 'react'
 import { useWhiteboardStore } from '../../store/useWhiteboardStore'
+import { useTouchAndMouse } from '../../hooks/useTouchAndMouse'
 
 const Protractor: React.FC = () => {
-  const { setShowProtractor } = useWhiteboardStore()
+  const { setShowProtractor, addItem, color, saveHistory } = useWhiteboardStore()
   const ref = useRef<HTMLDivElement>(null)
 
   // -- Window/Tool State --
@@ -24,43 +25,47 @@ const Protractor: React.FC = () => {
   const dragStart = useRef({ x: 0, y: 0, initialSize: 0, initialRotation: 0 })
   const lastAngleUpdate = useRef<number>(0)
   const animationFrameRef = useRef<number | null>(null)
+  const { getPointerEvent } = useTouchAndMouse()
+  const drawingPoints = useRef<{ [key: number]: number[] }>({ 1: [], 2: [] })
+  const currentStrokeId = useRef<{ [key: number]: string | null }>({ 1: null, 2: null })
 
   /* ================= TOOL TRANSFORM HANDLERS ================= */
 
-  const handleMouseDown = (e: React.MouseEvent) => {
-    // Only drag if clicking the main body (background) and not controls
+  const handleMouseDown = (e: React.MouseEvent | React.TouchEvent) => {
     if ((e.target as Element).closest('.protractor-control')) return
-    e.preventDefault() // Prevent text selection
-    e.stopPropagation()
+    const pointer = getPointerEvent(e)
+    pointer.preventDefault()
+    pointer.stopPropagation()
     setIsDragging(true)
     dragStart.current = {
-      x: e.clientX - position.x,
-      y: e.clientY - position.y,
+      x: pointer.clientX - position.x,
+      y: pointer.clientY - position.y,
       initialSize: 0,
       initialRotation: 0
     }
   }
 
-  const handleResizeStart = (e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
+  const handleResizeStart = (e: React.MouseEvent | React.TouchEvent) => {
+    const pointer = getPointerEvent(e)
+    pointer.preventDefault()
+    pointer.stopPropagation()
     setIsResizing(true)
     dragStart.current = {
       ...dragStart.current,
-      x: e.clientX,
+      x: pointer.clientX,
       initialSize: size
     }
   }
 
-  const handleRotateStart = (e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
+  const handleRotateStart = (e: React.MouseEvent | React.TouchEvent) => {
+    const pointer = getPointerEvent(e)
+    pointer.preventDefault()
+    pointer.stopPropagation()
     setIsRotating(true)
-    // Pivot is stable at position + size/2
     const cx = position.x + size / 2
     const cy = position.y + size / 2
     const currentAngle =
-      Math.atan2(e.clientY - cy, e.clientX - cx) * (180 / Math.PI)
+      Math.atan2(pointer.clientY - cy, pointer.clientX - cx) * (180 / Math.PI)
     dragStart.current = {
       ...dragStart.current,
       initialRotation: rotation - currentAngle
@@ -69,11 +74,32 @@ const Protractor: React.FC = () => {
 
   /* ================= ARM INTERACTION HANDLERS ================= */
 
-  const handleArmMouseDown = (e: React.MouseEvent, armIndex: 1 | 2) => {
-    e.preventDefault() // Important to stop browser drag/select behavior
-    e.stopPropagation()
+  const handleArmMouseDown = (e: React.MouseEvent | React.TouchEvent, armIndex: 1 | 2) => {
+    const pointer = getPointerEvent(e)
+    pointer.preventDefault()
+    pointer.stopPropagation()
     setDraggingArm(armIndex)
     lastAngleUpdate.current = Date.now()
+    
+    // Initialize drawing
+    const id = `protractor-${armIndex}-${Date.now()}`
+    currentStrokeId.current[armIndex] = id
+    drawingPoints.current[armIndex] = []
+    
+    // Get current arm tip position in screen coordinates
+    const cx = position.x + size / 2
+    const cy = position.y + size / 2
+    const currentAngle = armIndex === 1 ? angle1 : angle2
+    const rad = (currentAngle * Math.PI) / 180
+    const rotRad = (rotation * Math.PI) / 180
+    const armLen = rOuter + 40
+    
+    const localX = armLen * Math.cos(-rad)
+    const localY = armLen * Math.sin(-rad)
+    const screenX = cx + localX * Math.cos(rotRad) - localY * Math.sin(rotRad)
+    const screenY = cy + localX * Math.sin(rotRad) + localY * Math.cos(rotRad)
+    
+    drawingPoints.current[armIndex].push(screenX, screenY)
   }
 
   /* ================= CALCULATE ANGLE FOR ARM ================= */
@@ -109,7 +135,10 @@ const Protractor: React.FC = () => {
   /* ================= GLOBAL MOUSE HANDLERS ================= */
 
   useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
+    const handleMouseMove = (e: MouseEvent | TouchEvent) => {
+      const touch = 'touches' in e ? e.touches[0] : null
+      const clientX = touch ? touch.clientX : (e as MouseEvent).clientX
+      const clientY = touch ? touch.clientY : (e as MouseEvent).clientY
       // Cancel any pending animation frame
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current)
@@ -119,11 +148,11 @@ const Protractor: React.FC = () => {
       animationFrameRef.current = requestAnimationFrame(() => {
         if (isDragging) {
           setPosition({
-            x: e.clientX - dragStart.current.x,
-            y: e.clientY - dragStart.current.y
+            x: clientX - dragStart.current.x,
+            y: clientY - dragStart.current.y
           })
         } else if (isResizing) {
-          const delta = e.clientX - dragStart.current.x
+          const delta = clientX - dragStart.current.x
           // Limit size
           const newSize = Math.max(
             200,
@@ -135,7 +164,7 @@ const Protractor: React.FC = () => {
           const cx = position.x + size / 2
           const cy = position.y + size / 2
           const angle =
-            Math.atan2(e.clientY - cy, e.clientX - cx) * (180 / Math.PI)
+            Math.atan2(clientY - cy, clientX - cx) * (180 / Math.PI)
           setRotation(angle + dragStart.current.initialRotation)
         } else if (draggingArm) {
           // Throttle angle updates to reduce jitter
@@ -146,18 +175,49 @@ const Protractor: React.FC = () => {
           }
           lastAngleUpdate.current = now
 
-          const newAngle = calculateAngle(e.clientX, e.clientY)
+          const newAngle = calculateAngle(clientX, clientY)
 
           if (draggingArm === 1) {
             setAngle1(newAngle)
           } else {
             setAngle2(newAngle)
           }
+          
+          // Add drawing point
+          const cx = position.x + size / 2
+          const cy = position.y + size / 2
+          const rad = (newAngle * Math.PI) / 180
+          const rotRad = (rotation * Math.PI) / 180
+          const armLen = rOuter + 40
+          
+          const localX = armLen * Math.cos(-rad)
+          const localY = armLen * Math.sin(-rad)
+          const screenX = cx + localX * Math.cos(rotRad) - localY * Math.sin(rotRad)
+          const screenY = cy + localX * Math.sin(rotRad) + localY * Math.cos(rotRad)
+          
+          drawingPoints.current[draggingArm].push(screenX, screenY)
+          
+          if (currentStrokeId.current[draggingArm] && drawingPoints.current[draggingArm].length >= 4) {
+            const armColor = draggingArm === 1 ? '#2563EB' : '#DC2626'
+            addItem({
+              type: 'stroke',
+              id: currentStrokeId.current[draggingArm]!,
+              tool: 'pen',
+              points: [...drawingPoints.current[draggingArm]],
+              color: armColor,
+              size: 2,
+              isEraser: false,
+              isHighlighter: true
+            })
+          }
         }
       })
     }
 
     const handleMouseUp = () => {
+      if (draggingArm && currentStrokeId.current[draggingArm] && drawingPoints.current[draggingArm].length >= 4) {
+        saveHistory()
+      }
       setIsDragging(false)
       setIsResizing(false)
       setIsRotating(false)
@@ -170,10 +230,14 @@ const Protractor: React.FC = () => {
 
     window.addEventListener('mousemove', handleMouseMove)
     window.addEventListener('mouseup', handleMouseUp)
+    window.addEventListener('touchmove', handleMouseMove)
+    window.addEventListener('touchend', handleMouseUp)
 
     return () => {
       window.removeEventListener('mousemove', handleMouseMove)
       window.removeEventListener('mouseup', handleMouseUp)
+      window.removeEventListener('touchmove', handleMouseMove)
+      window.removeEventListener('touchend', handleMouseUp)
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current)
       }
@@ -301,6 +365,7 @@ const Protractor: React.FC = () => {
       <div
         className='absolute inset-0 cursor-grab active:cursor-grabbing'
         onMouseDown={handleMouseDown}
+        onTouchStart={handleMouseDown}
         style={{ pointerEvents: 'auto' }}
       >
         <svg
@@ -344,6 +409,7 @@ const Protractor: React.FC = () => {
             fill='#2563EB'
             className='cursor-pointer protractor-control transition-opacity duration-100'
             onMouseDown={e => handleArmMouseDown(e, 1)}
+            onTouchStart={e => handleArmMouseDown(e, 1)}
             stroke='#FFF'
             strokeWidth='2'
           />
@@ -366,6 +432,7 @@ const Protractor: React.FC = () => {
             fill='#DC2626'
             className='cursor-pointer protractor-control transition-opacity duration-100'
             onMouseDown={e => handleArmMouseDown(e, 2)}
+            onTouchStart={e => handleArmMouseDown(e, 2)}
             stroke='#FFF'
             strokeWidth='2'
           />
@@ -395,6 +462,7 @@ const Protractor: React.FC = () => {
       <div
         className='absolute bottom-0 right-0 translate-x-1/2 translate-y-1/2 w-8 h-8 bg-gray-800/80 border-2 border-gray-700 rounded-full cursor-se-resize flex items-center justify-center shadow-lg protractor-control pointer-events-auto hover:bg-gray-900'
         onMouseDown={handleResizeStart}
+        onTouchStart={handleResizeStart}
       >
         <svg
           width='14'
@@ -412,6 +480,7 @@ const Protractor: React.FC = () => {
       <div
         className='absolute bottom-0 left-0 -translate-x-1/2 translate-y-1/2 w-8 h-8 bg-gray-800/80 border-2 border-gray-700 rounded-full cursor-move flex items-center justify-center shadow-lg protractor-control pointer-events-auto hover:bg-gray-900'
         onMouseDown={handleRotateStart}
+        onTouchStart={handleRotateStart}
       >
         <svg
           width='16'

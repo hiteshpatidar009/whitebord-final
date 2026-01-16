@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react'
 import { useWhiteboardStore } from '../../store/useWhiteboardStore'
+import { useTouchAndMouse } from '../../hooks/useTouchAndMouse'
 
 const CM_IN_PX = 37.8
 
@@ -17,6 +18,7 @@ const Triangle60: React.FC = () => {
 
   const startRef = useRef({ x: 0, y: 0, size: 0, rotation: 0, mouseAngle: 0 })
   const [ticks, setTicks] = useState<number[]>([])
+  const { getPointerEvent } = useTouchAndMouse()
 
   /* --------- Generate scale --------- */
   useEffect(() => {
@@ -25,48 +27,50 @@ const Triangle60: React.FC = () => {
   }, [size])
 
   /* --------- Drag --------- */
-  const onDragStart = (e: React.MouseEvent) => {
+  const onDragStart = (e: React.MouseEvent | React.TouchEvent) => {
+    const pointer = getPointerEvent(e)
     setDragging(true)
-    startRef.current.x = e.clientX - position.x
-    startRef.current.y = e.clientY - position.y
+    startRef.current.x = pointer.clientX - position.x
+    startRef.current.y = pointer.clientY - position.y
   }
 
   /* --------- Resize --------- */
-  const onResizeStart = (e: React.MouseEvent) => {
-    e.stopPropagation()
+  const onResizeStart = (e: React.MouseEvent | React.TouchEvent) => {
+    const pointer = getPointerEvent(e)
+    pointer.stopPropagation()
     setResizing(true)
     startRef.current.size = size
-    startRef.current.x = e.clientX
+    startRef.current.x = pointer.clientX
   }
 
   /* --------- Rotate --------- */
-  const onRotateStart = (e: React.MouseEvent) => {
-    e.stopPropagation()
+  const onRotateStart = (e: React.MouseEvent | React.TouchEvent) => {
+    const pointer = getPointerEvent(e)
+    pointer.stopPropagation()
     setRotating(true)
 
     const rect = triangleRef.current!.getBoundingClientRect()
     const cx = rect.left + rect.width / 2
     const cy = rect.top + rect.height / 2
 
-    // Calculate initial mouse angle relative to center
     startRef.current.mouseAngle =
-      Math.atan2(e.clientY - cy, e.clientX - cx) * (180 / Math.PI)
+      Math.atan2(pointer.clientY - cy, pointer.clientX - cx) * (180 / Math.PI)
 
-    // Store current rotation
     startRef.current.rotation = rotation
   }
 
   /* --------- Mouse Move --------- */
-  const onMouseMove = (e: React.MouseEvent) => {
+  const onMouseMove = (e: React.MouseEvent | React.TouchEvent) => {
+    const pointer = getPointerEvent(e)
     if (dragging) {
       setPosition({
-        x: e.clientX - startRef.current.x,
-        y: e.clientY - startRef.current.y
+        x: pointer.clientX - startRef.current.x,
+        y: pointer.clientY - startRef.current.y
       })
     }
 
     if (resizing) {
-      const delta = e.clientX - startRef.current.x
+      const delta = pointer.clientX - startRef.current.x
       setSize(Math.max(200, Math.min(700, startRef.current.size + delta)))
     }
 
@@ -75,14 +79,11 @@ const Triangle60: React.FC = () => {
       const cx = rect.left + rect.width / 2
       const cy = rect.top + rect.height / 2
 
-      // Calculate current mouse angle
       const currentMouseAngle =
-        Math.atan2(e.clientY - cy, e.clientX - cx) * (180 / Math.PI)
+        Math.atan2(pointer.clientY - cy, pointer.clientX - cx) * (180 / Math.PI)
 
-      // Calculate delta from initial mouse angle
       const deltaAngle = currentMouseAngle - startRef.current.mouseAngle
 
-      // Apply delta to the stored initial rotation
       const newRotation = startRef.current.rotation + deltaAngle
       setRotation(newRotation)
     }
@@ -105,6 +106,8 @@ const Triangle60: React.FC = () => {
       onMouseMove={onMouseMove}
       onMouseUp={stopAll}
       onMouseLeave={stopAll}
+      onTouchMove={onMouseMove}
+      onTouchEnd={stopAll}
       style={{
         pointerEvents: dragging || resizing || rotating ? 'auto' : 'none'
       }}
@@ -112,6 +115,7 @@ const Triangle60: React.FC = () => {
       <div
         ref={triangleRef}
         onMouseDown={onDragStart}
+        onTouchStart={onDragStart}
         style={{
           left: position.x,
           top: position.y,
@@ -243,6 +247,7 @@ const Triangle60: React.FC = () => {
           {/* Resize */}
           <div
             onMouseDown={onResizeStart}
+            onTouchStart={onResizeStart}
             className='absolute right-12 top-[-10px] w-4 h-14 cursor-ew-resize rounded bg-gray-900/80 shadow-inner origin-center'
             style={{ transform: 'rotate(90deg)' }}
             title='Resize'
@@ -251,6 +256,7 @@ const Triangle60: React.FC = () => {
           {/* Rotate */}
           <div
             onMouseDown={onRotateStart}
+            onTouchStart={onRotateStart}
             className='absolute left-12 bottom-12 w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center cursor-pointer shadow-lg hover:bg-gray-800'
             title='Rotate'
           >

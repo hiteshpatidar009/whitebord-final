@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react'
 import { useWhiteboardStore } from '../../store/useWhiteboardStore'
+import { useTouchAndMouse } from '../../hooks/useTouchAndMouse'
 
 const UNIT_PX = 35
 const MIN_RANGE = 3
@@ -21,23 +22,26 @@ const NumberLine: React.FC = () => {
   >(null)
 
   const start = useRef({ x: 0, y: 0, range: 0 })
+  const { getPointerEvent } = useTouchAndMouse()
 
   /* ---------------- Drag ---------------- */
-  const onDragStart = (e: React.MouseEvent) => {
+  const onDragStart = (e: React.MouseEvent | React.TouchEvent) => {
+    const pointer = getPointerEvent(e)
     setDragging(true)
-    start.current.x = e.clientX - position.x
-    start.current.y = e.clientY - position.y
+    start.current.x = pointer.clientX - position.x
+    start.current.y = pointer.clientY - position.y
   }
 
   /* ---------------- Stretch Start ---------------- */
   const onStretchStart = (
-    e: React.MouseEvent,
+    e: React.MouseEvent | React.TouchEvent,
     dir: 'left' | 'right' | 'top' | 'bottom'
   ) => {
-    e.stopPropagation()
+    const pointer = getPointerEvent(e)
+    pointer.stopPropagation()
     setStretchDir(dir)
-    start.current.x = e.clientX
-    start.current.y = e.clientY
+    start.current.x = pointer.clientX
+    start.current.y = pointer.clientY
 
     if (dir === 'left') start.current.range = leftRange
     if (dir === 'right') start.current.range = rightRange
@@ -46,11 +50,12 @@ const NumberLine: React.FC = () => {
   }
 
   /* ---------------- Mouse Move ---------------- */
-  const onMouseMove = (e: React.MouseEvent) => {
+  const onMouseMove = (e: React.MouseEvent | React.TouchEvent) => {
+    const pointer = getPointerEvent(e)
     if (dragging) {
       setPosition({
-        x: e.clientX - start.current.x,
-        y: e.clientY - start.current.y
+        x: pointer.clientX - start.current.x,
+        y: pointer.clientY - start.current.y
       })
       return
     }
@@ -58,28 +63,28 @@ const NumberLine: React.FC = () => {
     if (!stretchDir) return
 
     if (stretchDir === 'right') {
-      const delta = e.clientX - start.current.x
+      const delta = pointer.clientX - start.current.x
       setRightRange(
         Math.max(MIN_RANGE, start.current.range + Math.round(delta / UNIT_PX))
       )
     }
 
     if (stretchDir === 'left') {
-      const delta = start.current.x - e.clientX
+      const delta = start.current.x - pointer.clientX
       setLeftRange(
         Math.max(MIN_RANGE, start.current.range + Math.round(delta / UNIT_PX))
       )
     }
 
     if (stretchDir === 'top') {
-      const delta = start.current.y - e.clientY
+      const delta = start.current.y - pointer.clientY
       setTopRange(
         Math.max(MIN_RANGE, start.current.range + Math.round(delta / UNIT_PX))
       )
     }
 
     if (stretchDir === 'bottom') {
-      const delta = e.clientY - start.current.y
+      const delta = pointer.clientY - start.current.y
       setBottomRange(
         Math.max(MIN_RANGE, start.current.range + Math.round(delta / UNIT_PX))
       )
@@ -100,11 +105,14 @@ const NumberLine: React.FC = () => {
       onMouseMove={onMouseMove}
       onMouseUp={stopAll}
       onMouseLeave={stopAll}
+      onTouchMove={onMouseMove}
+      onTouchEnd={stopAll}
       style={{ pointerEvents: dragging || stretchDir ? 'auto' : 'none' }}
     >
       <div
         ref={ref}
         onMouseDown={onDragStart}
+        onTouchStart={onDragStart}
         className='absolute cursor-move select-none'
         style={{ left: position.x, top: position.y, pointerEvents: 'auto' }}
       >
@@ -135,6 +143,7 @@ const NumberLine: React.FC = () => {
           {/* Left handle */}
           <div
             onMouseDown={e => onStretchStart(e, 'left')}
+            onTouchStart={e => onStretchStart(e, 'left')}
             className='absolute left-0 top-1/2 w-4 h-4 bg-gray-800 text-white
                        rounded-full cursor-ew-resize flex items-center justify-center
                        text-xs leading-none'
@@ -146,6 +155,7 @@ const NumberLine: React.FC = () => {
           {/* Right handle */}
           <div
             onMouseDown={e => onStretchStart(e, 'right')}
+            onTouchStart={e => onStretchStart(e, 'right')}
             className='absolute right-0 top-1/2 w-4 h-4 bg-gray-800 text-white
                        rounded-full cursor-ew-resize flex items-center justify-center
                        text-xs leading-none'
@@ -197,6 +207,7 @@ const NumberLine: React.FC = () => {
           {/* Top handle */}
           <div
             onMouseDown={e => onStretchStart(e, 'top')}
+            onTouchStart={e => onStretchStart(e, 'top')}
             className='absolute top-0 left-1/2 w-4 h-4 bg-gray-800 text-white
                        rounded-full cursor-ns-resize flex items-center justify-center
                        text-xs leading-none'
@@ -208,6 +219,7 @@ const NumberLine: React.FC = () => {
           {/* Bottom handle */}
           <div
             onMouseDown={e => onStretchStart(e, 'bottom')}
+            onTouchStart={e => onStretchStart(e, 'bottom')}
             className='absolute bottom-0 left-1/2 w-4 h-4 bg-gray-800 text-white
                        rounded-full cursor-ns-resize flex items-center justify-center
                        text-xs leading-none'
