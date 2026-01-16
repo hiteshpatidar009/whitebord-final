@@ -2,7 +2,7 @@
 import React from 'react'
 
 interface ArmProps {
-  angle: number
+  rotation: number
   length: number
   side: 'left' | 'right'
   onMouseDown?: (e: React.MouseEvent) => void
@@ -10,7 +10,7 @@ interface ArmProps {
 }
 
 const DividerArm: React.FC<ArmProps> = ({
-  angle,
+  rotation,
   length,
   side,
   onMouseDown,
@@ -24,9 +24,7 @@ const DividerArm: React.FC<ArmProps> = ({
         width: 10,
         background: side === 'right' ? '#f3f4f6' : '#e5e7eb',
         borderRadius: 8,
-        transform: `
-          rotate(${side === 'left' ? -angle : angle}deg)
-        `,
+        transform: `rotate(${rotation}deg)`,
         boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
         border: side === 'right' ? '1px solid #d1d5db' : 'none'
       }}
