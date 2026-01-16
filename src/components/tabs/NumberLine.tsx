@@ -9,18 +9,18 @@ const NumberLine: React.FC = () => {
   const ref = useRef<HTMLDivElement>(null)
 
   const [position, setPosition] = useState({ x: 400, y: 300 })
-  const [xRange, setXRange] = useState(5)
-  const [yRange, setYRange] = useState(5)
+
+  const [leftRange, setLeftRange] = useState(5)
+  const [rightRange, setRightRange] = useState(5)
+  const [topRange, setTopRange] = useState(5)
+  const [bottomRange, setBottomRange] = useState(5)
 
   const [dragging, setDragging] = useState(false)
-  const [stretchX, setStretchX] = useState(false)
-  const [stretchY, setStretchY] = useState(false)
+  const [stretchDir, setStretchDir] = useState<
+    null | 'left' | 'right' | 'top' | 'bottom'
+  >(null)
 
-  const start = useRef({
-    x: 0,
-    y: 0,
-    range: 0
-  })
+  const start = useRef({ x: 0, y: 0, range: 0 })
 
   /* ---------------- Drag ---------------- */
   const onDragStart = (e: React.MouseEvent) => {
@@ -29,56 +29,58 @@ const NumberLine: React.FC = () => {
     start.current.y = e.clientY - position.y
   }
 
-  /* ---------------- Stretch X Left ---------------- */
-  const onStretchXLeftStart = (e: React.MouseEvent) => {
+  /* ---------------- Stretch Start ---------------- */
+  const onStretchStart = (
+    e: React.MouseEvent,
+    dir: 'left' | 'right' | 'top' | 'bottom'
+  ) => {
     e.stopPropagation()
-    setStretchX(true)
+    setStretchDir(dir)
     start.current.x = e.clientX
-    start.current.range = xRange
-  }
-
-  /* ---------------- Stretch X Right ---------------- */
-  const onStretchXRightStart = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    setStretchX(true)
-    start.current.x = e.clientX
-    start.current.range = xRange
-  }
-
-  /* ---------------- Stretch Y Top ---------------- */
-  const onStretchYTopStart = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    setStretchY(true)
     start.current.y = e.clientY
-    start.current.range = yRange
+
+    if (dir === 'left') start.current.range = leftRange
+    if (dir === 'right') start.current.range = rightRange
+    if (dir === 'top') start.current.range = topRange
+    if (dir === 'bottom') start.current.range = bottomRange
   }
 
-  /* ---------------- Stretch Y Bottom ---------------- */
-  const onStretchYBottomStart = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    setStretchY(true)
-    start.current.y = e.clientY
-    start.current.range = yRange
-  }
-
+  /* ---------------- Mouse Move ---------------- */
   const onMouseMove = (e: React.MouseEvent) => {
     if (dragging) {
       setPosition({
         x: e.clientX - start.current.x,
         y: e.clientY - start.current.y
       })
+      return
     }
 
-    if (stretchX) {
+    if (!stretchDir) return
+
+    if (stretchDir === 'right') {
       const delta = e.clientX - start.current.x
-      setXRange(
+      setRightRange(
         Math.max(MIN_RANGE, start.current.range + Math.round(delta / UNIT_PX))
       )
     }
 
-    if (stretchY) {
+    if (stretchDir === 'left') {
+      const delta = start.current.x - e.clientX
+      setLeftRange(
+        Math.max(MIN_RANGE, start.current.range + Math.round(delta / UNIT_PX))
+      )
+    }
+
+    if (stretchDir === 'top') {
       const delta = start.current.y - e.clientY
-      setYRange(
+      setTopRange(
+        Math.max(MIN_RANGE, start.current.range + Math.round(delta / UNIT_PX))
+      )
+    }
+
+    if (stretchDir === 'bottom') {
+      const delta = e.clientY - start.current.y
+      setBottomRange(
         Math.max(MIN_RANGE, start.current.range + Math.round(delta / UNIT_PX))
       )
     }
@@ -86,9 +88,11 @@ const NumberLine: React.FC = () => {
 
   const stopAll = () => {
     setDragging(false)
-    setStretchX(false)
-    setStretchY(false)
+    setStretchDir(null)
   }
+
+  const totalWidth = (leftRange + rightRange) * UNIT_PX
+  const totalHeight = (topRange + bottomRange) * UNIT_PX
 
   return (
     <div
@@ -96,152 +100,129 @@ const NumberLine: React.FC = () => {
       onMouseMove={onMouseMove}
       onMouseUp={stopAll}
       onMouseLeave={stopAll}
-      style={{
-        pointerEvents: dragging || stretchX || stretchY ? 'auto' : 'none'
-      }}
+      style={{ pointerEvents: dragging || stretchDir ? 'auto' : 'none' }}
     >
       <div
         ref={ref}
         onMouseDown={onDragStart}
         className='absolute cursor-move select-none'
-        style={{
-          left: position.x,
-          top: position.y,
-          pointerEvents: 'auto'
-        }}
+        style={{ left: position.x, top: position.y, pointerEvents: 'auto' }}
       >
-        {/* Close Button */}
-        <button
-          className='absolute -top-9 -right-3 w-6 h-6 rounded-full bg-gray-800 hover:bg-gray-900 border-2 border-gray-700 text-white text-sm font-bold flex items-center justify-center shadow-md transition-all hover:scale-110 active:scale-95'
-          onClick={() => setShowNumberLine(false)}
-        >
-          ×
-        </button>
-
-        {/* ================= X AXIS ================= */}
+        {/* ========== X AXIS ========== */}
         <div
           className='relative h-[2px] bg-black'
-          style={{ width: xRange * 2 * UNIT_PX }}
+          style={{ width: totalWidth, left: -leftRange * UNIT_PX }}
         >
-          {/* Numbers */}
-          {Array.from({ length: xRange * 2 + 1 }).map((_, i) => {
-            const v = i - xRange
-            if (v === 0) return null
+          {/* Numbers + ticks */}
+          {Array.from({ length: leftRange + rightRange + 1 }).map((_, i) => {
+            const value = i - leftRange
             return (
-              <span
-                key={v}
-                className='absolute text-xs text-black font-bold'
-                style={{
-                  left: i * UNIT_PX,
-                  top: 6,
-                  transform: 'translateX(-50%)'
-                }}
+              <div
+                key={i}
+                className='absolute flex flex-col items-center'
+                style={{ left: i * UNIT_PX, transform: 'translateX(-50%)' }}
               >
-                {v}
-              </span>
+                {/* Tick */}
+                <div className='w-[1px] h-2 bg-black -mt-1' />
+                {/* Number */}
+                {value !== 0 && (
+                  <span className='text-xs font-bold mt-1'>{value}</span>
+                )}
+              </div>
             )
           })}
 
-          {/* Tick marks */}
-          {Array.from({ length: xRange * 2 + 1 }).map((_, i) => (
-            <div
-              key={i}
-              className='absolute w-[1px] h-2 bg-black'
-              style={{
-                left: i * UNIT_PX,
-                top: -4,
-                transform: 'translateX(-50%)'
-              }}
-            />
-          ))}
-
-          {/* Right stretch handle */}
+          {/* Left handle */}
           <div
-            onMouseDown={onStretchXRightStart}
-            className='absolute right-0 top-1/2 w-4 h-4 bg-gray-800 text-white rounded-full cursor-ew-resize flex items-center justify-center text-xs font-bold hover:bg-gray-700'
+            onMouseDown={e => onStretchStart(e, 'left')}
+            className='absolute left-0 top-1/2 w-4 h-4 bg-gray-800 text-white
+                       rounded-full cursor-ew-resize flex items-center justify-center
+                       text-xs leading-none'
+            style={{ transform: 'translate(-50%, -50%)' }}
+          >
+            ←
+          </div>
+
+          {/* Right handle */}
+          <div
+            onMouseDown={e => onStretchStart(e, 'right')}
+            className='absolute right-0 top-1/2 w-4 h-4 bg-gray-800 text-white
+                       rounded-full cursor-ew-resize flex items-center justify-center
+                       text-xs leading-none'
             style={{ transform: 'translate(50%, -50%)' }}
-            title='Stretch X-axis'
           >
             →
           </div>
 
-          {/* Left stretch handle */}
-          <div
-            onMouseDown={onStretchXLeftStart}
-            className='absolute left-0 top-1/2 w-4 h-4 bg-gray-800 text-white rounded-full cursor-ew-resize flex items-center justify-center text-xs font-bold hover:bg-gray-700'
-            style={{ transform: 'translate(-50%, -50%)' }}
-            title='Stretch X-axis'
+          {/* Close button – locked to right tip */}
+          <button
+            className='absolute w-6 h-6 rounded-full bg-gray-800 text-white font-bold
+                       flex items-center justify-center shadow-md
+                       hover:scale-110 active:scale-95'
+            style={{
+              right: 0,
+              top: -40,
+              transform: 'translateX(50%)'
+            }}
+            onClick={() => setShowNumberLine(false)}
           >
-            ←
-          </div>
+            ×
+          </button>
         </div>
 
-        {/* ================= Y AXIS ================= */}
+        {/* ========== Y AXIS ========== */}
         <div
-          className='absolute left-1/2 bg-black w-[2px]'
-          style={{
-            height: yRange * 2 * UNIT_PX,
-            top: -(yRange * UNIT_PX)
-          }}
+          className='absolute left-0 bg-black w-[2px]'
+          style={{ height: totalHeight, top: -topRange * UNIT_PX }}
         >
-          {/* Numbers */}
-          {Array.from({ length: yRange * 2 + 1 }).map((_, i) => {
-            const v = yRange - i
-            if (v === 0) return null
+          {/* Numbers + ticks */}
+          {Array.from({ length: topRange + bottomRange + 1 }).map((_, i) => {
+            const value = topRange - i
             return (
-              <span
-                key={v}
-                className='absolute text-xs text-black font-bold'
-                style={{
-                  top: i * UNIT_PX,
-                  left: -8,
-                  transform: 'translate(-100%, -50%)'
-                }}
+              <div
+                key={i}
+                className='absolute flex items-center'
+                style={{ top: i * UNIT_PX, transform: 'translateY(-50%)' }}
               >
-                {v}
-              </span>
+                {/* Tick */}
+                <div className='h-[1px] w-2 bg-black -ml-1' />
+                {/* Number */}
+                {value !== 0 && (
+                  <span className='text-xs font-bold ml-2'>{value}</span>
+                )}
+              </div>
             )
           })}
 
-          {/* Tick marks */}
-          {Array.from({ length: yRange * 2 + 1 }).map((_, i) => (
-            <div
-              key={i}
-              className='absolute h-[1px] w-2 bg-black'
-              style={{
-                top: i * UNIT_PX,
-                left: -4,
-                transform: 'translateY(-50%)'
-              }}
-            />
-          ))}
-
-          {/* Top stretch handle */}
+          {/* Top handle */}
           <div
-            onMouseDown={onStretchYTopStart}
-            className='absolute top-0 left-1/2 w-4 h-4 bg-gray-800 text-white rounded-full cursor-ns-resize flex items-center justify-center text-xs font-bold hover:bg-gray-700'
+            onMouseDown={e => onStretchStart(e, 'top')}
+            className='absolute top-0 left-1/2 w-4 h-4 bg-gray-800 text-white
+                       rounded-full cursor-ns-resize flex items-center justify-center
+                       text-xs leading-none'
             style={{ transform: 'translate(-50%, -50%)' }}
-            title='Stretch Y-axis'
           >
             ↑
           </div>
 
-          {/* Bottom stretch handle */}
+          {/* Bottom handle */}
           <div
-            onMouseDown={onStretchYBottomStart}
-            className='absolute bottom-0 left-1/2 w-4 h-4 bg-gray-800 text-white rounded-full cursor-ns-resize flex items-center justify-center text-xs font-bold hover:bg-gray-700'
+            onMouseDown={e => onStretchStart(e, 'bottom')}
+            className='absolute bottom-0 left-1/2 w-4 h-4 bg-gray-800 text-white
+                       rounded-full cursor-ns-resize flex items-center justify-center
+                       text-xs leading-none'
             style={{ transform: 'translate(-50%, 50%)' }}
-            title='Stretch Y-axis'
           >
             ↓
           </div>
         </div>
 
         {/* Origin */}
-        <div className='absolute left-1/2 top-0 w-3 h-3 bg-red-600 rounded-full -translate-x-1/2 -translate-y-1/2 border-2 border-white shadow-md' />
-
-        {/* Origin label */}
-        <span className='absolute left-1/2 top-0 text-xs font-bold text-red-600 transform translate-x-2 translate-y-2'>
+        <div
+          className='absolute w-3 h-3 bg-red-600 rounded-full
+                        -translate-x-1/2 -translate-y-1/2'
+        />
+        <span className='absolute text-xs font-bold text-red-600 translate-x-2 translate-y-2'>
           0
         </span>
       </div>
