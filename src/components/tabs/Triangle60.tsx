@@ -116,7 +116,8 @@ const Triangle60: React.FC = () => {
           left: position.x,
           top: position.y,
           width: size,
-          height: size * Math.tan((30 * Math.PI) / 180), // Height for 30-60-90 triangle
+          height: size * Math.tan((30 * Math.PI) / 180), // Height for 30-60-
+          //  triangle
           transform: `rotate(${rotation}deg)`, // Apply actual rotation
           pointerEvents: 'auto'
         }}
@@ -133,11 +134,11 @@ const Triangle60: React.FC = () => {
             clipPath: 'polygon(0 0, 100% 0, 0 100%)'
           }}
         >
-          {/* Base scale (horizontal) */}
+          {/* Base scale (horizontal) - Top Edge */}
           {ticks.map(i => (
             <div
               key={`base-${i}`}
-              className='absolute bottom-0 bg-gray-900'
+              className='absolute top-0 bg-gray-900'
               style={{
                 left: `${(i * CM_IN_PX) / 10}px`,
                 width: '1px',
@@ -146,54 +147,95 @@ const Triangle60: React.FC = () => {
             />
           ))}
 
-          {/* Height scale (vertical) */}
-          {ticks.map(i => (
-            <div
-              key={`height-${i}`}
-              className='absolute left-0 bg-gray-900'
-              style={{
-                bottom: `${(i * CM_IN_PX) / 10}px`,
-                height: '1px',
-                width: tickHeight(i)
-              }}
-            />
-          ))}
-
-          {/* CM Numbers (base) */}
+          {/* Height scale (vertical) - Left Edge */}
           {ticks
-            .filter(i => i % 10 === 0)
+            .filter(
+              i => (i * CM_IN_PX) / 10 <= size * Math.tan((30 * Math.PI) / 180)
+            )
+            .map(i => (
+              <div
+                key={`height-${i}`}
+                className='absolute left-0 bg-gray-900'
+                style={{
+                  top: `${(i * CM_IN_PX) / 10}px`,
+                  height: '1px',
+                  width: tickHeight(i)
+                }}
+              />
+            ))}
+
+          {/* CM Numbers (base) - Horizontal Edge (Top) */}
+          {ticks
+            .filter(i => i % 10 === 0 && i !== 0)
             .map(i => (
               <span
-                key={`num-${i}`}
-                className='absolute bottom-4 text-xs font-bold text-gray-900'
-                style={{ left: `${i * CM_IN_PX}px` }}
+                key={`num-base-${i}`}
+                className='absolute top-6 text-xs font-bold text-gray-900 origin-center'
+                style={{
+                  left: `${(i * CM_IN_PX) / 10}px`,
+                  transform: 'translateX(-50%)'
+                }}
               >
                 {i / 10}
               </span>
             ))}
+          <span className='absolute top-6 left-2 text-[10px] font-bold text-gray-900'>
+            cm
+          </span>
+
+          {/* CM Numbers (height) - Vertical Edge (Left) */}
+          {ticks
+            .filter(
+              i =>
+                i % 10 === 0 &&
+                i !== 0 &&
+                (i * CM_IN_PX) / 10 <= size * Math.tan((30 * Math.PI) / 180)
+            )
+            .map(i => (
+              <span
+                key={`num-height-${i}`}
+                className='absolute left-6 text-xs font-bold text-gray-900 origin-center'
+                style={{
+                  top: `${(i * CM_IN_PX) / 10}px`,
+                  transform: 'translateY(-50%) rotate(-90deg)'
+                }}
+              >
+                {i / 10}
+              </span>
+            ))}
+          <span
+            className='absolute left-6 text-[10px] font-bold text-gray-900 origin-center'
+            style={{ top: '10px', transform: 'rotate(-90deg)' }}
+          >
+            cm
+          </span>
 
           {/* Angle badge - Show display rotation (0° initially) */}
-          <div className='absolute left-16 top-7 bg-gray-900/90 text-white px-3 py-1 rounded-lg text-sm font-bold shadow-lg'>
+          <div className='absolute left-1/3 top-1/3 bg-gray-900/90 text-white px-3 py-1 rounded-lg text-sm font-bold shadow-lg transform -translate-x-1/2 -translate-y-1/2'>
             {Math.round(displayRotation)}°
           </div>
 
           {/* 60° marking (at bottom-left corner) */}
-          <div className='absolute left-3 bottom-3 text-sm font-bold text-gray-900'>
+          <div className='absolute left-2 bottom-8 text-sm font-bold text-gray-900'>
             60°
           </div>
 
-          {/* 90° marking (at right angle) */}
-          <div className='absolute right-3 top-3 text-sm font-bold text-gray-900'>
-            90°
+          {/* 30° marking (at top-right) */}
+          <div className='absolute right-12 top-2 text-sm font-bold text-gray-900'>
+            30°
           </div>
 
           {/* Square angle indicator */}
-          <div className='absolute right-4 top-4 w-4 h-4 border-2 border-gray-900 border-t-0 border-l-0' />
+          <div className='absolute left-0 top-0 w-4 h-4 border-2 border-gray-900 border-t-0 border-l-0' />
 
           {/* Close */}
           <button
             onClick={() => setShowTriangle60(false)}
-            className='absolute left-8 top-7 w-7 h-7 rounded-full bg-gray-800 text-white flex items-center justify-center border border-gray-700 hover:bg-gray-900'
+            className='absolute left-12 bottom-24 h-7 w-7 rounded-full
+             bg-gray-800 text-white flex items-center justify-center
+             border border-gray-700 shadow-md
+             hover:bg-gray-900 hover:scale-110 active:scale-95'
+            title='Close'
           >
             ×
           </button>
@@ -201,15 +243,15 @@ const Triangle60: React.FC = () => {
           {/* Resize */}
           <div
             onMouseDown={onResizeStart}
-            className='absolute left-7 bottom-10 w-4 h-14 bg-gray-900/80 cursor-ew-resize rounded shadow-inner origin-center'
-            style={{ transform: 'rotate(0deg)' }}
+            className='absolute right-12 top-[-10px] w-4 h-14 cursor-ew-resize rounded bg-gray-900/80 shadow-inner origin-center'
+            style={{ transform: 'rotate(90deg)' }}
             title='Resize'
           />
 
           {/* Rotate */}
           <div
             onMouseDown={onRotateStart}
-            className='absolute left-12 bottom-11 w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center cursor-pointer shadow-lg hover:bg-gray-800'
+            className='absolute left-12 bottom-12 w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center cursor-pointer shadow-lg hover:bg-gray-800'
             title='Rotate'
           >
             ⟳
