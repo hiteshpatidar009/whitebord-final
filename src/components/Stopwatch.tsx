@@ -36,6 +36,18 @@ const FloatingStopwatch: React.FC = () => {
     pos.current.dragging = true;
     document.addEventListener("mousemove", onMouseMove);
     document.addEventListener("mouseup", onMouseUp);
+    document.addEventListener("touchmove", onTouchMove);
+    document.addEventListener("touchend", onTouchEnd);
+  };
+
+  const onTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest("button")) return;
+    const touch = e.touches[0];
+    pos.current.dx = touch.clientX - pos.current.x;
+    pos.current.dy = touch.clientY - pos.current.y;
+    pos.current.dragging = true;
+    document.addEventListener("touchmove", onTouchMove);
+    document.addEventListener("touchend", onTouchEnd);
   };
 
   const onMouseMove = (e: MouseEvent) => {
@@ -48,10 +60,29 @@ const FloatingStopwatch: React.FC = () => {
     }
   };
 
+  const onTouchMove = (e: TouchEvent) => {
+    if (!pos.current.dragging) return;
+    const touch = e.touches[0];
+    pos.current.x = touch.clientX - pos.current.dx;
+    pos.current.y = touch.clientY - pos.current.dy;
+    if (dragRef.current) {
+      dragRef.current.style.left = `${pos.current.x}px`;
+      dragRef.current.style.top = `${pos.current.y}px`;
+    }
+  };
+
   const onMouseUp = () => {
     pos.current.dragging = false;
     document.removeEventListener("mousemove", onMouseMove);
     document.removeEventListener("mouseup", onMouseUp);
+    document.removeEventListener("touchmove", onTouchMove);
+    document.removeEventListener("touchend", onTouchEnd);
+  };
+
+  const onTouchEnd = () => {
+    pos.current.dragging = false;
+    document.removeEventListener("touchmove", onTouchMove);
+    document.removeEventListener("touchend", onTouchEnd);
   };
 
   /* ================= TIMER ================= */
@@ -113,6 +144,7 @@ const FloatingStopwatch: React.FC = () => {
     <div
       ref={dragRef}
       onMouseDown={onMouseDown}
+      onTouchStart={onTouchStart}
       className="fixed z-[100] w-[320px] cursor-grab select-none rounded-2xl  "
       style={{ left: pos.current.x, top: pos.current.y }}
     >

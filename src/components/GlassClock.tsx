@@ -21,9 +21,23 @@ const GlassClock: React.FC = () => {
     dragRef.current = { startX: e.clientX - position.x, startY: e.clientY - position.y };
   };
 
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if ((e.target as HTMLElement).closest('button')) return;
+    const touch = e.touches[0];
+    setIsDragging(true);
+    dragRef.current = { startX: touch.clientX - position.x, startY: touch.clientY - position.y };
+  };
+
   const handleMouseMove = (e: MouseEvent) => {
     if (isDragging) {
       setPosition({ x: e.clientX - dragRef.current.startX, y: e.clientY - dragRef.current.startY });
+    }
+  };
+
+  const handleTouchMove = (e: TouchEvent) => {
+    if (isDragging) {
+      const touch = e.touches[0];
+      setPosition({ x: touch.clientX - dragRef.current.startX, y: touch.clientY - dragRef.current.startY });
     }
   };
 
@@ -35,9 +49,13 @@ const GlassClock: React.FC = () => {
     if (isDragging) {
       window.addEventListener('mousemove', handleMouseMove);
       window.addEventListener('mouseup', handleMouseUp);
+      window.addEventListener('touchmove', handleTouchMove);
+      window.addEventListener('touchend', handleMouseUp);
       return () => {
         window.removeEventListener('mousemove', handleMouseMove);
         window.removeEventListener('mouseup', handleMouseUp);
+        window.removeEventListener('touchmove', handleTouchMove);
+        window.removeEventListener('touchend', handleMouseUp);
       };
     }
   }, [isDragging]);
@@ -61,6 +79,7 @@ const GlassClock: React.FC = () => {
   return (
     <div
       onMouseDown={handleMouseDown}
+      onTouchStart={handleTouchStart}
       style={{ left: position.x, top: position.y,  }}
       className={`fixed z-50 
       rounded-2xl px-6 py-3 backdrop-blur-xl

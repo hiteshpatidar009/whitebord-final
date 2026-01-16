@@ -2202,11 +2202,9 @@ const getCursorStyle = () => {
       {chromeWidgets.map((widget) => (
         <React.Fragment key={widget.id}>
           <ChromeWidget
-            id={widget.id}
             x={widget.x}
             y={widget.y}
             locked={widget.locked}
-            isDrawing={isDrawing.current}
             onClose={() => setChromeWidgets(prev => prev.filter(w => w.id !== widget.id))}
             onMove={(x, y) => setChromeWidgets(prev => prev.map(w => w.id === widget.id ? { ...w, x, y } : w))}
             onToggleLock={() => setChromeWidgets(prev => prev.map(w => w.id === widget.id ? { ...w, locked: !w.locked } : w))}

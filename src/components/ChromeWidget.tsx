@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
-  Search,
+  // Search,
   X,
   Lock,
   Unlock,
@@ -11,7 +11,7 @@ import {
   WifiOff,
   CreditCard,
   Key,
-  ShieldAlert,
+  // ShieldAlert,
   RefreshCw,
   SearchX,
   AlertCircle,
@@ -104,14 +104,26 @@ const ChromeSearchWidget: React.FC<Props> = ({
     offset.current = { x: e.clientX - x, y: e.clientY - y };
   };
 
+  const onTouchStart = (e: React.TouchEvent) => {
+    if (locked) return;
+    if ((e.target as HTMLElement).tagName === "INPUT") return;
+    if ((e.target as HTMLElement).classList.contains('resize-handle')) return;
+    const touch = e.touches[0];
+    dragging.current = true;
+    offset.current = { x: touch.clientX - x, y: touch.clientY - y };
+  };
+
   useEffect(() => {
-    const move = (e: MouseEvent) => {
+    const move = (e: MouseEvent | TouchEvent) => {
+      const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+      const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+      
       if (dragging.current) {
-        onMove(e.clientX - offset.current.x, e.clientY - offset.current.y);
+        onMove(clientX - offset.current.x, clientY - offset.current.y);
       }
       if (resizing.current) {
-        const newWidth = Math.max(600, e.clientX - x);
-        const newHeight = Math.max(400, e.clientY - y);
+        const newWidth = Math.max(600, clientX - x);
+        const newHeight = Math.max(400, clientY - y);
         setSize({ width: newWidth, height: newHeight });
       }
     };
@@ -122,14 +134,18 @@ const ChromeSearchWidget: React.FC<Props> = ({
 
     document.addEventListener("mousemove", move);
     document.addEventListener("mouseup", up);
+    document.addEventListener("touchmove", move);
+    document.addEventListener("touchend", up);
     return () => {
       document.removeEventListener("mousemove", move);
       document.removeEventListener("mouseup", up);
+      document.removeEventListener("touchmove", move);
+      document.removeEventListener("touchend", up);
     };
   }, [onMove, x, y]);
 
   /* ================= ERROR HANDLING ================= */
-  const handleSearchError = (errorType: SearchError['type'], data?: any): SearchError => {
+  const handleSearchError = (errorType: SearchError['type']): SearchError => {
     const errors: Record<SearchError['type'], SearchError> = {
       NETWORK_ERROR: {
         type: 'NETWORK_ERROR',
@@ -693,13 +709,16 @@ const ChromeSearchWidget: React.FC<Props> = ({
       {/* HEADER */}
       <div
         onMouseDown={onMouseDown}
+        onTouchStart={onTouchStart}
         className="flex items-center gap-3 px-4 py-3 bg-white/80 backdrop-blur border-b shadow-sm cursor-move"
       >
-        <X 
+        <button
           onClick={onClose} 
-          className="text-red-500 cursor-pointer hover:bg-red-50 p-1 rounded transition-colors" 
+          className="text-red-500 hover:bg-red-50 p-1 rounded transition-colors" 
           title="Close widget"
-        />
+        >
+          <X size={20} />
+        </button>
 
         <button
           onClick={() => {
@@ -849,6 +868,10 @@ const ChromeSearchWidget: React.FC<Props> = ({
       <div
         className="resize-handle absolute bottom-0 right-0 w-4 h-4 cursor-se-resize"
         onMouseDown={(e) => {
+          e.stopPropagation();
+          resizing.current = true;
+        }}
+        onTouchStart={(e) => {
           e.stopPropagation();
           resizing.current = true;
         }}
