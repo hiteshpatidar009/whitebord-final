@@ -11,8 +11,8 @@ const Divider: React.FC = () => {
 
   // Mechanical State
   const [position, setPosition] = useState({ x: 500, y: 300 })
-  const [rotation, setRotation] = useState(0) // Base rotation (Left Leg)
-  const [spread, setSpread] = useState(45)   // Angle between legs
+  const [rotation, setRotation] = useState(0) // Base rotation
+  const [spread, setSpread] = useState(45) // Angle between legs
   const [length, setLength] = useState(200)
 
   // Interaction State
@@ -20,6 +20,8 @@ const Divider: React.FC = () => {
   const [rotating, setRotating] = useState(false)
   const [extending, setExtending] = useState(false)
   const [drawing, setDrawing] = useState(false)
+  const [adjustingLeftTip, setAdjustingLeftTip] = useState(false)
+  const [adjustingRightTip, setAdjustingRightTip] = useState(false)
 
   // Refs for smooth interaction
   const start = useRef({
@@ -30,21 +32,27 @@ const Divider: React.FC = () => {
     length: 0,
     centerX: 0,
     centerY: 0,
-    startAngle: 0
+    startAngle: 0,
+    tipStartAngle: 0,
+    tipStartSpread: 0
   })
 
   // Exact center calculation using DOM
   const getExactCenter = () => {
     if (ref.current) {
       const rect = ref.current.getBoundingClientRect()
-      // The pivot is the center of the top handle (w-10 h-10 => +20 offset)
       return {
         x: rect.left + 20,
         y: rect.top + 20
       }
     }
-    // Fallback if needed
     return { x: position.x + 20, y: position.y + 20 }
+  }
+
+  // Calculate radius (distance between tips)
+  const getRadius = () => {
+    const angleRad = spread * (Math.PI / 180)
+    return 2 * length * Math.sin(angleRad / 2)
   }
 
   const drawingPoints = useRef<number[]>([])
@@ -70,7 +78,6 @@ const Divider: React.FC = () => {
     start.current.centerY = center.y
     start.current.rotation = rotation
 
-    // Calculate initial angle of mouse relative to center
     const dx = e.clientX - center.x
     const dy = e.clientY - center.y
     start.current.startAngle = Math.atan2(dx, dy) * (180 / Math.PI)
@@ -84,10 +91,48 @@ const Divider: React.FC = () => {
     start.current.centerY = e.clientY
   }
 
-  /* ---------- Draw / Spread (Right Tip) ---------- */
+  /* ---------- Adjust Left Tip ---------- */
+  const onLeftTipStart = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
+    if (e.button !== 0) return
+
+    setAdjustingLeftTip(true)
+    const center = getExactCenter()
+    start.current.centerX = center.x
+    start.current.centerY = center.y
+    start.current.rotation = rotation
+    start.current.spread = spread
+
+    const dx = e.clientX - center.x
+    const dy = e.clientY - center.y
+    start.current.tipStartAngle = Math.atan2(dx, dy) * (180 / Math.PI)
+    start.current.tipStartSpread = spread
+  }
+
+  /* ---------- Adjust Right Tip ---------- */
+  const onRightTipStart = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
+    if (e.button !== 0) return
+
+    setAdjustingRightTip(true)
+    const center = getExactCenter()
+    start.current.centerX = center.x
+    start.current.centerY = center.y
+    start.current.rotation = rotation
+    start.current.spread = spread
+
+    const dx = e.clientX - center.x
+    const dy = e.clientY - center.y
+    start.current.tipStartAngle = Math.atan2(dx, dy) * (180 / Math.PI)
+    start.current.tipStartSpread = spread
+  }
+
+  /* ---------- Start Drawing Circle ---------- */
   const onDrawStart = (e: React.MouseEvent) => {
     e.stopPropagation()
-    e.preventDefault() // Prevent text selection
+    e.preventDefault()
 
     if (e.button !== 0) return
 
@@ -95,32 +140,41 @@ const Divider: React.FC = () => {
     isStrokeCreated.current = false
 
     const center = getExactCenter()
-    start.current.centerX = center.x
-    start.current.centerY = center.y
-    start.current.spread = spread
-    start.current.rotation = rotation
+    const radius = getRadius()
 
-    // Calculate initial angle of mouse to correctly offset spread
-    const dx = e.clientX - center.x
-    const dy = e.clientY - center.y
-    // Angle from +Y axis (down)
-    start.current.startAngle = Math.atan2(dx, dy) * (180 / Math.PI)
+    // Start drawing circle from right tip position
+    const rightTipAngle = (rotation + spread) * (Math.PI / 180)
+    const startX = center.x + Math.sin(rightTipAngle) * length
+    const startY = center.y + Math.cos(rightTipAngle) * length
 
-    // Init Stroke
+    // Initialize stroke for full circle
     const id = uuidv4()
     currentStrokeId.current = id
-    drawingPoints.current = []
+    drawingPoints.current = [startX, startY]
 
-    // Record first point exactly at tip
-    // Left Arm transform: rotate(rotation)
-    // Right Arm transform: rotate(rotation + spread)
-    const tipAngle = (rotation + spread) * (Math.PI / 180)
+    // Generate circle points
+    const circlePoints: number[] = []
+    const steps = 64 // Smooth circle
+    for (let i = 0; i <= steps; i++) {
+      const angle = (i / steps) * Math.PI * 2
+      const x = center.x + Math.sin(angle) * radius
+      const y = center.y + Math.cos(angle) * radius
+      circlePoints.push(x, y)
+    }
 
-    const tipX = center.x + Math.sin(tipAngle) * (length)
-    const tipY = center.y + Math.cos(tipAngle) * (length)
-
-    drawingPoints.current.push(tipX, tipY)
-    lastPointTime.current = Date.now()
+    // Create the circle stroke
+    addItem({
+      type: 'stroke',
+      id: id,
+      tool: 'pen',
+      points: circlePoints,
+      color: color,
+      size: 2,
+      isEraser: false,
+      isHighlighter: false
+    })
+    isStrokeCreated.current = true
+    saveHistory()
   }
 
   const onMouseMove = (e: React.MouseEvent) => {
@@ -129,7 +183,6 @@ const Divider: React.FC = () => {
       const dx = e.clientX - start.current.centerX
       const dy = e.clientY - start.current.centerY
       const currentAngle = Math.atan2(dx, dy) * (180 / Math.PI)
-
       const delta = currentAngle - start.current.startAngle
       setRotation(start.current.rotation + delta)
     }
@@ -140,56 +193,31 @@ const Divider: React.FC = () => {
       setLength(clamp(start.current.length + delta, 100, 300))
     }
 
-    // 3. Drawing (Changing Spread)
-    if (drawing) {
+    // 3. Adjust Left Tip (Changes rotation)
+    if (adjustingLeftTip) {
       const dx = e.clientX - start.current.centerX
       const dy = e.clientY - start.current.centerY
-
-      // Calculate angle of the *mouse* relative to pivot
       const mouseAngleGlobal = Math.atan2(dx, dy) * (180 / Math.PI)
 
-      // Spread = Global Angle - Rotation
-      // We use the FIXED rotation from start to ensure tool doesn't drift
-      const newSpread = mouseAngleGlobal - rotation
-
-      setSpread(newSpread)
-
-      // --- Drawing Logic ---
-      const now = Date.now()
-      if (now - lastPointTime.current > 16) {
-        // Calculate Exact Tip Position
-        // Must match the Visual Rotation: rotation + newSpread
-        const tipAngle = (rotation + newSpread) * (Math.PI / 180)
-
-        // Use the center from start to avoid jitter
-        const tipX = start.current.centerX + Math.sin(tipAngle) * length
-        const tipY = start.current.centerY + Math.cos(tipAngle) * length
-
-        drawingPoints.current.push(tipX, tipY)
-        lastPointTime.current = now
-
-        if (currentStrokeId.current && drawingPoints.current.length >= 2) {
-          if (!isStrokeCreated.current) {
-            addItem({
-              type: 'stroke',
-              id: currentStrokeId.current,
-              tool: 'pen',
-              points: [...drawingPoints.current],
-              color: color,
-              size: 2,
-              isEraser: false,
-              isHighlighter: false
-            })
-            isStrokeCreated.current = true
-          } else {
-            updateItem(currentStrokeId.current, {
-              points: [...drawingPoints.current]
-            })
-          }
-        }
-      }
+      // Keep spread constant, rotate entire tool
+      const newRotation =
+        mouseAngleGlobal -
+        (start.current.tipStartAngle - start.current.rotation)
+      setRotation(newRotation)
     }
 
+    // 4. Adjust Right Tip (Changes spread)
+    if (adjustingRightTip) {
+      const dx = e.clientX - start.current.centerX
+      const dy = e.clientY - start.current.centerY
+      const mouseAngleGlobal = Math.atan2(dx, dy) * (180 / Math.PI)
+
+      // Keep rotation constant, adjust spread
+      const newSpread = mouseAngleGlobal - rotation
+      setSpread(clamp(newSpread, 5, 175)) // Limit to avoid crossing
+    }
+
+    // 5. Dragging
     if (dragging) {
       setPosition({
         x: e.clientX - start.current.x,
@@ -199,42 +227,12 @@ const Divider: React.FC = () => {
   }
 
   const stopAll = () => {
-    // Save final stroke when drawing stops
-    if (
-      drawing &&
-      currentStrokeId.current &&
-      drawingPoints.current.length >= 4 &&
-      isStrokeCreated.current
-    ) {
-      // Final update to ensure all points are saved
-      updateItem(currentStrokeId.current, {
-        points: [...drawingPoints.current]
-      })
-      saveHistory()
-    } else if (
-      drawing &&
-      currentStrokeId.current &&
-      drawingPoints.current.length >= 4 &&
-      !isStrokeCreated.current
-    ) {
-      // Edge case: drag ended before first throttle? Unlikely with >=4 points check
-      addItem({
-        type: 'stroke',
-        id: currentStrokeId.current,
-        tool: 'pen',
-        points: [...drawingPoints.current],
-        color: color,
-        size: 3,
-        isEraser: false,
-        isHighlighter: false
-      })
-      saveHistory()
-    }
-
     setDragging(false)
     setRotating(false)
     setExtending(false)
     setDrawing(false)
+    setAdjustingLeftTip(false)
+    setAdjustingRightTip(false)
     drawingPoints.current = []
     currentStrokeId.current = null
     isStrokeCreated.current = false
@@ -243,14 +241,31 @@ const Divider: React.FC = () => {
   // Add global mouse up listener
   useEffect(() => {
     const handleGlobalMouseUp = () => {
-      if (drawing || rotating || dragging || extending) {
+      if (
+        drawing ||
+        rotating ||
+        dragging ||
+        extending ||
+        adjustingLeftTip ||
+        adjustingRightTip
+      ) {
         stopAll()
       }
     }
 
     window.addEventListener('mouseup', handleGlobalMouseUp)
     return () => window.removeEventListener('mouseup', handleGlobalMouseUp)
-  }, [drawing, rotating, dragging, extending])
+  }, [
+    drawing,
+    rotating,
+    dragging,
+    extending,
+    adjustingLeftTip,
+    adjustingRightTip
+  ])
+
+  const radius = getRadius()
+  const center = getExactCenter()
 
   return (
     <div
@@ -259,7 +274,15 @@ const Divider: React.FC = () => {
       onMouseUp={stopAll}
       onMouseLeave={stopAll}
       style={{
-        pointerEvents: dragging || rotating || extending || drawing ? 'auto' : 'none'
+        pointerEvents:
+          dragging ||
+          rotating ||
+          extending ||
+          drawing ||
+          adjustingLeftTip ||
+          adjustingRightTip
+            ? 'auto'
+            : 'none'
       }}
     >
       <div
@@ -275,29 +298,37 @@ const Divider: React.FC = () => {
           cursor: 'move'
         }}
       >
+        {/* --- Radius Display --- */}
+        <div className='absolute -top-20 left-1/2 -translate-x-1/2 bg-blue-600 text-white px-3 py-1 rounded-lg text-sm font-medium shadow-lg whitespace-nowrap z-50 pointer-events-none'>
+          Radius: {Math.round(radius)}px
+        </div>
+
         {/* --- Arms Container --- */}
-        {/* Centered at 20,20 w.r.t the div */}
         <div className='absolute top-1/2 left-1/2 w-0 h-0'>
-          {/* Left Arm (Fixed Pivot Leg) */}
+          {/* Left Arm */}
           <DividerArm
             rotation={rotation}
             length={length}
             side='left'
+            onMouseDown={onLeftTipStart}
+            isAdjusting={adjustingLeftTip}
           />
 
-          {/* Right Arm (Movable Drawing Leg) */}
+          {/* Right Arm */}
           <DividerArm
             rotation={rotation + spread}
             length={length}
             side='right'
-            onMouseDown={onDrawStart}
+            onMouseDown={onRightTipStart}
+            onDrawStart={onDrawStart}
+            isAdjusting={adjustingRightTip}
             isDrawing={drawing}
           />
         </div>
 
-        {/* --- Top Joint / Handle --- */}
+        {/* --- Center Pivot --- */}
         <div className='absolute inset-0 bg-gray-800 rounded-full flex items-center justify-center shadow-xl border-2 border-gray-700 z-20'>
-          {/* Rotate Handle Overlay */}
+          {/* Rotate Handle */}
           <div
             onMouseDown={onRotateStart}
             className='absolute -top-8 w-8 h-8 bg-gray-900/90 text-white rounded-full flex items-center justify-center cursor-pointer hover:bg-black transition-transform hover:scale-110'
@@ -308,11 +339,11 @@ const Divider: React.FC = () => {
           <div className='w-3 h-3 bg-gray-400 rounded-full' />
         </div>
 
-        {/* --- Length Adjuster (Center) --- */}
+        {/* --- Length Adjuster --- */}
         <div
           onMouseDown={onExtendStart}
           className='absolute -bottom-6 left-1/2 -translate-x-1/2 w-6 h-6 bg-gray-700 text-white rounded-full flex items-center justify-center cursor-ns-resize z-30 hover:bg-gray-600 shadow-md'
-          title='Adjust length'
+          title='Adjust leg length'
         >
           ⇳
         </div>
@@ -320,7 +351,7 @@ const Divider: React.FC = () => {
         {/* --- Drawing Indicator --- */}
         {drawing && (
           <div className='absolute -top-16 left-1/2 -translate-x-1/2 bg-green-600 text-white px-3 py-1 rounded-lg text-sm font-medium shadow-lg whitespace-nowrap z-50 pointer-events-none'>
-            Drawing...
+            Circle drawn!
           </div>
         )}
       </div>

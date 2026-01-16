@@ -28,3 +28,16 @@ export const getDistance = (
 
 export const clamp = (val: number, min: number, max: number) =>
   Math.min(Math.max(val, min), max)
+
+// Calculate radius from spread and length
+export const calculateRadius = (spread: number, length: number) => {
+  const angleRad = spread * (Math.PI / 180)
+  return 2 * length * Math.sin(angleRad / 2)
+}
+
+// Calculate spread from desired radius and length
+export const calculateSpread = (radius: number, length: number) => {
+  const sinValue = radius / (2 * length)
+  const angleRad = 2 * Math.asin(Math.min(Math.max(sinValue, -1), 1))
+  return (angleRad * 180) / Math.PI
+}
