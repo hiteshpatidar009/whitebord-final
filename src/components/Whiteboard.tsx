@@ -2216,8 +2216,8 @@ const getCursorStyle = () => {
             <div
               style={{
                 position: 'absolute',
-                left: widget.x + 640,
-                top: widget.y + 10,
+                left: widget.x + 790,
+                top: widget.y + 20,
                 zIndex: 60,
                 pointerEvents: 'auto'
               }}

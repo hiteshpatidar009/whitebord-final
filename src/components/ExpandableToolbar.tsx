@@ -53,10 +53,11 @@ const ExpandableToolbar: React.FC<ExpandableToolbarProps> = ({ visible, onClose,
       onPcClick(file);
     }
     
-    if (wasFullscreenRef.current) {
+    if (wasFullscreenRef.current && !isFullscreen()) {
       setTimeout(() => {
         enterFullscreen();
-      }, 100);
+        wasFullscreenRef.current = false;
+      }, 300);
     }
     
     if (fileInputRef.current) fileInputRef.current.value = '';

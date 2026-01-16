@@ -73,7 +73,7 @@ export const Toolbar: React.FC = () => {
 
 
 
-  const [showBrowser, setShowBrowser] = React.useState(false);
+  // const [showBrowser, setShowBrowser] = React.useState(false);
 
   const handleChromeClick = () => {
     if ((window as any).addChromeWidget) {
@@ -82,13 +82,13 @@ export const Toolbar: React.FC = () => {
     setShowExpandableToolbar(false);
   };
 
-  const handlePcClick = () => {
-    if (document.fullscreenElement) {
-      wasInFullscreenRef.current = true;
-    }
-    fileInputRef.current?.click();
-    setShowExpandableToolbar(false);
-  };
+  // const handlePcClick = () => {
+  //   if (document.fullscreenElement) {
+  //     wasInFullscreenRef.current = true;
+  //   }
+  //   fileInputRef.current?.click();
+  //   setShowExpandableToolbar(false);
+  // };
 
 
 
