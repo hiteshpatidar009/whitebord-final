@@ -157,22 +157,55 @@ const Triangle45: React.FC = () => {
               }}
             />
           ))}
-          {/* CM Numbers (base) */}
+          {/* CM Numbers (base) - Horizontal Edge (Bottom) */}
           {ticks
-            .filter(i => i % 10 === 0)
+            .filter(i => i % 10 === 0 && i !== 0)
             .map(i => (
               <span
-                key={`num-${i}`}
-                className='absolute bottom-4 text-xs font-bold text-gray-900'
-                style={{ left: `${i * CM_IN_PX}px` }}
+                key={`num-base-${i}`}
+                className='absolute bottom-6 text-xs font-bold text-gray-900 origin-center'
+                style={{
+                  left: `${(i * CM_IN_PX) / 10}px`,
+                  transform: 'translateX(-50%)'
+                }}
               >
                 {i / 10}
               </span>
             ))}
+          <span className='absolute bottom-6 left-2 text-[10px] font-bold text-gray-900'>cm</span>
+
+          {/* CM Numbers (height) - Vertical Edge (Left) */}
+          {ticks
+            .filter(i => i % 10 === 0 && i !== 0 && (i * CM_IN_PX) / 10 <= size)
+            .map(i => (
+              <span
+                key={`num-height-${i}`}
+                className='absolute left-6 text-xs font-bold text-gray-900 origin-center'
+                style={{
+                  bottom: `${(i * CM_IN_PX) / 10}px`,
+                  transform: 'translateY(50%) rotate(-90deg)' // +50% Y because coordinate grows upwards (bottom-up), text origin issues? Check logic.
+                  // Logic: 'bottom' sets the baseline. 'translateY(50%)' moves it down half its height.
+                  // 'rotate(-90deg)' pivots around center.
+                  // Actually, standard is usually translateY(-50%) if top-aligned.
+                  // Since bottom-aligned: increasing bottom moves UP.
+                  // We want center of text to be at 'bottom: pixel'.
+                  // Text height center is 50% from bottom of element.
+                }}
+              >
+                {i / 10}
+              </span>
+            ))}
+          <span
+            className='absolute left-6 text-[10px] font-bold text-gray-900 origin-center'
+            style={{ bottom: '10px', transform: 'rotate(-90deg)' }}
+          >
+            cm
+          </span>
+
           {/* Angle badge - Show display rotation (0° initially) - Rotated 90° anticlockwise */}
           <div
-            className='absolute left-6 top-24 bg-gray-900/90 text-white px-3 py-1 rounded-lg text-sm font-bold shadow-lg'
-            style={{ transform: 'rotate(-90deg)' }}
+            className='absolute left-16 top-1/2 bg-gray-900/90 text-white px-3 py-1 rounded-lg text-sm font-bold shadow-lg'
+            style={{ transform: 'rotate(-90deg) translateX(-50%)' }} // Adjusted placement
           >
             {Math.round(displayRotation)}°
           </div>
