@@ -233,7 +233,7 @@ const Triangle45: React.FC = () => {
             />
           </svg>
           {/* 45° at top */}
-          <div className='absolute left-3 top-6 text-sm font-bold text-black'>
+          <div className='absolute left-2 top-6 text-sm font-bold text-black'>
             45°
           </div>
           {/* 90° at bottom-left corner */}
