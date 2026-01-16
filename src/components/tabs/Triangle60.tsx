@@ -219,18 +219,39 @@ const Triangle60: React.FC = () => {
             {Math.round(displayRotation)}°
           </div>
 
+          {/* Angle markings with arcs */}
+          <svg className='absolute inset-0 pointer-events-none' width='100%' height='100%' style={{ overflow: 'visible' }}>
+            {/* 30° arc at top-right */}
+            <path
+              d={`M ${size} 25 A 25 25 0 0 1 ${size - 40} 0`}
+              fill='none'
+              stroke='black'
+              strokeWidth='2.5'
+            />
+            {/* 60° arc at bottom-left */}
+            <path
+              d={`M 0 ${size * Math.tan((30 * Math.PI) / 180) - 25} A 30 30 0 0 1 25 ${size * Math.tan((30 * Math.PI) / 180)}`}
+              fill='none'
+              stroke='black'
+              strokeWidth='2.5'
+            />
+          </svg>
+
           {/* 60° marking (at bottom-left corner) */}
-          <div className='absolute left-2 bottom-8 text-sm font-bold text-gray-900'>
+          <div className='absolute left-2 bottom-7 text-sm font-bold text-black'>
             60°
           </div>
 
           {/* 30° marking (at top-right) */}
-          <div className='absolute right-12 top-2 text-sm font-bold text-gray-900'>
+          <div className='absolute right-10 top-1 text-sm font-bold text-black'>
             30°
           </div>
-
+          {/* 90° marking (at top-left) */}
+          <div className='absolute left-8 top-9 text-sm font-bold text-gray-900'>
+            90°
+          </div>
           {/* Square angle indicator */}
-          <div className='absolute left-0 top-0 w-4 h-4 border-2 border-gray-900 border-t-0 border-l-0' />
+          <div className='absolute left-0 top-0 w-6 h-6 border-[3px] border-black border-t-0 border-l-0' />
 
           {/* Close */}
           <button
@@ -248,7 +269,7 @@ const Triangle60: React.FC = () => {
           <div
             onMouseDown={onResizeStart}
             onTouchStart={onResizeStart}
-            className='absolute right-12 top-[-10px] w-4 h-14 cursor-ew-resize rounded bg-gray-900/80 shadow-inner origin-center'
+            className='absolute right-36 top-[35px] w-4 h-14 cursor-ew-resize rounded bg-gray-900/80 shadow-inner origin-center'
             style={{ transform: 'rotate(90deg)' }}
             title='Resize'
           />

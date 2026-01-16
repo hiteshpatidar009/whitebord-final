@@ -213,8 +213,36 @@ const Triangle45: React.FC = () => {
           >
             {Math.round(displayRotation)}°
           </div>
-          {/* 45° marking */}
-          <div className='absolute right-12 top-12 text-sm font-bold text-gray-900'>
+
+          {/* Angle markings with arcs */}
+          <svg className='absolute inset-0 pointer-events-none' width='100%' height='100%' style={{ overflow: 'visible' }}>
+            {/* 45° arc at top */}
+            <path
+              // d='M 15 0 A 20 20 0 0 0 0 15'
+              d='M 15 0 A 20 13 0 0 1 0 23'
+              fill='none'
+              stroke='black'
+              strokeWidth='2.5'
+            />
+            {/* 45° arc at bottom-right */}
+            <path
+              d={`M ${size - 25} ${size} A 25 25 0 0 1 ${size} ${size - 29}`}
+              fill='none'
+              stroke='black'
+              strokeWidth='2.5'
+            />
+          </svg>
+          {/* 45° at top */}
+          <div className='absolute left-3 top-6 text-sm font-bold text-black'>
+            45°
+          </div>
+          {/* 90° at bottom-left corner */}
+          <div className='absolute left-0  bottom-0 w-6 h-6 border-t-[3px] border-r-[3px] border-black' />
+          <div className='absolute left-10 bottom-10 text-lg font-bold text-black'>
+            90°
+          </div>
+          {/* 45° at bottom-right */}
+          <div className='absolute right-6 bottom-2 text-sm font-bold text-black'>
             45°
           </div>
           {/* Close */}
@@ -228,7 +256,7 @@ const Triangle45: React.FC = () => {
           <div
             onMouseDown={onResizeStart}
             onTouchStart={onResizeStart}
-            className='absolute right-12 bottom-6 w-14 h-4 bg-gray-900/80 cursor-ew-resize rounded shadow-inner'
+            className='absolute right-32 bottom-14 w-14 h-4 bg-gray-900/80 cursor-ew-resize rounded shadow-inner'
             title='Resize'
           />
           {/* Rotate */}
