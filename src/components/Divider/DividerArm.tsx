@@ -1,11 +1,10 @@
-// DividerArm.tsx
 import React from 'react'
 
 interface ArmProps {
   rotation: number
   length: number
   side: 'left' | 'right'
-  onMouseDown?: (e: React.MouseEvent) => void
+  onMouseDown?: (e: React.MouseEvent | React.TouchEvent) => void
   isDrawing?: boolean
 }
 
@@ -14,73 +13,44 @@ const DividerArm: React.FC<ArmProps> = ({
   length,
   side,
   onMouseDown,
-  isDrawing = false
+  // isDrawing = false
 }) => {
   return (
     <div
       className='absolute origin-top'
       style={{
         height: length,
-        width: 10,
-        background: side === 'right' ? '#f3f4f6' : '#e5e7eb',
-        borderRadius: 8,
+        width: 12,
+        background: 'linear-gradient(to right, #9ca3af, #d1d5db, #9ca3af)',
+        borderRadius: 6,
         transform: `rotate(${rotation}deg)`,
-        boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-        border: side === 'right' ? '1px solid #d1d5db' : 'none'
+        boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
       }}
     >
-      {/* Base tip */}
-      <div
-        className='absolute bottom-0 left-1/2 w-2 h-4 bg-gray-800 rounded-b-sm'
-        style={{ transform: 'translateX(-50%)' }}
-      />
-
-      {/* Right arm marker tip */}
       {side === 'right' && (
         <div
-          onMouseDown={onMouseDown}
-          className='absolute -bottom-3 left-1/2 w-6 h-6 rounded-full z-30 transition-all duration-150 hover:scale-110 active:scale-95'
-          style={{
-            transform: 'translateX(-50%)',
-            backgroundColor: isDrawing ? '#10b981' : '#ef4444',
-            border: '3px solid white',
-            boxShadow: isDrawing
-              ? '0 0 0 3px rgba(16, 185, 129, 0.3), 0 4px 8px rgba(0,0,0,0.4)'
-              : '0 4px 8px rgba(0,0,0,0.4)',
-            cursor: 'crosshair'
-          }}
-          title='Click and drag to draw arcs'
-        >
-          {/* Inner dot */}
-          <div
-            className='absolute inset-1 bg-white rounded-full'
-            style={{
-              animation: isDrawing ? 'pulse 1.5s infinite' : 'none'
-            }}
-          ></div>
-        </div>
-      )}
-
-      {/* Left arm fixed indicator */}
-      {side === 'left' && (
-        <div
-          className='absolute -bottom-2 left-1/2 w-4 h-4 bg-gray-600 rounded-full border-2 border-white'
-          style={{ transform: 'translateX(-50%)' }}
-          title='Fixed pivot'
+          className='absolute -bottom-1 left-1/2 w-3 h-3 bg-gray-700 transform -translate-x-1/2'
+          style={{ clipPath: 'polygon(50% 100%, 0% 0%, 100% 0%)' }}
         />
       )}
 
-      <style jsx>{`
-        @keyframes pulse {
-          0%,
-          100% {
-            opacity: 0.8;
-          }
-          50% {
-            opacity: 0.4;
-          }
-        }
-      `}</style>
+      {side === 'left' && (
+        <>
+          <div
+            onMouseDown={onMouseDown}
+            onTouchStart={onMouseDown}
+            className='absolute -bottom-4 left-1/2 w-8 h-8 z-99 rounded-full border-3 border-white shadow-lg cursor-crosshair'
+            style={{
+              transform: 'translateX(-50%)',
+              backgroundColor: '#a855f7'
+            }}
+          >
+            {/* Pencil tip at exact bottom center */}
+            <div className='absolute -bottom-1 left-1/2 w-1 h-2 bg-gray-900 transform -translate-x-1/2' 
+                 style={{ clipPath: 'polygon(50% 100%, 0% 0%, 100% 0%)' }} />
+          </div>
+        </>
+      )}
     </div>
   )
 }

@@ -11,26 +11,22 @@ const Divider: React.FC = () => {
 
   // Mechanical State
   const [position, setPosition] = useState({ x: 500, y: 300 })
-  const [rotation, setRotation] = useState(0) // Base rotation (Left Leg)
-  const [spread, setSpread] = useState(45)   // Angle between legs
-  const [length, setLength] = useState(200)
+  const [leftArmRotation, setLeftArmRotation] = useState(-15) // Left arm moves (drawing)
+  const [rightArmRotation] = useState(15) // Right arm always fixed
+  const [radius, setRadius] = useState(150)
 
   // Interaction State
   const [dragging, setDragging] = useState(false)
-  const [rotating, setRotating] = useState(false)
-  const [extending, setExtending] = useState(false)
-  const [drawing, setDrawing] = useState(false)
+  const [adjustingRadius, setAdjustingRadius] = useState(false)
 
   // Refs for smooth interaction
   const start = useRef({
     x: 0,
     y: 0,
-    rotation: 0,
-    spread: 0,
-    length: 0,
     centerX: 0,
     centerY: 0,
-    startAngle: 0
+    radius: 0,
+    initialRotation: 0
   })
 
   // Exact center calculation using DOM
@@ -51,45 +47,50 @@ const Divider: React.FC = () => {
   const currentStrokeId = useRef<string | null>(null)
   const lastPointTime = useRef<number>(0)
   const isStrokeCreated = useRef<boolean>(false)
+  const [drawing, setDrawing] = useState(false)
+  // const [hasStartedMoving, setHasStartedMoving] = useState(false)
 
   /* ---------- Drag Whole Tool ---------- */
-  const onDragStart = (e: React.MouseEvent) => {
-    if (e.button !== 0) return
+  const onDragStart = (e: React.MouseEvent | React.TouchEvent) => {
+    if ('button' in e && e.button !== 0) return
     setDragging(true)
-    start.current.x = e.clientX - position.x
-    start.current.y = e.clientY - position.y
+    
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY
+    start.current.x = clientX - position.x
+    start.current.y = clientY - position.y
   }
 
   /* ---------- Rotate (Top Handle) ---------- */
   const onRotateStart = (e: React.MouseEvent) => {
     e.stopPropagation()
-    e.button === 0 && setRotating(true)
+    if (e.button !== 0) return
+    
+    const center = getExactCenter()
+    const dx = e.clientX - center.x 
+    const dy = e.clientY - center.y
+    const angle = Math.atan2(dy, dx) * (180 / Math.PI)
+    setLeftArmRotation(angle)
+  }
 
+  /* ---------- Adjust Radius ---------- */
+  const onAdjustRadiusStart = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (e.button !== 0) return
+    
+    setAdjustingRadius(true)
     const center = getExactCenter()
     start.current.centerX = center.x
     start.current.centerY = center.y
-    start.current.rotation = rotation
-
-    // Calculate initial angle of mouse relative to center
-    const dx = e.clientX - center.x
-    const dy = e.clientY - center.y
-    start.current.startAngle = Math.atan2(dx, dy) * (180 / Math.PI)
+    start.current.radius = radius
+    start.current.initialRotation = leftArmRotation
   }
 
-  /* ---------- Extend Length ---------- */
-  const onExtendStart = (e: React.MouseEvent) => {
+  /* ---------- Draw Circle Manually ---------- */
+  const onDrawStart = (e: React.MouseEvent | React.TouchEvent) => {
     e.stopPropagation()
-    e.button === 0 && setExtending(true)
-    start.current.length = length
-    start.current.centerY = e.clientY
-  }
-
-  /* ---------- Draw / Spread (Right Tip) ---------- */
-  const onDrawStart = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    e.preventDefault() // Prevent text selection
-
-    if (e.button !== 0) return
+    e.preventDefault()
+    if ('button' in e && e.button !== 0) return
 
     setDrawing(true)
     isStrokeCreated.current = false
@@ -97,75 +98,48 @@ const Divider: React.FC = () => {
     const center = getExactCenter()
     start.current.centerX = center.x
     start.current.centerY = center.y
-    start.current.spread = spread
-    start.current.rotation = rotation
+    
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY
+    start.current.x = clientX
+    start.current.y = clientY
 
-    // Calculate initial angle of mouse to correctly offset spread
-    const dx = e.clientX - center.x
-    const dy = e.clientY - center.y
-    // Angle from +Y axis (down)
-    start.current.startAngle = Math.atan2(dx, dy) * (180 / Math.PI)
-
-    // Init Stroke
     const id = uuidv4()
     currentStrokeId.current = id
     drawingPoints.current = []
-
-    // Record first point exactly at tip
-    // Left Arm transform: rotate(rotation)
-    // Right Arm transform: rotate(rotation + spread)
-    const tipAngle = (rotation + spread) * (Math.PI / 180)
-
-    const tipX = center.x + Math.sin(tipAngle) * (length)
-    const tipY = center.y + Math.cos(tipAngle) * (length)
-
-    drawingPoints.current.push(tipX, tipY)
     lastPointTime.current = Date.now()
   }
 
-  const onMouseMove = (e: React.MouseEvent) => {
-    // 1. Rotation
-    if (rotating) {
-      const dx = e.clientX - start.current.centerX
-      const dy = e.clientY - start.current.centerY
-      const currentAngle = Math.atan2(dx, dy) * (180 / Math.PI)
-
-      const delta = currentAngle - start.current.startAngle
-      setRotation(start.current.rotation + delta)
+  const onMouseMove = (e: React.MouseEvent | React.TouchEvent) => {
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY
+    
+    // Adjusting Radius
+    if (adjustingRadius) {
+      const dx = clientX - start.current.centerX
+      const newRadius = clamp(Math.abs(dx), 50, 400)
+      setRadius(newRadius)
+      
+      // Move left arm horizontally (0 degrees = right, 180 = left)
+      setLeftArmRotation(dx > 0 ? 0 : 180)
     }
 
-    // 2. Extending
-    if (extending) {
-      const delta = e.clientY - start.current.centerY
-      setLength(clamp(start.current.length + delta, 100, 300))
-    }
-
-    // 3. Drawing (Changing Spread)
+    // Drawing Circle
     if (drawing) {
-      const dx = e.clientX - start.current.centerX
-      const dy = e.clientY - start.current.centerY
+      const dx = clientX - start.current.centerX
+      const dy = clientY - start.current.centerY
+      const mouseAngle = Math.atan2(dy, dx)
+      
+      // Update only left arm rotation to follow mouse
+      setLeftArmRotation(mouseAngle * (180 / Math.PI))
 
-      // Calculate angle of the *mouse* relative to pivot
-      const mouseAngleGlobal = Math.atan2(dx, dy) * (180 / Math.PI)
-
-      // Spread = Global Angle - Rotation
-      // We use the FIXED rotation from start to ensure tool doesn't drift
-      const newSpread = mouseAngleGlobal - rotation
-
-      setSpread(newSpread)
-
-      // --- Drawing Logic ---
       const now = Date.now()
-      if (now - lastPointTime.current > 16) {
-        // Calculate Exact Tip Position
-        // Must match the Visual Rotation: rotation + newSpread
-        const tipAngle = (rotation + newSpread) * (Math.PI / 180)
+      if (now - lastPointTime.current > 8) { // Smoother drawing
+        // CENTER → ARM LENGTH → PURPLE CIRCLE OFFSET (-bottom-4 = 16px) → TIP OFFSET (-bottom-1 = 4px) → TIP HEIGHT (2px)
+        const pencilTipX = start.current.centerX + Math.cos(mouseAngle) * (radius + 22)
+        const pencilTipY = start.current.centerY + Math.sin(mouseAngle) * (radius + 22)
 
-        // Use the center from start to avoid jitter
-        const tipX = start.current.centerX + Math.sin(tipAngle) * length
-        const tipY = start.current.centerY + Math.cos(tipAngle) * length
-
-        drawingPoints.current.push(tipX, tipY)
+        drawingPoints.current.push(pencilTipX, pencilTipY)
         lastPointTime.current = now
 
         if (currentStrokeId.current && drawingPoints.current.length >= 2) {
@@ -190,50 +164,25 @@ const Divider: React.FC = () => {
       }
     }
 
+    // Dragging
     if (dragging) {
       setPosition({
-        x: e.clientX - start.current.x,
-        y: e.clientY - start.current.y
+        x: clientX - start.current.x,
+        y: clientY - start.current.y
       })
     }
   }
 
   const stopAll = () => {
-    // Save final stroke when drawing stops
-    if (
-      drawing &&
-      currentStrokeId.current &&
-      drawingPoints.current.length >= 4 &&
-      isStrokeCreated.current
-    ) {
-      // Final update to ensure all points are saved
+    if (drawing && currentStrokeId.current && drawingPoints.current.length >= 4) {
       updateItem(currentStrokeId.current, {
         points: [...drawingPoints.current]
-      })
-      saveHistory()
-    } else if (
-      drawing &&
-      currentStrokeId.current &&
-      drawingPoints.current.length >= 4 &&
-      !isStrokeCreated.current
-    ) {
-      // Edge case: drag ended before first throttle? Unlikely with >=4 points check
-      addItem({
-        type: 'stroke',
-        id: currentStrokeId.current,
-        tool: 'pen',
-        points: [...drawingPoints.current],
-        color: color,
-        size: 3,
-        isEraser: false,
-        isHighlighter: false
       })
       saveHistory()
     }
 
     setDragging(false)
-    setRotating(false)
-    setExtending(false)
+    setAdjustingRadius(false)
     setDrawing(false)
     drawingPoints.current = []
     currentStrokeId.current = null
@@ -243,28 +192,35 @@ const Divider: React.FC = () => {
   // Add global mouse up listener
   useEffect(() => {
     const handleGlobalMouseUp = () => {
-      if (drawing || rotating || dragging || extending) {
+      if (dragging || adjustingRadius || drawing) {
         stopAll()
       }
     }
 
     window.addEventListener('mouseup', handleGlobalMouseUp)
     return () => window.removeEventListener('mouseup', handleGlobalMouseUp)
-  }, [drawing, rotating, dragging, extending])
+  }, [dragging, adjustingRadius, drawing])
+
+  // Right arm stays fixed, left arm moves independently
+  const leftRotation = leftArmRotation // Moves based on interaction
+  const rightRotation = rightArmRotation // Always fixed at 15 degrees
 
   return (
     <div
       className='fixed inset-0 z-[1000]'
       onMouseMove={onMouseMove}
+      onTouchMove={onMouseMove}
       onMouseUp={stopAll}
+      onTouchEnd={stopAll}
       onMouseLeave={stopAll}
       style={{
-        pointerEvents: dragging || rotating || extending || drawing ? 'auto' : 'none'
+        pointerEvents: dragging || adjustingRadius || drawing ? 'auto' : 'none'
       }}
     >
       <div
         ref={ref}
         onMouseDown={onDragStart}
+        onTouchStart={onDragStart}
         className='absolute select-none group'
         style={{
           left: position.x,
@@ -276,53 +232,65 @@ const Divider: React.FC = () => {
         }}
       >
         {/* --- Arms Container --- */}
-        {/* Centered at 20,20 w.r.t the div */}
-        <div className='absolute top-1/2 left-1/2 w-0 h-0'>
-          {/* Left Arm (Fixed Pivot Leg) */}
+        <div className='absolute top-1/2 left-1/3 -translate-x-1/2 -translate-y-1/2'>
+          {/* Left Arm (Drawing) */}
           <DividerArm
-            rotation={rotation}
-            length={length}
+            rotation={leftRotation}
+            length={radius}
             side='left'
-          />
-
-          {/* Right Arm (Movable Drawing Leg) */}
-          <DividerArm
-            rotation={rotation + spread}
-            length={length}
-            side='right'
             onMouseDown={onDrawStart}
             isDrawing={drawing}
+          />
+
+          {/* Right Arm (Fixed) */}
+          <DividerArm
+            rotation={rightRotation}
+            length={radius}
+            side='right'
           />
         </div>
 
         {/* --- Top Joint / Handle --- */}
-        <div className='absolute inset-0 bg-gray-800 rounded-full flex items-center justify-center shadow-xl border-2 border-gray-700 z-20'>
-          {/* Rotate Handle Overlay */}
-          <div
-            onMouseDown={onRotateStart}
-            className='absolute -top-8 w-8 h-8 bg-gray-900/90 text-white rounded-full flex items-center justify-center cursor-pointer hover:bg-black transition-transform hover:scale-110'
-            title='Rotate Divider'
-          >
-            ⟳
+        <div className='absolute inset-0 bg-gray-800 rounded-full flex items-center justify-center shadow-xl border-2 border-gray-600 z-20'>
+          {/* Drag button */}
+          <div className='w-6 h-6 bg-blue-500 rounded-full border-2 border-white shadow-md flex items-center justify-center'>
+            <div 
+              onMouseDown={onDragStart}
+              className='w-2 h-2 bg-white rounded-full cursor-move'
+            />
           </div>
-          <div className='w-3 h-3 bg-gray-400 rounded-full' />
         </div>
 
-        {/* --- Length Adjuster (Center) --- */}
+        {/* --- Top Handle --- */}
         <div
-          onMouseDown={onExtendStart}
-          className='absolute -bottom-6 left-1/2 -translate-x-1/2 w-6 h-6 bg-gray-700 text-white rounded-full flex items-center justify-center cursor-ns-resize z-30 hover:bg-gray-600 shadow-md'
-          title='Adjust length'
+          onMouseDown={onRotateStart}
+          className='absolute -top-6 left-1/2 w-6 h-12 bg-gray-400 rounded-t-md cursor-pointer'
+          style={{ transform: 'translateX(-50%)' }}
+          title='Rotate Divider'
+        />
+
+        {/* --- Radius Adjust Button --- */}
+        <div
+          onMouseDown={onAdjustRadiusStart}
+          className='absolute -bottom-6 left-1/2 -translate-x-1/2 w-7 h-7 bg-blue-600 text-white rounded-full flex items-center justify-center cursor-pointer z-30 hover:bg-blue-700 shadow-md text-xs font-bold'
+          title='Adjust Radius'
         >
-          ⇳
+          ⟷
         </div>
+
+        {/* --- Radius Display --- */}
+        {adjustingRadius && (
+          <div className='absolute -top-16 left-1/2 -translate-x-1/2 bg-blue-600 text-white px-3 py-1 rounded-lg text-sm font-medium shadow-lg whitespace-nowrap z-50 pointer-events-none'>
+            Radius: {Math.round(radius)}px
+          </div>
+        )}
 
         {/* --- Drawing Indicator --- */}
-        {drawing && (
+        {/* {drawing && (
           <div className='absolute -top-16 left-1/2 -translate-x-1/2 bg-green-600 text-white px-3 py-1 rounded-lg text-sm font-medium shadow-lg whitespace-nowrap z-50 pointer-events-none'>
             Drawing...
           </div>
-        )}
+        )} */}
       </div>
     </div>
   )
