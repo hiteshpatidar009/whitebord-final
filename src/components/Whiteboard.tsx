@@ -11,6 +11,7 @@ import { FONT_STACKS, FONTS } from './TextToolbar';
 import ChromeWidget from './ChromeWidget';
 import Protractor from './tabs/Protractor';
 import Divider from './Divider/Divider';
+import { RulerUtils } from './tabs/Ruler';
 
 import { transcribeHandwriting } from '../services/geminiService';
 
@@ -230,6 +231,7 @@ export const Whiteboard: React.FC = () => {
     ungroupItems,
     showProtractor,
     showDivider,
+    rulerGeometry,
   } = useWhiteboardStore();
 
   // --- PAN STATE ---
@@ -920,8 +922,20 @@ export const Whiteboard: React.FC = () => {
     if (currentStrokeId.current) {
         const stroke = items.find(i => i.id === currentStrokeId.current) as Stroke;
         if (stroke) {
+            let newX = point.x;
+            let newY = point.y;
+            
+            // Apply ruler snapping if ruler is visible and cursor is near ruler edge
+            if (rulerGeometry && (tool === 'pen' || tool === 'highlighter')) {
+              if (RulerUtils.isNearRulerEdge(point.x, point.y, rulerGeometry)) {
+                const snapped = RulerUtils.snapToRulerEdge(point.x, point.y, rulerGeometry);
+                newX = snapped.x;
+                newY = snapped.y;
+              }
+            }
+            
             updateItem(currentStrokeId.current, {
-                points: [...stroke.points, point.x, point.y]
+                points: [...stroke.points, newX, newY]
             });
         }
     }

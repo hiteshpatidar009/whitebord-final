@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import { type ToolType, type WhiteboardItem, COLORS } from '../types';
+import { type RulerGeometry } from '../components/tabs/Ruler';
 
 interface WhiteboardState {
   tool: ToolType;
@@ -31,6 +32,7 @@ interface WhiteboardState {
   showProtractor: boolean;
   showNumberLine: boolean;
   showDivider: boolean;
+  rulerGeometry: RulerGeometry | null;
   
   setTool: (tool: ToolType) => void;
   setSelectedId: (id: string | null) => void;
@@ -51,6 +53,7 @@ interface WhiteboardState {
   setShowProtractor: (show: boolean) => void;
   setShowNumberLine: (show: boolean) => void;
   setShowDivider: (show: boolean) => void;
+  setRulerGeometry: (geometry: RulerGeometry | null) => void;
   
   addItem: (item: WhiteboardItem) => void;
   updateItem: (id: string, updates: Partial<WhiteboardItem>) => void;
@@ -96,6 +99,7 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   showProtractor: false,
   showNumberLine: false,
   showDivider: false,
+  rulerGeometry: null,
 
   setTool: (tool) => set({ tool }),
   setSelectedId: (selectedId) => set({ selectedId }),
@@ -115,6 +119,7 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   setShowProtractor: (showProtractor) => set({ showProtractor }),
   setShowNumberLine: (showNumberLine) => set({ showNumberLine }),
   setShowDivider: (showDivider) => set({ showDivider }),
+  setRulerGeometry: (rulerGeometry) => set({ rulerGeometry }),
 
   // --- UPDATED: Cache Busting Logic ---
   setBackgroundImage: (image) => {
