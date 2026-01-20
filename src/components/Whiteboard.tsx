@@ -490,7 +490,7 @@ export const Whiteboard: React.FC = () => {
           x: (window.innerWidth / 2 - stagePos.x) / stageScale - 200,
           y: (window.innerHeight / 2 - stagePos.y) / stageScale - 50,
           text: text,
-          fontSize: size,
+          fontSize: 40,
           fontFamily: textOptions.fontFamily,
           fill: color,
           width: 400, // Explicit width for wrapping

@@ -48,7 +48,7 @@ export const Toolbar: React.FC = () => {
       x: window.innerWidth / 2 - 50,
       y: window.innerHeight / 2 - 20,
       text: 'Type here...',
-      fontSize: size,
+      fontSize: 30,
       fontFamily: textOptions.fontFamily,
       fontStyle: `${textOptions.isBold ? 'bold ' : ''}${textOptions.isItalic ? 'italic' : ''}`.trim(),
       textDecoration: textOptions.isUnderline ? 'underline' : '',
