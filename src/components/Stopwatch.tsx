@@ -9,81 +9,67 @@ const FloatingStopwatch: React.FC = () => {
   const [settings, setSettings] = useState(false);
   const [countdown, setCountdown] = useState(false);
   const [time, setTime] = useState(0);
+  const [scale, setScale] = useState(1);
 
   const intervalRef = useRef<number | null>(null);
   const dragRef = useRef<HTMLDivElement | null>(null);
 
   const pos = useRef({
-    x: window.innerWidth / 2 - 160,
-    y: window.innerHeight / 2 - 100,
+    x: window.innerWidth / 2 - 180,
+    y: window.innerHeight / 2 - 150,
     dx: 0,
     dy: 0,
     dragging: false,
+    resizing: false,
+    startScale: 1,
+    startX: 0,
+    startY: 0,
   });
 
   /* ================= DRAG ================= */
+  const startDrag = (x: number, y: number) => {
+    pos.current.dx = x - pos.current.x;
+    pos.current.dy = y - pos.current.y;
+    pos.current.dragging = true;
+  };
+
+  const move = (x: number, y: number) => {
+    if (pos.current.dragging && dragRef.current) {
+      pos.current.x = x - pos.current.dx;
+      pos.current.y = y - pos.current.dy;
+      dragRef.current.style.left = `${pos.current.x}px`;
+      dragRef.current.style.top = `${pos.current.y}px`;
+    }
+
+    if (pos.current.resizing) {
+      const delta = (x - pos.current.startX) / 300;
+      const next = Math.min(1.6, Math.max(0.7, pos.current.startScale + delta));
+      setScale(next);
+    }
+  };
+
+  const stopAll = () => {
+    pos.current.dragging = false;
+    pos.current.resizing = false;
+  };
+
   useEffect(() => {
-    if (dragRef.current) {
-      dragRef.current.style.left = `${pos.current.x}px`;
-      dragRef.current.style.top = `${pos.current.y}px`;
-    }
+    const mm = (e: MouseEvent) => move(e.clientX, e.clientY);
+    const tm = (e: TouchEvent) =>
+      move(e.touches[0].clientX, e.touches[0].clientY);
+
+    window.addEventListener("mousemove", mm);
+    window.addEventListener("mouseup", stopAll);
+    window.addEventListener("touchmove", tm);
+    window.addEventListener("touchend", stopAll);
+
+    return () => {
+      window.removeEventListener("mousemove", mm);
+      window.removeEventListener("mouseup", stopAll);
+      window.removeEventListener("touchmove", tm);
+      window.removeEventListener("touchend", stopAll);
+    };
   }, []);
-
-  const onMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    if ((e.target as HTMLElement).closest("button")) return;
-    pos.current.dx = e.clientX - pos.current.x;
-    pos.current.dy = e.clientY - pos.current.y;
-    pos.current.dragging = true;
-    document.addEventListener("mousemove", onMouseMove);
-    document.addEventListener("mouseup", onMouseUp);
-    document.addEventListener("touchmove", onTouchMove);
-    document.addEventListener("touchend", onTouchEnd);
-  };
-
-  const onTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
-    if ((e.target as HTMLElement).closest("button")) return;
-    const touch = e.touches[0];
-    pos.current.dx = touch.clientX - pos.current.x;
-    pos.current.dy = touch.clientY - pos.current.y;
-    pos.current.dragging = true;
-    document.addEventListener("touchmove", onTouchMove);
-    document.addEventListener("touchend", onTouchEnd);
-  };
-
-  const onMouseMove = (e: MouseEvent) => {
-    if (!pos.current.dragging) return;
-    pos.current.x = e.clientX - pos.current.dx;
-    pos.current.y = e.clientY - pos.current.dy;
-    if (dragRef.current) {
-      dragRef.current.style.left = `${pos.current.x}px`;
-      dragRef.current.style.top = `${pos.current.y}px`;
-    }
-  };
-
-  const onTouchMove = (e: TouchEvent) => {
-    if (!pos.current.dragging) return;
-    const touch = e.touches[0];
-    pos.current.x = touch.clientX - pos.current.dx;
-    pos.current.y = touch.clientY - pos.current.dy;
-    if (dragRef.current) {
-      dragRef.current.style.left = `${pos.current.x}px`;
-      dragRef.current.style.top = `${pos.current.y}px`;
-    }
-  };
-
-  const onMouseUp = () => {
-    pos.current.dragging = false;
-    document.removeEventListener("mousemove", onMouseMove);
-    document.removeEventListener("mouseup", onMouseUp);
-    document.removeEventListener("touchmove", onTouchMove);
-    document.removeEventListener("touchend", onTouchEnd);
-  };
-
-  const onTouchEnd = () => {
-    pos.current.dragging = false;
-    document.removeEventListener("touchmove", onTouchMove);
-    document.removeEventListener("touchend", onTouchEnd);
-  };
 
   /* ================= TIMER ================= */
   useEffect(() => {
@@ -103,9 +89,7 @@ const FloatingStopwatch: React.FC = () => {
       });
     }, 1000);
 
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
+    return () => intervalRef.current && clearInterval(intervalRef.current);
   }, [running, countdown]);
 
   const reset = () => {
@@ -114,7 +98,7 @@ const FloatingStopwatch: React.FC = () => {
     setTime(0);
   };
 
-  /* ================= TIME DIGITS ================= */
+  /* ================= DIGITS ================= */
   const h = Math.floor(time / 3600);
   const m = Math.floor((time % 3600) / 60);
   const s = time % 60;
@@ -128,110 +112,140 @@ const FloatingStopwatch: React.FC = () => {
   const updateDigit = (index: number, delta: number) => {
     if (!settings) return;
 
-    const values = [...digits];
-    values[index] = (values[index] + delta + 10) % 10;
+    const vals = [...digits];
+    vals[index] = (vals[index] + delta + 10) % 10;
 
-    const newH = values[0] * 10 + values[1];
-    const newM = values[2] * 10 + values[3];
-    const newS = values[4] * 10 + values[5];
+    const nh = vals[0] * 10 + vals[1];
+    const nm = vals[2] * 10 + vals[3];
+    const ns = vals[4] * 10 + vals[5];
 
-    setTime(newH * 3600 + newM * 60 + newS);
+    setTime(nh * 3600 + nm * 60 + ns);
   };
+
+  const isLastSeconds = countdown && time <= 10 && time > 0;
 
   if (!showStopwatch) return null;
 
   return (
     <div
       ref={dragRef}
-      onMouseDown={onMouseDown}
-      onTouchStart={onTouchStart}
-      className="fixed z-[100] w-[320px] cursor-grab select-none rounded-2xl  "
-      style={{ left: pos.current.x, top: pos.current.y }}
+      onMouseDown={(e) => {
+        if ((e.target as HTMLElement).closest("button")) return;
+        startDrag(e.clientX, e.clientY);
+      }}
+      onTouchStart={(e) => {
+        if ((e.target as HTMLElement).closest("button")) return;
+        startDrag(e.touches[0].clientX, e.touches[0].clientY);
+      }}
+      className="fixed z-[100] select-none cursor-grab"
+      style={{
+        left: pos.current.x,
+        top: pos.current.y,
+        transform: `scale(${scale})`,
+      }}
     >
-      {/* TOP BAR */}
-      <div className="flex justify-center gap-2 py-2">
-        <Move className="h-7 w-7 rounded-lg bg-white p-1 text-gray-500 active:cursor-grabbing" />
-        <button onClick={() => setShowStopwatch(false)}>
-          <X className="h-7 w-7 rounded-lg bg-white p-1 text-gray-500" />
-        </button>
-      </div>
+      <div className="w-[360px] rounded-[30px]  relative">
 
-      {/* BODY */}
-      <div className="rounded-b-2xl bg-white px-4 pb-4 pt-3">
-        {/* DISPLAY */}
-        <div className="flex justify-center gap-1 my-3">
-          {digits.map((d, i) => (
-            <React.Fragment key={i}>
-              <div className="flex flex-col items-center">
-                {settings && (
-                  <button
-                    onClick={() => updateDigit(i, 1)}
-                    className="mb-1 h-5 w-5 rounded-full bg-lime-500 text-xs text-white"
+        {/* TOP BAR */}
+        <div className="flex justify-center gap-2 py-3">
+          <Move className="h-8 w-8 rounded-xl bg-white shadow-inner p-1 text-gray-500" />
+          <button onClick={() => setShowStopwatch(false)}>
+            <X className="h-8 w-8 rounded-xl bg-white shadow-inner p-1 text-gray-500" />
+          </button>
+        </div>
+
+        {/* BODY */}
+        <div className=" rounded-2xl bg-gray-100 px-4 pb-5 pt-4 shadow-[inset_0_5px_10px_rgba(0,0,0,0.25)]">
+
+          {/* DISPLAY */}
+          <div className="flex justify-center gap-1 my-4 ">
+            {digits.map((d, i) => (
+              <React.Fragment key={i}>
+                <div className="flex flex-col items-center ">
+                  {settings && (
+                    <button
+                      onClick={() => updateDigit(i, 1)}
+                      className="mb-1 h-5 w-5 rounded-full bg-lime-500 text-xs text-white"
+                    >
+                      ▲
+                    </button>
+                  )}
+
+                  <div
+                    className={`flex h-[68px] w-[46px] items-center justify-center rounded-lg bg-black text-4xl font-bold text-lime-400 shadow-[inset_0_0_14px_rgba(0,255,0,0.5)]
+                    ${isLastSeconds ? "animate-pulse" : ""}`}
                   >
-                    ▲
-                  </button>
-                )}
+                    {d}
+                  </div>
 
-                <div className="flex h-[56px] w-[38px] items-center justify-center rounded-md bg-black text-3xl font-bold text-yellow-300">
-                  {d}
+                  {settings && (
+                    <button
+                      onClick={() => updateDigit(i, -1)}
+                      className="mt-1 h-5 w-5 rounded-full bg-lime-500 text-xs text-white"
+                    >
+                      ▼
+                    </button>
+                  )}
                 </div>
 
-                {settings && (
-                  <button
-                    onClick={() => updateDigit(i, -1)}
-                    className="mt-1 h-5 w-5 rounded-full bg-lime-500 text-xs text-white"
-                  >
-                    ▼
-                  </button>
+                {(i === 1 || i === 3) && (
+                  <span className="mx-1 flex items-center text-2xl font-bold">:</span>
                 )}
-              </div>
+              </React.Fragment>
+            ))}
+          </div>
 
-              {(i === 1 || i === 3) && (
-                <span className="mx-1 flex items-center text-xl font-bold text-black">
-                  :
-                </span>
+          {/* CONTROLS */}
+          <div className="flex items-center justify-center gap-6 rounded-xl bg-gray-200 py-3 shadow-inner">
+            <button onClick={reset} className="bg-white p-3 rounded-full shadow-md">
+              <Square size={20} fill="black" stroke="none" />
+            </button>
+
+            <button
+              className="h-14 w-14 bg-white rounded-full shadow-md flex items-center justify-center"
+              onClick={() => {
+                if (running) {
+                  setRunning(false);
+                  return;
+                }
+                if (settings) {
+                  setCountdown(true);
+                  setSettings(false);
+                }
+                setRunning(true);
+              }}
+            >
+              {running ? (
+                <Pause size={24} fill="black" stroke="none" />
+              ) : (
+                <Play size={24} fill="black" stroke="none" />
               )}
-            </React.Fragment>
-          ))}
-        </div>
+            </button>
 
-        {/* CONTROLS */}
-        <div className="flex items-center justify-center gap-4 rounded-xl bg-gray-200 py-2">
-          <button onClick={reset}>
-            <Square size={18} fill="black" stroke="none" />
-          </button>
-
-          <button
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-300"
-            onClick={() => {
-              if (running) {
+            <button
+              onClick={() => {
                 setRunning(false);
-                return;
-              }
-              if (settings) {
-                setCountdown(true);
-                setSettings(false);
-              }
-              setRunning(true);
-            }}
-          >
-            {running ? (
-              <Pause size={20} fill="black" stroke="none" />
-            ) : (
-              <Play size={20} fill="black" stroke="none" />
-            )}
-          </button>
-
-          <button
-            onClick={() => {
-              setRunning(false);
-              setCountdown(false);
-              setSettings((s) => !s);
-            }}
-          >
-            <Settings size={18} />
-          </button>
+                setCountdown(false);
+                setSettings((s) => !s);
+              }}
+              className={`bg-white p-3 rounded-full shadow-md ${settings ? "ring-2 ring-lime-400" : ""}`}
+            >
+              <Settings size={20} />
+            </button>
+          </div>
         </div>
+
+        {/* RESIZE HANDLE */}
+        <div
+          onMouseDown={(e) => {
+            e.stopPropagation();
+            pos.current.resizing = true;
+            pos.current.startScale = scale;
+            pos.current.startX = e.clientX;
+            pos.current.startY = e.clientY;
+          }}
+          className="absolute bottom-2 right-2 h-4 w-4 cursor-nwse-resize rounded-sm bg-gray-500 opacity-60"
+        />
       </div>
     </div>
   );

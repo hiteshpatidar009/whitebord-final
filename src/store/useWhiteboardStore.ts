@@ -69,7 +69,7 @@ interface WhiteboardState {
 
 export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   tool: 'pen',
-  color: COLORS.red,
+  color: COLORS.black,
   size: 44,
   items: [],
   history: [[]],

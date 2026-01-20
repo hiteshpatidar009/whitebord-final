@@ -2433,7 +2433,7 @@ const getCursorStyle = () => {
       {showProtractor && <Protractor />}
       {showDivider && <Divider />}
 
-      {/* Multi-selection drag button */}
+      {/* Multi-selection drag overlay */}
       {selectedId && selectedId.includes(',') && (() => {
         const selectedIds = selectedId.split(',');
         const stage = stageRef.current;
@@ -2451,118 +2451,77 @@ const getCursorStyle = () => {
           }
         });
         
-        const centerX = (minX + maxX) / 2;
-        const centerY = minY - 40;
+        const dragHandler = (e: React.MouseEvent | React.TouchEvent) => {
+          e.preventDefault();
+          const stageRect = stage.container().getBoundingClientRect();
+          const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+          const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+          const startX = (clientX - stageRect.left - stagePos.x) / stageScale;
+          const startY = (clientY - stageRect.top - stagePos.y) / stageScale;
+          const initialItems = selectedIds.map(id => {
+            const item = items.find(i => i.id === id);
+            return item ? JSON.parse(JSON.stringify(item)) : null;
+          }).filter(Boolean);
+          
+          let animationId: number;
+          const handleMove = (e: MouseEvent | TouchEvent) => {
+            const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+            const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+            const currentX = (clientX - stageRect.left - stagePos.x) / stageScale;
+            const currentY = (clientY - stageRect.top - stagePos.y) / stageScale;
+            const dx = currentX - startX;
+            const dy = currentY - startY;
+            
+            cancelAnimationFrame(animationId);
+            animationId = requestAnimationFrame(() => {
+              initialItems.forEach((initialItem: any) => {
+                if (initialItem.type === 'text' || initialItem.type === 'image' || initialItem.type === 'group' || (initialItem.type === 'shape' && initialItem.shapeType !== 'line' && initialItem.shapeType !== 'polygon')) {
+                  updateItem(initialItem.id, { 
+                    x: initialItem.x + dx, 
+                    y: initialItem.y + dy 
+                  });
+                } else if (initialItem.type === 'stroke' || (initialItem.type === 'shape' && (initialItem.shapeType === 'line' || initialItem.shapeType === 'polygon'))) {
+                  const newPoints = initialItem.points.map((p: number, i: number) => 
+                    i % 2 === 0 ? p + dx : p + dy
+                  );
+                  updateItem(initialItem.id, { points: newPoints });
+                }
+              });
+            });
+          };
+          
+          const handleUp = () => {
+            cancelAnimationFrame(animationId);
+            saveHistory();
+            document.removeEventListener('mousemove', handleMove);
+            document.removeEventListener('mouseup', handleUp);
+            document.removeEventListener('touchmove', handleMove);
+            document.removeEventListener('touchend', handleUp);
+          };
+          
+          document.addEventListener('mousemove', handleMove);
+          document.addEventListener('mouseup', handleUp);
+          document.addEventListener('touchmove', handleMove);
+          document.addEventListener('touchend', handleUp);
+        };
         
         return (
           <div
-            onMouseDown={(e) => {
-              e.preventDefault();
-              const stageRect = stage.container().getBoundingClientRect();
-              const startX = (e.clientX - stageRect.left - stagePos.x) / stageScale;
-              const startY = (e.clientY - stageRect.top - stagePos.y) / stageScale;
-              const initialItems = selectedIds.map(id => {
-                const item = items.find(i => i.id === id);
-                return item ? JSON.parse(JSON.stringify(item)) : null;
-              }).filter(Boolean);
-              
-              const handleMove = (e: MouseEvent | TouchEvent) => {
-                const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-                const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-                const currentX = (clientX - stageRect.left - stagePos.x) / stageScale;
-                const currentY = (clientY - stageRect.top - stagePos.y) / stageScale;
-                const dx = currentX - startX;
-                const dy = currentY - startY;
-                
-                initialItems.forEach((initialItem: any) => {
-                  if (initialItem.type === 'text' || initialItem.type === 'image' || initialItem.type === 'group' || (initialItem.type === 'shape' && initialItem.shapeType !== 'line' && initialItem.shapeType !== 'polygon')) {
-                    updateItem(initialItem.id, { 
-                      x: initialItem.x + dx, 
-                      y: initialItem.y + dy 
-                    });
-                  } else if (initialItem.type === 'stroke' || (initialItem.type === 'shape' && (initialItem.shapeType === 'line' || initialItem.shapeType === 'polygon'))) {
-                    const newPoints = initialItem.points.map((p: number, i: number) => 
-                      i % 2 === 0 ? p + dx : p + dy
-                    );
-                    updateItem(initialItem.id, { points: newPoints });
-                  }
-                });
-              };
-              
-              const handleUp = () => {
-                saveHistory();
-                document.removeEventListener('mousemove', handleMove);
-                document.removeEventListener('mouseup', handleUp);
-                document.removeEventListener('touchmove', handleMove);
-                document.removeEventListener('touchend', handleUp);
-              };
-              
-              document.addEventListener('mousemove', handleMove);
-              document.addEventListener('mouseup', handleUp);
-              document.addEventListener('touchmove', handleMove);
-              document.addEventListener('touchend', handleUp);
-            }}
-            onTouchStart={(e) => {
-              e.preventDefault();
-              const touch = e.touches[0];
-              const stageRect = stage.container().getBoundingClientRect();
-              const startX = (touch.clientX - stageRect.left - stagePos.x) / stageScale;
-              const startY = (touch.clientY - stageRect.top - stagePos.y) / stageScale;
-              const initialItems = selectedIds.map(id => {
-                const item = items.find(i => i.id === id);
-                return item ? JSON.parse(JSON.stringify(item)) : null;
-              }).filter(Boolean);
-              
-              const handleMove = (e: TouchEvent) => {
-                const touch = e.touches[0];
-                const currentX = (touch.clientX - stageRect.left - stagePos.x) / stageScale;
-                const currentY = (touch.clientY - stageRect.top - stagePos.y) / stageScale;
-                const dx = currentX - startX;
-                const dy = currentY - startY;
-                
-                initialItems.forEach((initialItem: any) => {
-                  if (initialItem.type === 'text' || initialItem.type === 'image' || initialItem.type === 'group' || (initialItem.type === 'shape' && initialItem.shapeType !== 'line' && initialItem.shapeType !== 'polygon')) {
-                    updateItem(initialItem.id, { 
-                      x: initialItem.x + dx, 
-                      y: initialItem.y + dy 
-                    });
-                  } else if (initialItem.type === 'stroke' || (initialItem.type === 'shape' && (initialItem.shapeType === 'line' || initialItem.shapeType === 'polygon'))) {
-                    const newPoints = initialItem.points.map((p: number, i: number) => 
-                      i % 2 === 0 ? p + dx : p + dy
-                    );
-                    updateItem(initialItem.id, { points: newPoints });
-                  }
-                });
-              };
-              
-              const handleUp = () => {
-                saveHistory();
-                document.removeEventListener('touchmove', handleMove);
-                document.removeEventListener('touchend', handleUp);
-              };
-              
-              document.addEventListener('touchmove', handleMove);
-              document.addEventListener('touchend', handleUp);
-            }}
+            onMouseDown={dragHandler}
+            onTouchStart={dragHandler}
             style={{
               position: 'fixed',
-              left: centerX + 'px',
-              top: centerY + 'px',
-              background: '#0099ff',
-              color: 'white',       
-              padding: '10px 20px',
-              borderRadius: '8px',
-              fontSize: '14px',
-              fontWeight: '600',
-              zIndex: 1000,
-              boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-              cursor: 'move',
-              userSelect: 'none',
-              border: '2px solid white'
+              left: minX + 'px',
+              top: minY + 'px',
+              width: (maxX - minX) + 'px',
+              height: (maxY - minY) + 'px',
+              cursor: 'grab',
+              zIndex: 999,
+              pointerEvents: 'auto'
             }}
-          >
-            ⬍ Drag items
-          </div>
+            onMouseDownCapture={(e) => e.currentTarget.style.cursor = 'grabbing'}
+            onMouseUpCapture={(e) => e.currentTarget.style.cursor = 'grab'}
+          />
         );
       })()}
 
