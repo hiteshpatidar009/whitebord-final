@@ -36,6 +36,10 @@ const Ruler: React.FC = () => {
     dark: {
       rulerBg: 'bg-[#05FF29]/10',
       rulerBorder: 'border-black',
+      toggleBtnBg: 'bg-white/20',
+      toggleBtnHover: 'hover:bg-gray-700',
+      toggleBtnBorder: 'border-black',
+      toggleIcon: 'text-white',
       tickColors: {
         10: 'bg-gray-900',
         5: 'bg-gray-800',
@@ -51,18 +55,22 @@ const Ruler: React.FC = () => {
         inch: 'text-gray-800'
       },
       closeBtn: {
-        bg: 'bg-gray-900/80',
-        hover: 'hover:bg-gray-900',
+        bg: 'bg-white/20', // Yahan bhi
+        hover: 'hover:bg-white/30',
         text: 'text-white'
       },
       resizeHandle: 'bg-gray-800 border-black',
-      rotateBtn: 'bg-gray-900 border-black text-white',
-      angleDisplay: 'bg-gray-900/90 border-gray-800 text-white',
+      rotateBtn: 'bg-white/20 border-white/30 text-white',
+      angleDisplay: 'bg-white/20 border-white/30 text-white',
       centerLine: 'bg-red-600/80'
     },
     light: {
       rulerBg: 'bg-[#05FF29]/10', // Same as dark theme
       rulerBorder: 'border-black',
+      toggleBtnBg: 'bg-white/90', // Whitish background for light theme
+      toggleBtnHover: 'hover:bg-white',
+      toggleBtnBorder: 'border-gray-300',
+      toggleIcon: 'text-gray-800',
       tickColors: {
         10: 'bg-gray-100',
         5: 'bg-gray-200',
@@ -78,13 +86,13 @@ const Ruler: React.FC = () => {
         inch: 'text-gray-200'
       },
       closeBtn: {
-        bg: 'bg-gray-100/80',
-        hover: 'hover:bg-gray-100',
+        bg: 'bg-white/90', // Whitish background
+        hover: 'hover:bg-white',
         text: 'text-gray-900'
       },
-      resizeHandle: 'bg-gray-200 border-gray-400',
-      rotateBtn: 'bg-gray-100 border-gray-400 text-gray-900',
-      angleDisplay: 'bg-gray-100/90 border-gray-300 text-gray-900',
+      resizeHandle: 'bg-gray-200 border-gray-300',
+      rotateBtn: 'bg-white/90 border-gray-300 text-gray-800', // Whitish background
+      angleDisplay: 'bg-white/90 border-gray-300 text-gray-800', // Whitish background
       centerLine: 'bg-red-600/80' // Same as dark theme
     }
   }
@@ -294,18 +302,48 @@ const Ruler: React.FC = () => {
             onClick={toggleTheme}
             className={`absolute left-16 top-1/2 -translate-y-1/2
              w-7 h-7 rounded-full
-             ${isDarkTheme ? 'bg-gray-800' : 'bg-gray-200'} backdrop-blur-sm
-             border ${colors.rulerBorder}
-             ${isDarkTheme ? 'text-white' : 'text-gray-900'} text-sm font-bold
+             ${colors.toggleBtnBg} backdrop-blur-sm
+             border ${colors.toggleBtnBorder}
+             ${colors.toggleIcon} text-sm font-bold
              flex items-center justify-center
-             shadow-lg ${
-               isDarkTheme ? 'hover:bg-gray-700' : 'hover:bg-gray-300'
-             }`}
+             shadow-lg ${colors.toggleBtnHover}`}
             title={
               isDarkTheme ? 'Switch to light theme' : 'Switch to dark theme'
             }
           >
-            {isDarkTheme ? '☀' : '☾'}
+            {isDarkTheme ? (
+              // Simple sun icon (no yellow, just outline)
+              <svg
+                width='14'
+                height='14'
+                viewBox='0 0 24 24'
+                fill='none'
+                stroke='currentColor'
+                strokeWidth='2'
+              >
+                <circle cx='12' cy='12' r='4' />
+                <line x1='12' y1='2' x2='12' y2='4' />
+                <line x1='12' y1='20' x2='12' y2='22' />
+                <line x1='4.22' y1='4.22' x2='5.64' y2='5.64' />
+                <line x1='18.36' y1='18.36' x2='19.78' y2='19.78' />
+                <line x1='2' y1='12' x2='4' y2='12' />
+                <line x1='20' y1='12' x2='22' y2='12' />
+                <line x1='4.22' y1='19.78' x2='5.64' y2='18.36' />
+                <line x1='18.36' y1='5.64' x2='19.78' y2='4.22' />
+              </svg>
+            ) : (
+              // Simple moon icon
+              <svg
+                width='14'
+                height='14'
+                viewBox='0 0 24 24'
+                fill='none'
+                stroke='currentColor'
+                strokeWidth='2'
+              >
+                <path d='M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z' />
+              </svg>
+            )}
           </button>
 
           {/* Resize */}
