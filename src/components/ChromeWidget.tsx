@@ -225,14 +225,23 @@ const ChromeSearchWidget: React.FC<Props> = ({
 
   /* ================= VALIDATE API CONFIG ================= */
   const validateApiConfig = (): boolean => {
+    console.log('Validating API config:', {
+      mode,
+      GOOGLE_KEY: GOOGLE_KEY ? 'Present' : 'Missing',
+      GOOGLE_CX: GOOGLE_CX ? 'Present' : 'Missing', 
+      YT_KEY: YT_KEY ? 'Present' : 'Missing'
+    });
+    
     if (mode === 'google') {
       if (!GOOGLE_KEY || !GOOGLE_CX) {
+        console.error('Google API config missing:', { GOOGLE_KEY: !!GOOGLE_KEY, GOOGLE_CX: !!GOOGLE_CX });
         setError(handleSearchError('API_NOT_CONFIGURED'));
         return false;
       }
     }
     if (mode === 'youtube') {
       if (!YT_KEY) {
+        console.error('YouTube API key missing');
         setError(handleSearchError('API_NOT_CONFIGURED'));
         return false;
       }
@@ -272,6 +281,12 @@ const ChromeSearchWidget: React.FC<Props> = ({
 
         if (!res.ok) {
           const errorData = await res.json().catch(() => ({}));
+          console.error('Google API Error:', {
+            status: res.status,
+            statusText: res.statusText,
+            errorData,
+            url: res.url
+          });
           
           if (res.status === 403) {
             if (errorData.error?.message?.includes('quota') || 
@@ -527,6 +542,18 @@ const ChromeSearchWidget: React.FC<Props> = ({
               <p className="text-sm text-amber-700 mt-1">
                 Google Search API is not configured. Add your API keys to enable search functionality.
               </p>
+              <button
+                onClick={() => {
+                  console.log('Current API Keys:', {
+                    GOOGLE_KEY: GOOGLE_KEY || 'Not set',
+                    GOOGLE_CX: GOOGLE_CX || 'Not set'
+                  });
+                  alert(`API Key Status:\nGoogle API Key: ${GOOGLE_KEY ? 'Set' : 'Missing'}\nGoogle CX: ${GOOGLE_CX ? 'Set' : 'Missing'}`);
+                }}
+                className="mt-2 text-xs bg-amber-100 hover:bg-amber-200 px-2 py-1 rounded transition-colors"
+              >
+                Check Current Config
+              </button>
             </div>
           </div>
         </div>

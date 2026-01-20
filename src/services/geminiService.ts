@@ -2,7 +2,7 @@
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 
 const getAIClient = () => {
-  return new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+  return new GoogleGenAI({ apiKey: import.meta.env.VITE_API_KEY as string });
 };
 
 export const transcribeHandwriting = async (base64Data: string): Promise<string> => {

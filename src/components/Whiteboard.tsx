@@ -2195,7 +2195,12 @@ const getCursorStyle = () => {
         ...getCursorStyle(),
         backgroundColor: '#f5f5f5',
         touchAction: 'none',
+        WebkitTouchCallout: 'none',
+        WebkitUserSelect: 'none',
+        userSelect: 'none'
       }}
+      onTouchStart={(e) => e.preventDefault()}
+      onTouchMove={(e) => e.preventDefault()}
     >
 
       {/* Chrome Widgets - Render BEFORE Stage */}
@@ -2232,7 +2237,7 @@ const getCursorStyle = () => {
       ))}
 
       {/* Stage Wrapper with higher z-index */}
-      <div style={{ position: 'absolute', inset: 0, zIndex: 10 }}>
+      <div style={{ position: 'absolute', inset: 0, zIndex: 10, touchAction: 'none' }}>
         <Stage
           ref={stageRef}
           style={{ background: 'transparent', zIndex: 10 }}
