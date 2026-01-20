@@ -8,7 +8,7 @@ const Ruler: React.FC = () => {
   const [position, setPosition] = useState({ x: 200, y: 200 })
   const [rotation, setRotation] = useState(0)
   const [width, setWidth] = useState(420)
-  const [isDarkTheme, setIsDarkTheme] = useState(true) // New state for theme
+  const [isDarkTheme, setIsDarkTheme] = useState(false) // Changed to false - DEFAULT LIGHT MODE
 
   const [dragging, setDragging] = useState(false)
   const [resizing, setResizing] = useState(false)
@@ -33,10 +33,11 @@ const Ruler: React.FC = () => {
 
   /* ---------------- Theme Colors ---------------- */
   const themeColors = {
-    dark: {
+    // LIGHT MODE (DEFAULT) - Original ruler style
+    light: {
       rulerBg: 'bg-[#05FF29]/10',
       rulerBorder: 'border-black',
-      toggleBtnBg: 'bg-white/20',
+      toggleBtnBg: 'bg-gray-900/80',
       toggleBtnHover: 'hover:bg-gray-700',
       toggleBtnBorder: 'border-black',
       toggleIcon: 'text-white',
@@ -55,45 +56,64 @@ const Ruler: React.FC = () => {
         inch: 'text-gray-800'
       },
       closeBtn: {
-        bg: 'bg-white/20', // Yahan bhi
-        hover: 'hover:bg-white/30',
+        bg: 'bg-gray-900/80',
+        hover: 'hover:bg-gray-900',
         text: 'text-white'
       },
       resizeHandle: 'bg-gray-800 border-black',
-      rotateBtn: 'bg-white/20 border-white/30 text-white',
-      angleDisplay: 'bg-white/20 border-white/30 text-white',
+      rotateBtn: 'bg-gray-900 border-black text-white',
+      angleDisplay: 'bg-gray-900/90 border-gray-800 text-white',
       centerLine: 'bg-red-600/80'
     },
-    light: {
-      rulerBg: 'bg-[#05FF29]/10', // Same as dark theme
-      rulerBorder: 'border-black',
-      toggleBtnBg: 'bg-white/90', // Whitish background for light theme
-      toggleBtnHover: 'hover:bg-white',
-      toggleBtnBorder: 'border-gray-300',
-      toggleIcon: 'text-gray-800',
+
+    // DARK MODE (AFTER TOGGLE) - Glass greyish-white style
+    dark: {
+      // Ruler background changed to greyish-white
+      rulerBg: 'bg-white/20',
+      rulerBorder: 'border-white/30',
+
+      // Toggle button
+      toggleBtnBg: 'bg-white/20',
+      toggleBtnHover: 'hover:bg-white/30',
+      toggleBtnBorder: 'border-white/30',
+      toggleIcon: 'text-white',
+
+      // Tick colors - changed to white variants
       tickColors: {
-        10: 'bg-gray-100',
-        5: 'bg-gray-200',
-        default: 'bg-gray-300'
+        10: 'bg-white/60',
+        5: 'bg-white/50',
+        default: 'bg-white/40'
       },
       inchTickColors: {
-        4: 'bg-gray-100',
-        2: 'bg-gray-300',
-        default: 'bg-gray-400'
+        4: 'bg-white/60',
+        2: 'bg-white/50',
+        default: 'bg-white/40'
       },
+
+      // Text colors - changed to white
       text: {
-        cm: 'text-gray-100',
-        inch: 'text-gray-200'
+        cm: 'text-white/80',
+        inch: 'text-white/70'
       },
+
+      // Close button
       closeBtn: {
-        bg: 'bg-white/90', // Whitish background
-        hover: 'hover:bg-white',
-        text: 'text-gray-900'
+        bg: 'bg-white/20',
+        hover: 'hover:bg-white/30',
+        text: 'text-white'
       },
-      resizeHandle: 'bg-gray-200 border-gray-300',
-      rotateBtn: 'bg-white/90 border-gray-300 text-gray-800', // Whitish background
-      angleDisplay: 'bg-white/90 border-gray-300 text-gray-800', // Whitish background
-      centerLine: 'bg-red-600/80' // Same as dark theme
+
+      // Resize handle
+      resizeHandle: 'bg-white/20 border-white/30',
+
+      // Rotate button
+      rotateBtn: 'bg-white/20 border-white/30 text-white',
+
+      // Angle display
+      angleDisplay: 'bg-white/20 border-white/30 text-white',
+
+      // Center line (kept same for visibility)
+      centerLine: 'bg-red-600/80'
     }
   }
 
@@ -275,9 +295,7 @@ const Ruler: React.FC = () => {
             className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 ${
               colors.angleDisplay
             } px-4 py-2 rounded-lg border ${
-              colors.angleDisplay.includes('gray-900')
-                ? 'border-gray-800'
-                : 'border-gray-300'
+              isDarkTheme ? 'border-white/30' : 'border-gray-800'
             } font-bold`}
           >
             {Math.round(rotation)}°
@@ -308,11 +326,13 @@ const Ruler: React.FC = () => {
              flex items-center justify-center
              shadow-lg ${colors.toggleBtnHover}`}
             title={
-              isDarkTheme ? 'Switch to light theme' : 'Switch to dark theme'
+              isDarkTheme
+                ? 'Switch to light theme (original)'
+                : 'Switch to dark theme (glass)'
             }
           >
             {isDarkTheme ? (
-              // Simple sun icon (no yellow, just outline)
+              // Sun icon for dark mode (switch to light)
               <svg
                 width='14'
                 height='14'
@@ -332,7 +352,7 @@ const Ruler: React.FC = () => {
                 <line x1='18.36' y1='5.64' x2='19.78' y2='4.22' />
               </svg>
             ) : (
-              // Simple moon icon
+              // Moon icon for light mode (switch to dark)
               <svg
                 width='14'
                 height='14'
