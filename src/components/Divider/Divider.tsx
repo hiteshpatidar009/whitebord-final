@@ -155,23 +155,40 @@ const Divider: React.FC = () => {
     update();
   }, [update, saveHistory]);
 
-  const toggleLock = useCallback(() => {
+  const toggleLock = useCallback((e?: React.TouchEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     stateRef.current.isLocked = !stateRef.current.isLocked;
     update();
   }, [update]);
 
+  const closeDivider = useCallback((e?: React.TouchEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    setShowDivider(false);
+  }, [setShowDivider]);
+
   React.useEffect(() => {
     if (!showDivider) return;
 
+    const handleTouchMove = (e: TouchEvent) => {
+      e.preventDefault();
+      handleMouseMove(e);
+    };
+
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
-    document.addEventListener('touchmove', handleMouseMove);
+    document.addEventListener('touchmove', handleTouchMove, { passive: false });
     document.addEventListener('touchend', handleMouseUp);
 
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
-      document.removeEventListener('touchmove', handleMouseMove);
+      document.removeEventListener('touchmove', handleTouchMove);
       document.removeEventListener('touchend', handleMouseUp);
     };
   }, [showDivider, handleMouseMove, handleMouseUp]);
@@ -297,13 +314,13 @@ const Divider: React.FC = () => {
           stroke="#5B21B6"
           strokeWidth="2"
           onClick={toggleLock}
-          onTouchEnd={toggleLock}
+          onTouchStart={toggleLock}
           className="cursor-pointer"
         />
         
         {/* LOCK ICON */}
         {state.isLocked ? (
-          <g onClick={toggleLock} onTouchEnd={toggleLock} className="cursor-pointer">
+          <g onClick={toggleLock} onTouchStart={toggleLock} className="cursor-pointer">
             <rect
               x={pencilPos.x - 30}
               y={pencilPos.y - 63}
@@ -320,7 +337,7 @@ const Divider: React.FC = () => {
             />
           </g>
         ) : (
-          <g onClick={toggleLock} onTouchEnd={toggleLock} className="cursor-pointer">
+          <g onClick={toggleLock} onTouchStart={toggleLock} className="cursor-pointer">
             <rect
               x={pencilPos.x - 30}
               y={pencilPos.y - 63}
@@ -381,8 +398,8 @@ const Divider: React.FC = () => {
           fill="#DC2626"
           stroke="#991B1B"
           strokeWidth="1"
-          onClick={() => setShowDivider(false)}
-          onTouchEnd={() => setShowDivider(false)}
+          onClick={closeDivider}
+          onTouchStart={closeDivider}
           className="cursor-pointer"
         />
         <text
@@ -392,8 +409,8 @@ const Divider: React.FC = () => {
           fontSize="10"
           fill="white"
           className="cursor-pointer select-none"
-          onClick={() => setShowDivider(false)}
-          onTouchEnd={() => setShowDivider(false)}
+          onClick={closeDivider}
+          onTouchStart={closeDivider}
         >
           ✕
         </text>
