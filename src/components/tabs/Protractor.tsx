@@ -3,13 +3,15 @@ import { useWhiteboardStore } from '../../store/useWhiteboardStore'
 import { useTouchAndMouse } from '../../hooks/useTouchAndMouse'
 
 const Protractor: React.FC = () => {
-  const { setShowProtractor, addItem, color, saveHistory } = useWhiteboardStore()
+  const { setShowProtractor, addItem, color, saveHistory } =
+    useWhiteboardStore()
   const ref = useRef<HTMLDivElement>(null)
 
   // -- Window/Tool State --
   const [position, setPosition] = useState({ x: 300, y: 300 })
   const [rotation, setRotation] = useState(0)
   const [size, setSize] = useState(400) // Width of the base
+  const [isDarkTheme, setIsDarkTheme] = useState(false) // Theme toggle state
 
   // -- Interaction State --
   const [isDragging, setIsDragging] = useState(false)
@@ -27,7 +29,15 @@ const Protractor: React.FC = () => {
   const animationFrameRef = useRef<number | null>(null)
   const { getPointerEvent } = useTouchAndMouse()
   const drawingPoints = useRef<{ [key: number]: number[] }>({ 1: [], 2: [] })
-  const currentStrokeId = useRef<{ [key: number]: string | null }>({ 1: null, 2: null })
+  const currentStrokeId = useRef<{ [key: number]: string | null }>({
+    1: null,
+    2: null
+  })
+
+  /* ---------------- Theme Toggle ---------------- */
+  const toggleTheme = () => {
+    setIsDarkTheme(!isDarkTheme)
+  }
 
   /* ================= TOOL TRANSFORM HANDLERS ================= */
 
@@ -74,18 +84,21 @@ const Protractor: React.FC = () => {
 
   /* ================= ARM INTERACTION HANDLERS ================= */
 
-  const handleArmMouseDown = (e: React.MouseEvent | React.TouchEvent, armIndex: 1 | 2) => {
+  const handleArmMouseDown = (
+    e: React.MouseEvent | React.TouchEvent,
+    armIndex: 1 | 2
+  ) => {
     const pointer = getPointerEvent(e)
     pointer.preventDefault()
     pointer.stopPropagation()
     setDraggingArm(armIndex)
     lastAngleUpdate.current = Date.now()
-    
+
     // Initialize drawing
     const id = `protractor-${armIndex}-${Date.now()}`
     currentStrokeId.current[armIndex] = id
     drawingPoints.current[armIndex] = []
-    
+
     // Get current arm tip position in screen coordinates
     const cx = position.x + size / 2
     const cy = position.y + size / 2
@@ -93,12 +106,12 @@ const Protractor: React.FC = () => {
     const rad = (currentAngle * Math.PI) / 180
     const rotRad = (rotation * Math.PI) / 180
     const armLen = rOuter + 40
-    
+
     const localX = armLen * Math.cos(-rad)
     const localY = armLen * Math.sin(-rad)
     const screenX = cx + localX * Math.cos(rotRad) - localY * Math.sin(rotRad)
     const screenY = cy + localX * Math.sin(rotRad) + localY * Math.cos(rotRad)
-    
+
     drawingPoints.current[armIndex].push(screenX, screenY)
   }
 
@@ -163,8 +176,7 @@ const Protractor: React.FC = () => {
           // Pivot is stable at position + size/2
           const cx = position.x + size / 2
           const cy = position.y + size / 2
-          const angle =
-            Math.atan2(clientY - cy, clientX - cx) * (180 / Math.PI)
+          const angle = Math.atan2(clientY - cy, clientX - cx) * (180 / Math.PI)
           setRotation(angle + dragStart.current.initialRotation)
         } else if (draggingArm) {
           // Throttle angle updates to reduce jitter
@@ -182,22 +194,27 @@ const Protractor: React.FC = () => {
           } else {
             setAngle2(newAngle)
           }
-          
+
           // Add drawing point
           const cx = position.x + size / 2
           const cy = position.y + size / 2
           const rad = (newAngle * Math.PI) / 180
           const rotRad = (rotation * Math.PI) / 180
           const armLen = rOuter + 40
-          
+
           const localX = armLen * Math.cos(-rad)
           const localY = armLen * Math.sin(-rad)
-          const screenX = cx + localX * Math.cos(rotRad) - localY * Math.sin(rotRad)
-          const screenY = cy + localX * Math.sin(rotRad) + localY * Math.cos(rotRad)
-          
+          const screenX =
+            cx + localX * Math.cos(rotRad) - localY * Math.sin(rotRad)
+          const screenY =
+            cy + localX * Math.sin(rotRad) + localY * Math.cos(rotRad)
+
           drawingPoints.current[draggingArm].push(screenX, screenY)
-          
-          if (currentStrokeId.current[draggingArm] && drawingPoints.current[draggingArm].length >= 4) {
+
+          if (
+            currentStrokeId.current[draggingArm] &&
+            drawingPoints.current[draggingArm].length >= 4
+          ) {
             const armColor = draggingArm === 1 ? '#2563EB' : '#DC2626'
             addItem({
               type: 'stroke',
@@ -215,7 +232,11 @@ const Protractor: React.FC = () => {
     }
 
     const handleMouseUp = () => {
-      if (draggingArm && currentStrokeId.current[draggingArm] && drawingPoints.current[draggingArm].length >= 4) {
+      if (
+        draggingArm &&
+        currentStrokeId.current[draggingArm] &&
+        drawingPoints.current[draggingArm].length >= 4
+      ) {
         saveHistory()
       }
       setIsDragging(false)
@@ -290,7 +311,15 @@ const Protractor: React.FC = () => {
           y1={p1.y}
           x2={p2.x}
           y2={p2.y}
-          stroke={isMajor ? '#000' : '#666'}
+          stroke={
+            isMajor
+              ? isDarkTheme
+                ? '#fff'
+                : '#000'
+              : isDarkTheme
+              ? '#aaa'
+              : '#666'
+          }
           strokeWidth={isMajor ? 1.5 : 1}
         />
       )
@@ -307,7 +336,7 @@ const Protractor: React.FC = () => {
             fontWeight='600'
             textAnchor='middle'
             dominantBaseline='middle'
-            fill='#333'
+            fill={isDarkTheme ? '#fff' : '#333'}
             transform={`rotate(${90 - i} ${pText.x} ${pText.y})`}
           >
             {i}
@@ -329,7 +358,7 @@ const Protractor: React.FC = () => {
           fontSize={9}
           textAnchor='middle'
           dominantBaseline='middle'
-          fill='#DC2626'
+          fill={isDarkTheme ? '#ff9999' : '#DC2626'}
           transform={`rotate(${90 - i} ${pText.x} ${pText.y})`}
         >
           {val}
@@ -338,7 +367,7 @@ const Protractor: React.FC = () => {
     }
 
     return ticks
-  }, [rOuter])
+  }, [rOuter, isDarkTheme])
 
   const armLength = rOuter + 40 // Extend beyond the protractor body
   const pArm1 = degToSvg(angle1, armLength)
@@ -379,8 +408,10 @@ const Protractor: React.FC = () => {
             d={`M 0,${size / 2} A ${size / 2},${size / 2} 0 0,1 ${size},${
               size / 2
             } Z`}
-            fill='rgba(5, 255, 41, 0.1)'
-            stroke='#000'
+            fill={
+              isDarkTheme ? 'rgba(255, 255, 255, 0.2)' : 'rgba(5, 255, 41, 0.1)'
+            }
+            stroke={isDarkTheme ? '#fff' : '#000'}
             strokeWidth='2.5'
             className='backdrop-blur-sm'
           />
@@ -389,7 +420,12 @@ const Protractor: React.FC = () => {
           {renderTicks}
 
           {/* Pivot Point */}
-          <circle cx={size / 2} cy={size / 2} r={5} fill='#000' />
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={5}
+            fill={isDarkTheme ? '#fff' : '#000'}
+          />
 
           {/* Arm 1 (Blue) */}
           <line
@@ -439,7 +475,13 @@ const Protractor: React.FC = () => {
         </svg>
 
         {/* Live Angle Display Box */}
-        <div className='absolute left-1/2 bottom-2 -translate-x-1/2 bg-gray-900/90 text-white px-3 py-1 rounded-full text-sm font-bold shadow-lg pointer-events-none'>
+        <div
+          className={`absolute left-1/2 bottom-2 -translate-x-1/2 ${
+            isDarkTheme ? 'bg-white/20' : 'bg-gray-900/90'
+          } ${
+            isDarkTheme ? 'text-white' : 'text-white'
+          } px-3 py-1 rounded-full text-sm font-bold shadow-lg pointer-events-none`}
+        >
           {displayAngle}°
         </div>
       </div>
@@ -448,7 +490,11 @@ const Protractor: React.FC = () => {
 
       {/* Close Button */}
       <button
-        className='absolute -top-4 left-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-gray-800 text-white flex items-center justify-center shadow-lg hover:bg-gray-900 border border-gray-700 protractor-control pointer-events-auto'
+        className={`absolute -top-4 left-1/2 -translate-x-1/2 w-8 h-8 rounded-full ${
+          isDarkTheme
+            ? 'bg-white/20 hover:bg-white/30 border-white/30'
+            : 'bg-gray-800 hover:bg-gray-900 border-gray-700'
+        } text-white flex items-center justify-center shadow-lg border protractor-control pointer-events-auto`}
         onClick={e => {
           e.preventDefault()
           e.stopPropagation()
@@ -458,9 +504,64 @@ const Protractor: React.FC = () => {
         ×
       </button>
 
+      {/* Theme Toggle Button */}
+      <button
+        onClick={toggleTheme}
+        className={`absolute -top-4 left-[calc(50%+50px)] -translate-x-1/2 w-8 h-8 rounded-full 
+          ${isDarkTheme ? 'bg-white/20' : 'bg-gray-900/80'} backdrop-blur-sm
+          border ${isDarkTheme ? 'border-white/30' : 'border-black'}
+          ${isDarkTheme ? 'text-white' : 'text-white'} text-sm font-bold
+          flex items-center justify-center
+          shadow-lg protractor-control pointer-events-auto
+          ${isDarkTheme ? 'hover:bg-white/30' : 'hover:bg-gray-700'}`}
+        title={
+          isDarkTheme
+            ? 'Switch to light theme (original)'
+            : 'Switch to dark theme (glass)'
+        }
+      >
+        {isDarkTheme ? (
+          // Sun icon for dark mode (switch to light)
+          <svg
+            width='14'
+            height='14'
+            viewBox='0 0 24 24'
+            fill='none'
+            stroke='currentColor'
+            strokeWidth='2'
+          >
+            <circle cx='12' cy='12' r='4' />
+            <line x1='12' y1='2' x2='12' y2='4' />
+            <line x1='12' y1='20' x2='12' y2='22' />
+            <line x1='4.22' y1='4.22' x2='5.64' y2='5.64' />
+            <line x1='18.36' y1='18.36' x2='19.78' y2='19.78' />
+            <line x1='2' y1='12' x2='4' y2='12' />
+            <line x1='20' y1='12' x2='22' y2='12' />
+            <line x1='4.22' y1='19.78' x2='5.64' y2='18.36' />
+            <line x1='18.36' y1='5.64' x2='19.78' y2='4.22' />
+          </svg>
+        ) : (
+          // Moon icon for light mode (switch to dark)
+          <svg
+            width='14'
+            height='14'
+            viewBox='0 0 24 24'
+            fill='none'
+            stroke='currentColor'
+            strokeWidth='2'
+          >
+            <path d='M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z' />
+          </svg>
+        )}
+      </button>
+
       {/* Resize Handle */}
       <div
-        className='absolute bottom-0 right-0 translate-x-1/2 translate-y-1/2 w-8 h-8 bg-gray-800/80 border-2 border-gray-700 rounded-full cursor-se-resize flex items-center justify-center shadow-lg protractor-control pointer-events-auto hover:bg-gray-900'
+        className={`absolute bottom-0 right-0 translate-x-1/2 translate-y-1/2 w-8 h-8 ${
+          isDarkTheme
+            ? 'bg-white/20 border-white/30 hover:bg-white/30'
+            : 'bg-gray-800/80 border-gray-700 hover:bg-gray-900'
+        } rounded-full cursor-se-resize flex items-center justify-center shadow-lg protractor-control pointer-events-auto`}
         onMouseDown={handleResizeStart}
         onTouchStart={handleResizeStart}
       >
@@ -469,7 +570,7 @@ const Protractor: React.FC = () => {
           height='14'
           viewBox='0 0 24 24'
           fill='none'
-          stroke='white'
+          stroke={isDarkTheme ? 'currentColor' : 'white'}
           strokeWidth='3'
         >
           <path d='M15 3h6v6M9 21H3v-6' />
@@ -478,7 +579,11 @@ const Protractor: React.FC = () => {
 
       {/* Rotate Handle */}
       <div
-        className='absolute bottom-0 left-0 -translate-x-1/2 translate-y-1/2 w-8 h-8 bg-gray-800/80 border-2 border-gray-700 rounded-full cursor-move flex items-center justify-center shadow-lg protractor-control pointer-events-auto hover:bg-gray-900'
+        className={`absolute bottom-0 left-0 -translate-x-1/2 translate-y-1/2 w-8 h-8 ${
+          isDarkTheme
+            ? 'bg-white/20 border-white/30 hover:bg-white/30'
+            : 'bg-gray-800/80 border-gray-700 hover:bg-gray-900'
+        } rounded-full cursor-move flex items-center justify-center shadow-lg protractor-control pointer-events-auto`}
         onMouseDown={handleRotateStart}
         onTouchStart={handleRotateStart}
       >
@@ -487,7 +592,7 @@ const Protractor: React.FC = () => {
           height='16'
           viewBox='0 0 24 24'
           fill='none'
-          stroke='white'
+          stroke={isDarkTheme ? 'currentColor' : 'white'}
           strokeWidth='2.5'
         >
           <path d='M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8' />
