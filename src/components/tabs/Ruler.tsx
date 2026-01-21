@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react'
 import { useWhiteboardStore } from '../../store/useWhiteboardStore'
+import { Minus } from 'lucide-react'
 
 // Ruler geometry interface
 export interface RulerGeometry {
@@ -49,7 +50,7 @@ export const RulerUtils = {
 }
 
 const Ruler: React.FC = () => {
-  const { setShowRuler, setRulerGeometry } = useWhiteboardStore()
+  const { setShowRuler, setRulerGeometry, setTool } = useWhiteboardStore()
   const rulerRef = useRef<HTMLDivElement>(null)
 
   const [position, setPosition] = useState({ x: 200, y: 200 })
@@ -394,6 +395,21 @@ const Ruler: React.FC = () => {
              shadow-lg ${colors.closeBtn.hover}`}
           >
             ×
+          </button>
+          
+          {/* Line Tool Button */}
+          <button
+            onClick={() => setTool('line')}
+            className={`absolute left-28 top-1/2 -translate-y-1/2
+             w-7 h-7 rounded-full
+             bg-gray-700 backdrop-blur-sm
+             border border-gray-700
+             text-white text-sm font-bold
+             flex items-center justify-center
+             shadow-lg hover:bg-gray-700`}
+            title='Straight Line Tool'
+          >
+            <Minus size={14} />
           </button>
 
           {/* Theme Toggle Button */}

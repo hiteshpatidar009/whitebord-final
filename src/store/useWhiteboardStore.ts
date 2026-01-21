@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import { type ToolType, type WhiteboardItem, COLORS } from '../types';
 import { type RulerGeometry } from '../components/tabs/Ruler';
+import { type Triangle45Geometry } from '../components/tabs/Triangle45';
+import { type Triangle60Geometry } from '../components/tabs/Triangle60';
 
 interface WhiteboardState {
   tool: ToolType;
@@ -33,6 +35,8 @@ interface WhiteboardState {
   showNumberLine: boolean;
   showDivider: boolean;
   rulerGeometry: RulerGeometry | null;
+  triangle45Geometry: Triangle45Geometry | null;
+  triangle60Geometry: Triangle60Geometry | null;
   
   setTool: (tool: ToolType) => void;
   setSelectedId: (id: string | null) => void;
@@ -54,6 +58,8 @@ interface WhiteboardState {
   setShowNumberLine: (show: boolean) => void;
   setShowDivider: (show: boolean) => void;
   setRulerGeometry: (geometry: RulerGeometry | null) => void;
+  setTriangle45Geometry: (geometry: Triangle45Geometry | null) => void;
+  setTriangle60Geometry: (geometry: Triangle60Geometry | null) => void;
   
   addItem: (item: WhiteboardItem) => void;
   updateItem: (id: string, updates: Partial<WhiteboardItem>) => void;
@@ -100,6 +106,8 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   showNumberLine: false,
   showDivider: false,
   rulerGeometry: null,
+  triangle45Geometry: null,
+  triangle60Geometry: null,
 
   setTool: (tool) => set({ tool }),
   setSelectedId: (selectedId) => set({ selectedId }),
@@ -120,6 +128,8 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   setShowNumberLine: (showNumberLine) => set({ showNumberLine }),
   setShowDivider: (showDivider) => set({ showDivider }),
   setRulerGeometry: (rulerGeometry) => set({ rulerGeometry }),
+  setTriangle45Geometry: (triangle45Geometry) => set({ triangle45Geometry }),
+  setTriangle60Geometry: (triangle60Geometry) => set({ triangle60Geometry }),
 
   // --- UPDATED: Cache Busting Logic ---
   setBackgroundImage: (image) => {

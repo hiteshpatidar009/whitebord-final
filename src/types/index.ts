@@ -1,4 +1,4 @@
-export type ToolType = 'select' | 'hand' | 'pen' | 'eraser' | 'shape' | 'text' | 'image' | 'handwriting' | 'highlighter' | 'fill' | 'highlighter-eraser';
+export type ToolType = 'select' | 'hand' | 'pen' | 'eraser' | 'shape' | 'text' | 'image' | 'handwriting' | 'highlighter' | 'fill' | 'highlighter-eraser' | 'line';
 
 export type Point = {
   x: number;

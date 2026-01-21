@@ -13,6 +13,7 @@ import Protractor from './tabs/Protractor';
 import Divider from './Divider/Divider';
 import { RulerUtils } from './tabs/Ruler';
 
+
 import { transcribeHandwriting } from '../services/geminiService';
 
 
@@ -232,6 +233,8 @@ export const Whiteboard: React.FC = () => {
     showProtractor,
     showDivider,
     rulerGeometry,
+    triangle45Geometry,
+    triangle60Geometry,
   } = useWhiteboardStore();
 
   // --- PAN STATE ---
@@ -855,6 +858,22 @@ export const Whiteboard: React.FC = () => {
       });
       return;
     }
+
+    if (tool === 'line') {
+      addItem({
+        type: 'shape',
+        id,
+        shapeType: 'line',
+        points: [pos.x, pos.y],
+        stroke: color,
+        strokeWidth: size,
+        opacity: 1,
+        x: 0,
+        y: 0
+      });
+      return;
+    }
+
     addItem({
       type: 'stroke', 
       id, 
@@ -921,7 +940,14 @@ export const Whiteboard: React.FC = () => {
 
     if (currentStrokeId.current) {
         const stroke = items.find(i => i.id === currentStrokeId.current) as Stroke;
-        if (stroke) {
+        const shape = items.find(i => i.id === currentStrokeId.current && i.type === 'shape');
+        
+        if (tool === 'line' && shape) {
+            // For line tool, only store start and end points
+            updateItem(currentStrokeId.current, {
+                points: [shape.points![0], shape.points![1], point.x, point.y]
+            });
+        } else if (stroke) {
             let newX = point.x;
             let newY = point.y;
             
@@ -929,6 +955,24 @@ export const Whiteboard: React.FC = () => {
             if (rulerGeometry && (tool === 'pen' || tool === 'highlighter')) {
               if (RulerUtils.isNearRulerEdge(point.x, point.y, rulerGeometry)) {
                 const snapped = RulerUtils.snapToRulerEdge(point.x, point.y, rulerGeometry);
+                newX = snapped.x;
+                newY = snapped.y;
+              }
+            }
+            
+            // Apply Triangle45 snapping if triangle is visible and cursor is near triangle edge
+            if (triangle45Geometry && (tool === 'pen' || tool === 'highlighter')) {
+              if (Triangle45Utils.isNearTriangleEdge(point.x, point.y, triangle45Geometry)) {
+                const snapped = Triangle45Utils.snapToTriangleEdge(point.x, point.y, triangle45Geometry);
+                newX = snapped.x;
+                newY = snapped.y;
+              }
+            }
+            
+            // Apply Triangle60 snapping if triangle is visible and cursor is near triangle edge
+            if (triangle60Geometry && (tool === 'pen' || tool === 'highlighter')) {
+              if (Triangle60Utils.isNearTriangleEdge(point.x, point.y, triangle60Geometry)) {
+                const snapped = Triangle60Utils.snapToTriangleEdge(point.x, point.y, triangle60Geometry);
                 newX = snapped.x;
                 newY = snapped.y;
               }

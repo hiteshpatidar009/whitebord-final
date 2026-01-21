@@ -2,7 +2,7 @@ import React, { useRef, useEffect } from 'react';
 import { useWhiteboardStore } from '../store/useWhiteboardStore';
 import { v4 as uuidv4 } from 'uuid';
 import { 
-  Pen, Hand, Eraser, Shapes, Type, Undo, Redo, FileUp, MousePointer2, PenLine, Trash2, Image as ImageIcon, Highlighter, PaintBucket, Maximize2, Upload, X , Plus
+  Pen, Hand, Eraser, Shapes, Type, Undo, Redo, FileUp, MousePointer2, PenLine, Trash2, Image as ImageIcon, Highlighter, PaintBucket, Maximize2, Upload, X , Plus, Minus
 } from 'lucide-react';
 import ExpandableToolbar from "./ExpandableToolbar";
 import { COLORS, type ToolType } from '../types';
@@ -265,6 +265,7 @@ export const Toolbar: React.FC = () => {
           case 'e': setTool('eraser'); e.preventDefault(); break;
           case 's': setTool('shape'); e.preventDefault(); break;
           case 't': handleToolClick('text'); e.preventDefault(); break;
+
           case 'i': setTool('highlighter'); e.preventDefault(); break;
         }
       }
@@ -391,6 +392,7 @@ export const Toolbar: React.FC = () => {
     { id: 'select', icon: <MousePointer2 size={20} />, label: 'Select' },
     { id: 'hand', icon: <Hand size={20} />, label: 'Pan' },
     { id: 'pen', icon: <Pen size={20} />, label: 'Pen' },
+
     { id: 'handwriting', icon: <PenLine size={20} />, label: 'Handwriting' },
     { id: 'highlighter', icon: <Highlighter size={20} />, label: 'Highlighter' },
     { id: 'highlighter-eraser', icon: <Eraser size={20} color="#ff00ff" />, label: 'Highlighter Eraser' },
