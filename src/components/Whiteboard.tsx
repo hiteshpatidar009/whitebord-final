@@ -945,7 +945,7 @@ export const Whiteboard: React.FC = () => {
         if (tool === 'line' && shape) {
             // For line tool, only store start and end points
             updateItem(currentStrokeId.current, {
-                points: [shape.points![0], shape.points![1], point.x, point.y]
+                points: [(shape as any).points![0], (shape as any).points![1], point.x, point.y]
             });
         } else if (stroke) {
             let newX = point.x;
