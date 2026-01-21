@@ -3,13 +3,16 @@ import { useWhiteboardStore } from '../../store/useWhiteboardStore'
 import { useTouchAndMouse } from '../../hooks/useTouchAndMouse'
 
 const Protractor: React.FC = () => {
-  const { setShowProtractor, addItem, color, saveHistory } = useWhiteboardStore()
+  const { setShowProtractor, addItem, saveHistory } = useWhiteboardStore()
   const ref = useRef<HTMLDivElement>(null)
 
   // -- Window/Tool State --
   const [position, setPosition] = useState({ x: 300, y: 300 })
   const [rotation, setRotation] = useState(0)
   const [size, setSize] = useState(400) // Width of the base
+  const rOuter = size / 2
+  const pivotX = size / 2
+  const pivotY = size / 2
 
   // -- Interaction State --
   const [isDragging, setIsDragging] = useState(false)
@@ -21,6 +24,12 @@ const Protractor: React.FC = () => {
   const [angle1, setAngle1] = useState(45)
   const [angle2, setAngle2] = useState(135)
   const [draggingArm, setDraggingArm] = useState<1 | 2 | null>(null)
+  const [measurementLines, setMeasurementLines] = useState<{
+    arm1: { startX: number, startY: number, endX: number, endY: number, angle: number } | null
+    arm2: { startX: number, startY: number, endX: number, endY: number, angle: number } | null
+  }>({ arm1: null, arm2: null })
+  const [isArcDrawingMode, setIsArcDrawingMode] = useState(false)
+  const [isDarkTheme, setIsDarkTheme] = useState(false)
 
   const dragStart = useRef({ x: 0, y: 0, initialSize: 0, initialRotation: 0 })
   const lastAngleUpdate = useRef<number>(0)
@@ -28,6 +37,35 @@ const Protractor: React.FC = () => {
   const { getPointerEvent } = useTouchAndMouse()
   const drawingPoints = useRef<{ [key: number]: number[] }>({ 1: [], 2: [] })
   const currentStrokeId = useRef<{ [key: number]: string | null }>({ 1: null, 2: null })
+
+  const toggleTheme = () => {
+    setIsDarkTheme(!isDarkTheme)
+  }
+
+  const themeColors = {
+    light: {
+      protractorBg: 'rgba(5, 255, 41, 0.1)',
+      protractorBorder: '#000',
+      tickMajor: '#000',
+      tickMinor: '#666',
+      textOuter: '#333',
+      textInner: '#DC2626',
+      centerBg: '#FFD700',
+      centerText: '#333'
+    },
+    dark: {
+      protractorBg: 'rgba(255, 255, 255, 0.1)',
+      protractorBorder: '#FFF',
+      tickMajor: '#FFF',
+      tickMinor: '#CCC',
+      textOuter: '#FFF',
+      textInner: '#FFF',
+      centerBg: '#4A5568',
+      centerText: '#FFF'
+    }
+  }
+
+  const colors = isDarkTheme ? themeColors.dark : themeColors.light
 
   /* ================= TOOL TRANSFORM HANDLERS ================= */
 
@@ -72,7 +110,128 @@ const Protractor: React.FC = () => {
     }
   }
 
-  /* ================= ARM INTERACTION HANDLERS ================= */
+  const handleArmDoubleClick = (armIndex: 1 | 2) => {
+    const cx = position.x + size / 2
+    const cy = position.y + size / 2
+    const currentAngle = armIndex === 1 ? angle1 : angle2
+    const rad = (currentAngle * Math.PI) / 180
+    const rotRad = (rotation * Math.PI) / 180
+    const armLen = rOuter + 100 // Extended line length
+    
+    // Calculate line endpoints in screen coordinates
+    const localX = armLen * Math.cos(-rad)
+    const localY = armLen * Math.sin(-rad)
+    const endX = cx + localX * Math.cos(rotRad) - localY * Math.sin(rotRad)
+    const endY = cy + localX * Math.sin(rotRad) + localY * Math.cos(rotRad)
+    
+    const lineData = {
+      startX: cx,
+      startY: cy,
+      endX,
+      endY,
+      angle: currentAngle
+    }
+    
+    if (armIndex === 1) {
+      setMeasurementLines(prev => ({ ...prev, arm1: lineData }))
+    } else {
+      setMeasurementLines(prev => ({ ...prev, arm2: lineData }))
+    }
+    
+    // Create persistent line item
+    const lineColor = armIndex === 1 ? '#2563EB' : '#DC2626'
+    addItem({
+      type: 'stroke',
+      id: `measurement-line-${armIndex}-${Date.now()}`,
+      tool: 'pen',
+      points: [cx, cy, endX, endY],
+      color: lineColor,
+      size: 3,
+      isEraser: false,
+      isHighlighter: false
+    } as any)
+    saveHistory()
+    
+    // Check if both arms have measurement lines to enable arc drawing
+    if (armIndex === 1 && measurementLines.arm2) {
+      setIsArcDrawingMode(true)
+    } else if (armIndex === 2 && measurementLines.arm1) {
+      setIsArcDrawingMode(true)
+    }
+  }
+
+  const handleCenterClick = (e: React.MouseEvent) => {
+    if (!isArcDrawingMode || !measurementLines.arm1 || !measurementLines.arm2) return
+    
+    e.preventDefault()
+    e.stopPropagation()
+    
+    const cx = position.x + size / 2
+    const cy = position.y + size / 2
+    const radius = 60
+    
+    // Calculate arc between the two angles
+    const startAngle = Math.min(measurementLines.arm1.angle, measurementLines.arm2.angle)
+    const endAngle = Math.max(measurementLines.arm1.angle, measurementLines.arm2.angle)
+    const angleDiff = endAngle - startAngle
+    
+    // Create arc points
+    const arcPoints: number[] = []
+    const steps = Math.max(20, Math.floor(angleDiff * 2))
+    
+    for (let i = 0; i <= steps; i++) {
+      const currentAngle = startAngle + (angleDiff * i / steps)
+      const rad = (currentAngle * Math.PI) / 180
+      const rotRad = (rotation * Math.PI) / 180
+      
+      const localX = radius * Math.cos(-rad)
+      const localY = radius * Math.sin(-rad)
+      const x = cx + localX * Math.cos(rotRad) - localY * Math.sin(rotRad)
+      const y = cy + localX * Math.sin(rotRad) + localY * Math.cos(rotRad)
+      
+      arcPoints.push(x, y)
+    }
+    
+    // Add the arc as a stroke
+    addItem({
+      type: 'stroke',
+      id: `angle-arc-${Date.now()}`,
+      tool: 'pen',
+      points: arcPoints,
+      color: '#10B981',
+      size: 3,
+      isEraser: false,
+      isHighlighter: false
+    } as any)
+    
+    // Add angle text at the middle of the arc
+    const midAngle = (startAngle + endAngle) / 2
+    const textRadius = radius + 15
+    const textRad = (midAngle * Math.PI) / 180
+    const rotRad = (rotation * Math.PI) / 180
+    
+    const textLocalX = textRadius * Math.cos(-textRad)
+    const textLocalY = textRadius * Math.sin(-textRad)
+    const textX = cx + textLocalX * Math.cos(rotRad) - textLocalY * Math.sin(rotRad)
+    const textY = cy + textLocalX * Math.sin(rotRad) + textLocalY * Math.cos(rotRad)
+    
+    addItem({
+      type: 'text',
+      id: `angle-text-${Date.now()}`,
+      x: textX,
+      y: textY,
+      text: `${Math.round(angleDiff)}°`,
+      fontSize: 14,
+      fontFamily: 'Arial',
+      color: '#10B981',
+      isBold: true,
+      isItalic: false,
+      textAlign: 'center',
+      
+    } as any)
+    
+    saveHistory()
+  }
 
   const handleArmMouseDown = (e: React.MouseEvent | React.TouchEvent, armIndex: 1 | 2) => {
     const pointer = getPointerEvent(e)
@@ -87,19 +246,7 @@ const Protractor: React.FC = () => {
     drawingPoints.current[armIndex] = []
     
     // Get current arm tip position in screen coordinates
-    const cx = position.x + size / 2
-    const cy = position.y + size / 2
-    const currentAngle = armIndex === 1 ? angle1 : angle2
-    const rad = (currentAngle * Math.PI) / 180
-    const rotRad = (rotation * Math.PI) / 180
-    const armLen = rOuter + 40
     
-    const localX = armLen * Math.cos(-rad)
-    const localY = armLen * Math.sin(-rad)
-    const screenX = cx + localX * Math.cos(rotRad) - localY * Math.sin(rotRad)
-    const screenY = cy + localX * Math.sin(rotRad) + localY * Math.cos(rotRad)
-    
-    drawingPoints.current[armIndex].push(screenX, screenY)
   }
 
   /* ================= CALCULATE ANGLE FOR ARM ================= */
@@ -133,6 +280,52 @@ const Protractor: React.FC = () => {
   }
 
   /* ================= GLOBAL MOUSE HANDLERS ================= */
+
+  // Update measurement lines when protractor moves
+  useEffect(() => {
+    if (measurementLines.arm1 || measurementLines.arm2) {
+      const cx = position.x + size / 2
+      const cy = position.y + size / 2
+      const rotRad = (rotation * Math.PI) / 180
+      const armLen = rOuter + 200
+      
+      const updatedLines = { ...measurementLines }
+      
+      if (measurementLines.arm1) {
+        const rad = (measurementLines.arm1.angle * Math.PI) / 180
+        const localX = armLen * Math.cos(-rad)
+        const localY = armLen * Math.sin(-rad)
+        const endX = cx + localX * Math.cos(rotRad) - localY * Math.sin(rotRad)
+        const endY = cy + localX * Math.sin(rotRad) + localY * Math.cos(rotRad)
+        
+        updatedLines.arm1 = {
+          ...measurementLines.arm1,
+          startX: cx,
+          startY: cy,
+          endX,
+          endY
+        }
+      }
+      
+      if (measurementLines.arm2) {
+        const rad = (measurementLines.arm2.angle * Math.PI) / 180
+        const localX = armLen * Math.cos(-rad)
+        const localY = armLen * Math.sin(-rad)
+        const endX = cx + localX * Math.cos(rotRad) - localY * Math.sin(rotRad)
+        const endY = cy + localX * Math.sin(rotRad) + localY * Math.cos(rotRad)
+        
+        updatedLines.arm2 = {
+          ...measurementLines.arm2,
+          startX: cx,
+          startY: cy,
+          endX,
+          endY
+        }
+      }
+      
+      setMeasurementLines(updatedLines)
+    }
+  }, [position, rotation, size, rOuter])
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent | TouchEvent) => {
@@ -188,7 +381,7 @@ const Protractor: React.FC = () => {
           const cy = position.y + size / 2
           const rad = (newAngle * Math.PI) / 180
           const rotRad = (rotation * Math.PI) / 180
-          const armLen = rOuter + 40
+          const armLen = rOuter + 20
           
           const localX = armLen * Math.cos(-rad)
           const localY = armLen * Math.sin(-rad)
@@ -254,12 +447,7 @@ const Protractor: React.FC = () => {
 
   // -- Rendering Helpers --
 
-  // Radius calculations
-  const rOuter = size / 2
-
   // Convert degrees to SVG coordinates (0 at right, 180 at left, counter-clockwise)
-  const pivotX = size / 2
-  const pivotY = size / 2
 
   const degToSvg = (deg: number, radius: number) => {
     const rad = (deg * Math.PI) / 180
@@ -290,7 +478,7 @@ const Protractor: React.FC = () => {
           y1={p1.y}
           x2={p2.x}
           y2={p2.y}
-          stroke={isMajor ? '#000' : '#666'}
+          stroke={isMajor ? colors.tickMajor : colors.tickMinor}
           strokeWidth={isMajor ? 1.5 : 1}
         />
       )
@@ -303,14 +491,14 @@ const Protractor: React.FC = () => {
             key={`label-outer-${i}`}
             x={pText.x}
             y={pText.y}
-            fontSize={10}
-            fontWeight='600'
+            fontSize={i === 90 ? 14 : 10}
+            fontWeight={i === 90 ? '700' : '600'}
             textAnchor='middle'
             dominantBaseline='middle'
-            fill='#333'
+            fill={colors.textOuter}
             transform={`rotate(${90 - i} ${pText.x} ${pText.y})`}
           >
-            {i}
+            {i}°
           </text>
         )
       }
@@ -320,27 +508,29 @@ const Protractor: React.FC = () => {
     const innerRadius = rOuter - 50
     for (let i = 0; i <= 180; i += 10) {
       const val = 180 - i
-      const pText = degToSvg(i, innerRadius)
-      ticks.push(
-        <text
-          key={`label-inner-${i}`}
-          x={pText.x}
-          y={pText.y}
-          fontSize={9}
-          textAnchor='middle'
-          dominantBaseline='middle'
-          fill='#DC2626'
-          transform={`rotate(${90 - i} ${pText.x} ${pText.y})`}
-        >
-          {val}
-        </text>
-      )
+      if (val !== 90) { // Exclude 90 from inner labels
+        const pText = degToSvg(i, innerRadius)
+        ticks.push(
+          <text
+            key={`label-inner-${i}`}
+            x={pText.x}
+            y={pText.y}
+            fontSize={9}
+            textAnchor='middle'
+            dominantBaseline='middle'
+            fill={colors.textInner}
+            transform={`rotate(${90 - i} ${pText.x} ${pText.y})`}
+          >
+            {val}°
+          </text>
+        )
+      }
     }
 
     return ticks
-  }, [rOuter])
+  }, [rOuter, colors])
 
-  const armLength = rOuter + 40 // Extend beyond the protractor body
+  const armLength = rOuter + 40 // Visual arm length
   const pArm1 = degToSvg(angle1, armLength)
   const pArm2 = degToSvg(angle2, armLength)
 
@@ -379,8 +569,8 @@ const Protractor: React.FC = () => {
             d={`M 0,${size / 2} A ${size / 2},${size / 2} 0 0,1 ${size},${
               size / 2
             } Z`}
-            fill='rgba(5, 255, 41, 0.1)'
-            stroke='#000'
+            fill={colors.protractorBg}
+            stroke={colors.protractorBorder}
             strokeWidth='2.5'
             className='backdrop-blur-sm'
           />
@@ -388,8 +578,38 @@ const Protractor: React.FC = () => {
           {/* Scales */}
           {renderTicks}
 
+          {/* Center 90° Label */}
+          <rect
+            x={size / 2 - 12}
+            y={size / 2 - 25}
+            width={24}
+            height={16}
+            fill={colors.centerBg}
+            rx={3}
+          />
+          <text
+            x={size / 2}
+            y={size / 2 - 15}
+            fontSize={12}
+            fontWeight='700'
+            textAnchor='middle'
+            dominantBaseline='middle'
+            fill={colors.centerText}
+          >
+            90°
+          </text>
+
           {/* Pivot Point */}
-          <circle cx={size / 2} cy={size / 2} r={5} fill='#000' />
+          <circle 
+            cx={size / 2} 
+            cy={size / 2} 
+            r={isArcDrawingMode ? 8 : 5} 
+            fill={isArcDrawingMode ? '#10B981' : '#000'}
+            className={isArcDrawingMode ? 'cursor-pointer protractor-control' : ''}
+            onClick={isArcDrawingMode ? handleCenterClick : undefined}
+            stroke={isArcDrawingMode ? '#FFF' : 'none'}
+            strokeWidth={isArcDrawingMode ? 2 : 0}
+          />
 
           {/* Arm 1 (Blue) */}
           <line
@@ -410,6 +630,7 @@ const Protractor: React.FC = () => {
             className='cursor-pointer protractor-control transition-opacity duration-100'
             onMouseDown={e => handleArmMouseDown(e, 1)}
             onTouchStart={e => handleArmMouseDown(e, 1)}
+            onDoubleClick={() => handleArmDoubleClick(1)}
             stroke='#FFF'
             strokeWidth='2'
           />
@@ -433,6 +654,7 @@ const Protractor: React.FC = () => {
             className='cursor-pointer protractor-control transition-opacity duration-100'
             onMouseDown={e => handleArmMouseDown(e, 2)}
             onTouchStart={e => handleArmMouseDown(e, 2)}
+            onDoubleClick={() => handleArmDoubleClick(2)}
             stroke='#FFF'
             strokeWidth='2'
           />
@@ -442,9 +664,44 @@ const Protractor: React.FC = () => {
         <div className='absolute left-1/2 bottom-2 -translate-x-1/2 bg-gray-900/90 text-white px-3 py-1 rounded-full text-sm font-bold shadow-lg pointer-events-none'>
           {displayAngle}°
         </div>
+        
+        {/* Arc Drawing Mode Indicator */}
+        {isArcDrawingMode && (
+          <div 
+            className='absolute left-1/2 bottom-12 -translate-x-1/2 bg-green-600/90 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg cursor-pointer animate-pulse'
+            onClick={handleCenterClick}
+          >
+           {` Click center to draw arc ${displayAngle}°`} 
+          </div>
+        )}
       </div>
 
       {/* Controls */}
+
+      {/* Theme Toggle Button */}
+      <button
+        className='absolute -top-4 left-1/4 -translate-x-1/2 w-8 h-8 rounded-full bg-gray-800 text-white flex items-center justify-center shadow-lg hover:bg-gray-900 border border-gray-700 protractor-control pointer-events-auto'
+        onClick={toggleTheme}
+        title={isDarkTheme ? 'Switch to light theme' : 'Switch to dark theme'}
+      >
+        {isDarkTheme ? (
+          <svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'>
+            <circle cx='12' cy='12' r='4' />
+            <line x1='12' y1='2' x2='12' y2='4' />
+            <line x1='12' y1='20' x2='12' y2='22' />
+            <line x1='4.22' y1='4.22' x2='5.64' y2='5.64' />
+            <line x1='18.36' y1='18.36' x2='19.78' y2='19.78' />
+            <line x1='2' y1='12' x2='4' y2='12' />
+            <line x1='20' y1='12' x2='22' y2='12' />
+            <line x1='4.22' y1='19.78' x2='5.64' y2='18.36' />
+            <line x1='18.36' y1='5.64' x2='19.78' y2='4.22' />
+          </svg>
+        ) : (
+          <svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'>
+            <path d='M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z' />
+          </svg>
+        )}
+      </button>
 
       {/* Close Button */}
       <button

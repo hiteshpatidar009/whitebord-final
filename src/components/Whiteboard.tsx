@@ -233,8 +233,8 @@ export const Whiteboard: React.FC = () => {
     showProtractor,
     showDivider,
     rulerGeometry,
-    triangle45Geometry,
-    triangle60Geometry,
+    // triangle45Geometry,
+    // triangle60Geometry,
   } = useWhiteboardStore();
 
   // --- PAN STATE ---
@@ -961,22 +961,22 @@ export const Whiteboard: React.FC = () => {
             }
             
             // Apply Triangle45 snapping if triangle is visible and cursor is near triangle edge
-            if (triangle45Geometry && (tool === 'pen' || tool === 'highlighter')) {
-              if (Triangle45Utils.isNearTriangleEdge(point.x, point.y, triangle45Geometry)) {
-                const snapped = Triangle45Utils.snapToTriangleEdge(point.x, point.y, triangle45Geometry);
-                newX = snapped.x;
-                newY = snapped.y;
-              }
-            }
+            // if (triangle45Geometry && (tool === 'pen' || tool === 'highlighter')) {
+            //   if (Triangle45Utils.isNearTriangleEdge(point.x, point.y, triangle45Geometry)) {
+            //     const snapped = Triangle45Utils.snapToTriangleEdge(point.x, point.y, triangle45Geometry);
+            //     newX = snapped.x;
+            //     newY = snapped.y;
+            //   }
+            // }
             
             // Apply Triangle60 snapping if triangle is visible and cursor is near triangle edge
-            if (triangle60Geometry && (tool === 'pen' || tool === 'highlighter')) {
-              if (Triangle60Utils.isNearTriangleEdge(point.x, point.y, triangle60Geometry)) {
-                const snapped = Triangle60Utils.snapToTriangleEdge(point.x, point.y, triangle60Geometry);
-                newX = snapped.x;
-                newY = snapped.y;
-              }
-            }
+            // if (triangle60Geometry && (tool === 'pen' || tool === 'highlighter')) {
+            //   if (Triangle60Utils.isNearTriangleEdge(point.x, point.y, triangle60Geometry)) {
+            //     const snapped = Triangle60Utils.snapToTriangleEdge(point.x, point.y, triangle60Geometry);
+            //     newX = snapped.x;
+            //     newY = snapped.y;
+            //   }
+            // }
             
             updateItem(currentStrokeId.current, {
                 points: [...stroke.points, newX, newY]

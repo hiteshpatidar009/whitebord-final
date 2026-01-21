@@ -6,7 +6,7 @@ import { Minus } from 'lucide-react'
 const CM_IN_PX = 37.8
 
 const Triangle45: React.FC = () => {
-  const { setShowTriangle45, setTriangle45Geometry, setTool } = useWhiteboardStore()
+  const { setShowTriangle45, setTool } = useWhiteboardStore()
   const triangleRef = useRef<HTMLDivElement>(null)
 
   const [position, setPosition] = useState({ x: 250, y: 250 })
