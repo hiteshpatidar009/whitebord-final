@@ -122,7 +122,7 @@ const FloatingStopwatch: React.FC = () => {
     setTime(nh * 3600 + nm * 60 + ns);
   };
 
-  const isLastSeconds = countdown && time <= 10 && time > 0;
+  const isLastSeconds = countdown && time <= 10 && time > 0 && running;
 
   if (!showStopwatch) return null;
 
@@ -165,15 +165,15 @@ const FloatingStopwatch: React.FC = () => {
                   {settings && (
                     <button
                       onClick={() => updateDigit(i, 1)}
-                      className="mb-1 h-5 w-5 rounded-full bg-lime-500 text-xs text-white"
+                      className="mb-1 h-5 w-5 rounded-full bg-yellow-300 text-xs text-white"
                     >
                       ▲
                     </button>
                   )}
 
                   <div
-                    className={`flex h-[68px] w-[46px] items-center justify-center rounded-lg bg-black text-4xl font-bold text-lime-400 shadow-[inset_0_0_14px_rgba(0,255,0,0.5)]
-                    ${isLastSeconds ? "animate-pulse" : ""}`}
+                    className={`flex h-[68px] w-[46px] items-center justify-center rounded-lg text-4xl font-bold shadow-[inset_0_0_14px_rgba(0,255,0,0.5)]
+                    ${isLastSeconds ? "bg-red-600 text-white animate-pulse" : "bg-black text-yellow-300"}`}
                   >
                     {d}
                   </div>
@@ -181,7 +181,7 @@ const FloatingStopwatch: React.FC = () => {
                   {settings && (
                     <button
                       onClick={() => updateDigit(i, -1)}
-                      className="mt-1 h-5 w-5 rounded-full bg-lime-500 text-xs text-white"
+                      className="mt-1 h-5 w-5 rounded-full bg-yellow-300 text-xs text-white"
                     >
                       ▼
                     </button>
@@ -228,7 +228,7 @@ const FloatingStopwatch: React.FC = () => {
                 setCountdown(false);
                 setSettings((s) => !s);
               }}
-              className={`bg-white p-3 rounded-full shadow-md ${settings ? "ring-2 ring-lime-400" : ""}`}
+              className={`bg-white p-3 rounded-full shadow-md ${settings ? "ring-2 ring-yellow-400" : ""}`}
             >
               <Settings size={20} />
             </button>

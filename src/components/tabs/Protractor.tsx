@@ -116,11 +116,11 @@ const Protractor: React.FC = () => {
     const currentAngle = armIndex === 1 ? angle1 : angle2
     const rad = (currentAngle * Math.PI) / 180
     const rotRad = (rotation * Math.PI) / 180
-    const armLen = rOuter + 100 // Extended line length
+    const armLen = rOuter + 200 // Extended line length
     
-    // Calculate line endpoints in screen coordinates
-    const localX = armLen * Math.cos(-rad)
-    const localY = armLen * Math.sin(-rad)
+    // Calculate line endpoints behind the arm (opposite direction)
+    const localX = -armLen * Math.cos(-rad) // Negative to go behind
+    const localY = -armLen * Math.sin(-rad) // Negative to go behind
     const endX = cx + localX * Math.cos(rotRad) - localY * Math.sin(rotRad)
     const endY = cy + localX * Math.sin(rotRad) + localY * Math.cos(rotRad)
     

@@ -725,9 +725,39 @@ export const Whiteboard: React.FC = () => {
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   };
 
+  // Touch scaling state
+  const touchStateRef = useRef({
+    lastTouchDistance: 0,
+    lastTouchCenter: { x: 0, y: 0 },
+    isTouchScaling: false
+  });
+
+  const getTouchDistance = (touches: TouchList) => {
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  };
+
+  const getTouchCenter = (touches: TouchList) => {
+    return {
+      x: (touches[0].clientX + touches[1].clientX) / 2,
+      y: (touches[0].clientY + touches[1].clientY) / 2
+    };
+  };
+
   const handleMouseDown = (e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
     e.evt.preventDefault();
-    if ((e.evt as TouchEvent).touches && (e.evt as TouchEvent).touches.length > 1) return;
+    const touches = (e.evt as TouchEvent).touches;
+    
+    // Handle multi-touch for scaling
+    if (touches && touches.length === 2) {
+      touchStateRef.current.isTouchScaling = true;
+      touchStateRef.current.lastTouchDistance = getTouchDistance(touches);
+      touchStateRef.current.lastTouchCenter = getTouchCenter(touches);
+      return;
+    }
+    
+    if (touches && touches.length > 1) return;
 
     const stage = e.target.getStage();
     const clickedOnEmpty = e.target === stage;
@@ -739,7 +769,9 @@ export const Whiteboard: React.FC = () => {
     // --- PAN TOOL LOGIC ---
     if (tool === 'hand') {
       isPanningRef.current = true;
-      panStartRef.current = { x: (e.evt as MouseEvent).clientX, y: (e.evt as MouseEvent).clientY };
+      const clientX = isTouch ? (e.evt as TouchEvent).touches[0].clientX : (e.evt as MouseEvent).clientX;
+      const clientY = isTouch ? (e.evt as TouchEvent).touches[0].clientY : (e.evt as MouseEvent).clientY;
+      panStartRef.current = { x: clientX, y: clientY };
       panOriginRef.current = { x: stagePos.x, y: stagePos.y };
       return;
     }
@@ -826,6 +858,32 @@ export const Whiteboard: React.FC = () => {
     }
 
     if (tool === 'eraser' || tool === 'highlighter-eraser') {
+       // Check for text collision
+       items.forEach(item => {
+         if (item.type === 'text') {
+           const textRect = {
+             x: item.x,
+             y: item.y,
+             width: item.width || 200,
+             height: item.fontSize * 1.4
+           };
+           if (pos.x >= textRect.x && pos.x <= textRect.x + textRect.width &&
+               pos.y >= textRect.y && pos.y <= textRect.y + textRect.height) {
+             // Calculate which word to erase based on position
+             const words = item.text.split(' ');
+             const charWidth = item.fontSize * 0.6; // Approximate character width
+             const relativeX = pos.x - item.x;
+             const wordIndex = Math.floor(relativeX / (charWidth * 6)); // Approximate word position
+             
+             if (wordIndex >= 0 && wordIndex < words.length) {
+               words.splice(wordIndex, 1);
+               const newText = words.join(' ').trim() || 'Type here...';
+               updateItem(item.id, { text: newText });
+             }
+           }
+         }
+       });
+       
        addItem({
         type: 'stroke',
         id,
@@ -888,16 +946,55 @@ export const Whiteboard: React.FC = () => {
 
  const handleMouseMove = (e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
     e.evt.preventDefault();
-    // Guard: Never process canvas events if target is text
-    if ((e.evt.target as HTMLElement)?.dataset?.type === 'text') return;
+    // Guard: Never process canvas events if target is text or when pan tool is active with text overlay
+    if ((e.evt.target as HTMLElement)?.dataset?.type === 'text' || 
+        (tool === 'hand' && (e.evt.target as HTMLElement)?.closest('[data-text-overlay]'))) return;
+    
+    const touches = (e.evt as TouchEvent).touches;
+    
+    // Handle multi-touch scaling
+    if (touches && touches.length === 2 && touchStateRef.current.isTouchScaling) {
+      const stage = e.target.getStage();
+      if (!stage) return;
+      
+      const currentDistance = getTouchDistance(touches);
+      const currentCenter = getTouchCenter(touches);
+      
+      // Calculate scale change
+      const scaleChange = currentDistance / touchStateRef.current.lastTouchDistance;
+      const oldScale = stage.scaleX();
+      const newScale = Math.max(0.1, Math.min(5, oldScale * scaleChange));
+      
+      // Calculate position to maintain center point
+      const stageRect = stage.container().getBoundingClientRect();
+      const centerX = currentCenter.x - stageRect.left;
+      const centerY = currentCenter.y - stageRect.top;
+      
+      const mousePointTo = {
+        x: (centerX - stage.x()) / oldScale,
+        y: (centerY - stage.y()) / oldScale
+      };
+      
+      setStageScale(newScale);
+      setStagePos({
+        x: centerX - mousePointTo.x * newScale,
+        y: centerY - mousePointTo.y * newScale
+      });
+      
+      touchStateRef.current.lastTouchDistance = currentDistance;
+      touchStateRef.current.lastTouchCenter = currentCenter;
+      return;
+    }
+    
     const stage = e.target.getStage();
     const point = stage?.getRelativePointerPosition();
     if (!point) return;
 
     // --- PAN TOOL LOGIC ---
     if (tool === 'hand' && isPanningRef.current && panStartRef.current) {
-      const clientX = (e.evt as MouseEvent).clientX;
-      const clientY = (e.evt as MouseEvent).clientY;
+      const isTouch = e.evt.type === 'touchmove';
+      const clientX = isTouch ? (e.evt as TouchEvent).touches[0].clientX : (e.evt as MouseEvent).clientX;
+      const clientY = isTouch ? (e.evt as TouchEvent).touches[0].clientY : (e.evt as MouseEvent).clientY;
       const dx = clientX - panStartRef.current.x;
       const dy = clientY - panStartRef.current.y;
       setStagePos({
@@ -978,6 +1075,24 @@ export const Whiteboard: React.FC = () => {
             //   }
             // }
             
+            // Check for text collision during eraser move
+            if (tool === 'eraser' || tool === 'highlighter-eraser') {
+              items.forEach(item => {
+                if (item.type === 'text') {
+                  const textRect = {
+                    x: item.x,
+                    y: item.y,
+                    width: item.width || 200,
+                    height: item.fontSize * 1.4
+                  };
+                  if (newX >= textRect.x && newX <= textRect.x + textRect.width &&
+                      newY >= textRect.y && newY <= textRect.y + textRect.height) {
+             removeItem(item.id);
+                  }
+                }
+              });
+            }
+            
             updateItem(currentStrokeId.current, {
                 points: [...stroke.points, newX, newY]
             });
@@ -985,7 +1100,14 @@ export const Whiteboard: React.FC = () => {
     }
   };
 
- const handleMouseUp = () => {
+ const handleMouseUp = (e?: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
+    // Reset touch scaling state
+    if (touchStateRef.current.isTouchScaling) {
+      touchStateRef.current.isTouchScaling = false;
+      touchStateRef.current.lastTouchDistance = 0;
+      return;
+    }
+    
     // --- PAN TOOL LOGIC ---
     if (tool === 'hand' && isPanningRef.current) {
       isPanningRef.current = false;
@@ -2316,7 +2438,7 @@ const getCursorStyle = () => {
           }}
           onDblClick={handleCanvasDoubleClick}
           onDblTap={handleCanvasDoubleClick}
-          draggable={tool === 'hand'}
+          draggable={false}
           x={stagePos.x}
           y={stagePos.y}
           scaleX={stageScale}
@@ -2464,27 +2586,26 @@ const getCursorStyle = () => {
           const hasFormatting = /<(b|strong|i|em|u|span)/.test(item.text);
           if (!hasFormatting) return null;
           
-          const screenX = item.x * stageScale + stagePos.x;
-          const screenY = item.y * stageScale + stagePos.y;
-          
           return (
             <div
               key={`overlay-${item.id}`}
               style={{
                 position: 'fixed',
-                left: screenX,
-                top: screenY,
-                width: item.width ? (item.width * stageScale) : (200 * stageScale),
-                fontSize: item.fontSize * stageScale,
+                left: item.x,
+                top: item.y,
+                width: item.width || 200,
+                fontSize: item.fontSize,
                 fontFamily: item.fontFamily,
                 color: item.fill,
                 lineHeight: 1.4,
                 pointerEvents: 'none',
                 overflow: 'hidden',
                 wordWrap: 'break-word',
-                zIndex: 20,
+                zIndex: tool === 'hand' ? -1 : 20,
                 userSelect: 'none',
-                touchAction: 'none'
+                touchAction: 'none',
+                transform: `translate(${stagePos.x}px, ${stagePos.y}px) scale(${stageScale})`,
+                transformOrigin: '0 0'
               }}
               dangerouslySetInnerHTML={{ __html: item.text }}
             />

@@ -1,6 +1,5 @@
 import React, { useRef, useState, useCallback } from 'react';
 import { useWhiteboardStore } from '../../store/useWhiteboardStore';
-import {LockKeyhole,  LockKeyholeOpen } from 'lucide-react';
 import { polarToCartesian, distance, angleBetween } from '../../utils/mathUtils';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -22,8 +21,8 @@ const Divider: React.FC = () => {
   const stateRef = useRef<DividerState>({
     centerX: 300,
     centerY: 200,
-    radius: 100,
-    angle: 0,
+    radius: 60, // Reduced initial radius for right arm
+    angle: 0,    // Always pointing right
     isLocked: false,
     isDragging: false,
     isDrawing: false,
@@ -42,14 +41,19 @@ const Divider: React.FC = () => {
     return polarToCartesian(
       state.centerX,
       state.centerY,
-      state.radius,
-      state.angle
+      state.radius, // Radius changes for right arm
+      state.angle   // Fixed angle (0 = right)
     );
   }, []);
 
-  /* ============================
-     YOUR LOGIC — UNCHANGED
-     ============================ */
+  const getLeftLegPosition = useCallback(() => {
+    const state = stateRef.current;
+    // Left arm FIXED at center (doesn't move)
+    return {
+      x: state.centerX - 10, // Fixed distance from center
+      y: state.centerY + 130  // Fixed position
+    };
+  }, []);
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent | React.TouchEvent, type: 'body' | 'pencil') => {
@@ -102,17 +106,15 @@ const Divider: React.FC = () => {
         state.centerX = mouseX;
         state.centerY = mouseY;
       } else if (state.dragType === 'pencil' && !state.isLocked) {
-        state.radius = Math.max(
-          20,
-          Math.min(300, distance(state.centerX, state.centerY, mouseX, mouseY))
-        );
-        state.angle = angleBetween(
-          state.centerX,
-          state.centerY,
-          mouseX,
-          mouseY
-        );
+        // When unlocked: adjust RADIUS only for right arm
+        // Angle remains fixed at 0 (pointing right)
+        state.angle = 0; // Always point right
+        
+        // Calculate horizontal distance for radius
+        const newRadius = Math.max(50, Math.min(300, mouseX - state.centerX));
+        state.radius = newRadius;
       } else if (state.isDrawing && state.isLocked) {
+        // When locked: full circular movement for drawing
         const newAngle = angleBetween(
           state.centerX,
           state.centerY,
@@ -155,12 +157,19 @@ const Divider: React.FC = () => {
     update();
   }, [update, saveHistory]);
 
-  const toggleLock = useCallback((e?: React.TouchEvent) => {
+  const toggleLock = useCallback((e?: React.MouseEvent | React.TouchEvent) => {
     if (e) {
       e.preventDefault();
       e.stopPropagation();
     }
-    stateRef.current.isLocked = !stateRef.current.isLocked;
+    const state = stateRef.current;
+    state.isLocked = !state.isLocked;
+    
+    // When unlocking, reset angle to 0 (pointing right)
+    if (!state.isLocked) {
+      state.angle = 0;
+    }
+    
     update();
   }, [update]);
 
@@ -197,10 +206,7 @@ const Divider: React.FC = () => {
 
   const state = stateRef.current;
   const pencilPos = getPencilPosition();
-
-  /* ============================
-     UI — REALISTIC COMPASS DESIGN
-     ============================ */
+  const leftLegPos = getLeftLegPosition();
 
   return (
     <div className="fixed inset-0 pointer-events-none z-50">
@@ -223,7 +229,7 @@ const Divider: React.FC = () => {
           fill="#6B7280"
         />
 
-        {/* MAIN BODY - DARKER AND MORE REALISTIC */}
+        {/* MAIN BODY */}
         <ellipse
           cx={state.centerX}
           cy={state.centerY - 25}
@@ -238,17 +244,7 @@ const Divider: React.FC = () => {
         />
 
         {/* BLUE CIRCULAR DISPLAY */}
-        <circle
-          cx={state.centerX}
-          cy={state.centerY - 25}
-          r="20"
-          fill="#2563EB"
-          stroke="#1D4ED8"
-          strokeWidth="2"
-          className="cursor-move"
-          onMouseDown={(e) => handleMouseDown(e, 'body')}
-          onTouchStart={(e) => handleMouseDown(e, 'body')}
-        />
+        
 
         {/* COMPASS ICON IN DISPLAY */}
         <g fill="white">
@@ -266,34 +262,43 @@ const Divider: React.FC = () => {
           />
         </g>
 
-        {/* LEFT LEG - NEEDLE */}
+        {/* LEFT LEG - FIXED AT CENTER (DOESN'T MOVE) */}
         <defs>
           <linearGradient id="metalGradient" x1="0%" y1="0%" x2="100%" y2="0%">
             <stop offset="0%" stopColor="#9CA3AF" />
             <stop offset="50%" stopColor="#D1D5DB" />
             <stop offset="100%" stopColor="#6B7280" />
           </linearGradient>
+          
+          <linearGradient id="fixedLegGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#6B7280" />
+            <stop offset="50%" stopColor="#9CA3AF" />
+            <stop offset="100%" stopColor="#4B5563" />
+          </linearGradient>
         </defs>
         
+        {/* FIXED LEFT LEG (ALWAYS SAME POSITION) */}
         <line
-          x1={state.centerX - 0}
+          x1={state.centerX - 5}
           y1={state.centerY + 15}
-          x2={state.centerX - 25}
-          y2={state.centerY + 180}
-          stroke="url(#metalGradient)"
+          x2={leftLegPos.x}
+          y2={leftLegPos.y}
+          stroke="url(#fixedLegGradient)"
           strokeWidth="8"
           strokeLinecap="round"
         />
         
-        {/* NEEDLE POINT */}
+        {/* FIXED LEFT LEG POINT */}
         <polygon
-          points={`${state.centerX - 25},${state.centerY + 190} ${state.centerX - 21},${state.centerY + 175} ${state.centerX - 29},${state.centerY + 175}`}
-          fill="#374151"
+          points={`${leftLegPos.x},${leftLegPos.y + 10} 
+                   ${leftLegPos.x - 4},${leftLegPos.y} 
+                   ${leftLegPos.x + 4},${leftLegPos.y}`}
+          fill="#1F2937"
         />
 
-        {/* RIGHT LEG - PENCIL ARM */}
+        {/* RIGHT LEG - PENCIL ARM (ADJUSTABLE RADIUS) */}
         <line
-          x1={state.centerX + 5}
+          x1={state.centerX - 2}
           y1={state.centerY + 15}
           x2={pencilPos.x}
           y2={pencilPos.y - 25}
@@ -302,52 +307,52 @@ const Divider: React.FC = () => {
           strokeLinecap="round"
           onMouseDown={(e) => handleMouseDown(e, 'pencil')}
           onTouchStart={(e) => handleMouseDown(e, 'pencil')}
-          className={state.isLocked ? 'cursor-crosshair' : 'cursor-grab'}
+          className={state.isLocked ? 'cursor-crosshair' : 'cursor-ew-resize'}
         />
 
-        {/* LOCK CONTROL - PURPLE CIRCLE */}
+        {/* LOCK CONTROL */}
         <circle
-          cx={pencilPos.x - 25}
-          cy={pencilPos.y - 60}
+          cx={state.centerX}
+          cy={state.centerY - 25}
           r="15"
-          fill="#7C3AED"
-          stroke="#5B21B6"
+          fill={state.isLocked ? "#7C3AED" : "#10B981"}
+          stroke={state.isLocked ? "#5B21B6" : "#059669"}
           strokeWidth="2"
           onClick={toggleLock}
-          onTouchStart={toggleLock}
+          onTouchEnd={toggleLock}
           className="cursor-pointer"
         />
         
         {/* LOCK ICON */}
         {state.isLocked ? (
-          <g onClick={toggleLock} onTouchStart={toggleLock} className="cursor-pointer">
+          <g onClick={toggleLock} onTouchEnd={toggleLock} className="cursor-pointer">
             <rect
-              x={pencilPos.x - 30}
-              y={pencilPos.y - 63}
+              x={state.centerX - 5}
+              y={state.centerY - 28}
               width="10"
               height="8"
               rx="1"
               fill="white"
             />
             <path
-              d={`M ${pencilPos.x - 28} ${pencilPos.y - 62} v -3 a 3 3 0 0 1 6 0 v 3`}
+              d={`M ${state.centerX - 3} ${state.centerY - 27} v -3 a 3 3 0 0 1 6 0 v 3`}
               fill="none"
               stroke="white"
               strokeWidth="1.5"
             />
           </g>
         ) : (
-          <g onClick={toggleLock} onTouchStart={toggleLock} className="cursor-pointer">
+          <g onClick={toggleLock} onTouchEnd={toggleLock} className="cursor-pointer">
             <rect
-              x={pencilPos.x - 30}
-              y={pencilPos.y - 63}
+              x={state.centerX - 5}
+              y={state.centerY - 28}
               width="10"
               height="8"
               rx="1"
               fill="white"
             />
             <path
-              d={`M ${pencilPos.x - 23} ${pencilPos.y - 63} v -3 a 3 3 0 0 1 6 0`}
+              d={`M ${state.centerX + 2} ${state.centerY - 28} v -3 a 3 3 0 0 1 6 0`}
               fill="none"
               stroke="white"
               strokeWidth="1.5"
@@ -366,7 +371,7 @@ const Divider: React.FC = () => {
           strokeWidth="2"
           onMouseDown={(e) => handleMouseDown(e, 'pencil')}
           onTouchStart={(e) => handleMouseDown(e, 'pencil')}
-          className={state.isLocked ? 'cursor-crosshair' : 'cursor-grab'}
+          className={state.isLocked ? 'cursor-crosshair' : 'cursor-ew-resize'}
         />
 
         {/* PENCIL */}
@@ -378,16 +383,16 @@ const Divider: React.FC = () => {
           fill="#FBBF24"
           onMouseDown={(e) => handleMouseDown(e, 'pencil')}
           onTouchStart={(e) => handleMouseDown(e, 'pencil')}
-          className={state.isLocked ? 'cursor-crosshair' : 'cursor-grab'}
+          className={state.isLocked ? 'cursor-crosshair' : 'cursor-ew-resize'}
         />
         
         {/* PENCIL TIP */}
         <polygon
-          points={`${pencilPos.x},${pencilPos.y + 12} ${pencilPos.x - 3},${pencilPos.y + 8} ${pencilPos.x + 3},${pencilPos.y + 8}`}
+          points={`${pencilPos.x},${pencilPos.y + 15} ${pencilPos.x - 3},${pencilPos.y + 8} ${pencilPos.x + 3},${pencilPos.y + 8}`}
           fill="#1F2937"
           onMouseDown={(e) => handleMouseDown(e, 'pencil')}
           onTouchStart={(e) => handleMouseDown(e, 'pencil')}
-          className={state.isLocked ? 'cursor-crosshair' : 'cursor-grab'}
+          className={state.isLocked ? 'cursor-crosshair' : 'cursor-ew-resize'}
         />
 
         {/* CLOSE BUTTON */}
@@ -414,6 +419,16 @@ const Divider: React.FC = () => {
         >
           ✕
         </text>
+
+      
+        
+       
+        
+      
+       
+
+        {/* RADIUS ADJUSTMENT GUIDE */}
+       
 
       </svg>
     </div>

@@ -195,52 +195,61 @@ const Ruler: React.FC = () => {
     setRulerGeometry(rulerGeometry)
   }, [position.x, position.y, width, rotation, setRulerGeometry])
 
-  /* ---------------- Drag ---------------- */
-  const onDragStart = (e: React.MouseEvent) => {
-    setDragging(true)
-    startRef.current.x = e.clientX - position.x
-    startRef.current.y = e.clientY - position.y
+  /* ---------------- Touch/Mouse Handlers ---------------- */
+  const getEventCoords = (e: React.MouseEvent | React.TouchEvent) => {
+    if ('touches' in e && e.touches.length > 0) {
+      return { clientX: e.touches[0].clientX, clientY: e.touches[0].clientY }
+    }
+    return { clientX: (e as React.MouseEvent).clientX, clientY: (e as React.MouseEvent).clientY }
   }
 
-  /* ---------------- Resize ---------------- */
-  const onResizeStart = (e: React.MouseEvent) => {
+  const onDragStart = (e: React.MouseEvent | React.TouchEvent) => {
+    const coords = getEventCoords(e)
+    setDragging(true)
+    startRef.current.x = coords.clientX - position.x
+    startRef.current.y = coords.clientY - position.y
+  }
+
+  const onResizeStart = (e: React.MouseEvent | React.TouchEvent) => {
     e.stopPropagation()
+    const coords = getEventCoords(e)
     setResizing(true)
     startRef.current.width = width
-    startRef.current.x = e.clientX
+    startRef.current.x = coords.clientX
   }
 
-  /* ---------------- Rotate ---------------- */
-  const onRotateStart = (e: React.MouseEvent) => {
+  const onRotateStart = (e: React.MouseEvent | React.TouchEvent) => {
     e.stopPropagation()
+    const coords = getEventCoords(e)
     setRotating(true)
     const rect = rulerRef.current!.getBoundingClientRect()
     const pivotX = rect.left
     const pivotY = rect.top
-    const initialAngle = Math.atan2(e.clientY - pivotY, e.clientX - pivotX)
+    const initialAngle = Math.atan2(coords.clientY - pivotY, coords.clientX - pivotX)
     startRef.current.angle = initialAngle - rotation * (Math.PI / 180)
     startRef.current.pivotX = pivotX
     startRef.current.pivotY = pivotY
   }
 
-  /* ---------------- Mouse Move ---------------- */
-  const onMouseMove = (e: React.MouseEvent) => {
+  const onMove = (e: React.MouseEvent | React.TouchEvent) => {
+    const coords = getEventCoords(e)
+    
     if (dragging) {
       setPosition({
-        x: e.clientX - startRef.current.x,
-        y: e.clientY - startRef.current.y
+        x: coords.clientX - startRef.current.x,
+        y: coords.clientY - startRef.current.y
       })
     }
 
     if (resizing) {
-      const delta = e.clientX - startRef.current.x
+      const delta = coords.clientX - startRef.current.x
       setWidth(Math.max(250, Math.min(1400, startRef.current.width + delta)))
     }
 
     if (rotating) {
       const currentAngle = Math.atan2(
-        e.clientY - startRef.current.pivotY,
-        e.clientX - startRef.current.pivotX
+        coords.clientY - startRef.current.pivotY,
+        coords.clientX - startRef.current.pivotX
       )
       setRotation((currentAngle - startRef.current.angle) * (180 / Math.PI))
     }
@@ -272,9 +281,11 @@ const Ruler: React.FC = () => {
   return (
     <div
       className='fixed inset-0 z-50'
-      onMouseMove={onMouseMove}
+      onMouseMove={onMove}
       onMouseUp={stopAll}
       onMouseLeave={stopAll}
+      onTouchMove={onMove}
+      onTouchEnd={stopAll}
       style={{
         pointerEvents: dragging || resizing || rotating ? 'auto' : 'none'
       }}
@@ -282,6 +293,7 @@ const Ruler: React.FC = () => {
       <div
         ref={rulerRef}
         onMouseDown={onDragStart}
+        onTouchStart={onDragStart}
         style={{
           left: position.x,
           top: position.y,
@@ -466,12 +478,14 @@ const Ruler: React.FC = () => {
           {/* Resize */}
           <div
             onMouseDown={onResizeStart}
+            onTouchStart={onResizeStart}
             className={`absolute right-8 top-1/2 -translate-y-1/2 w-3 h-16 ${colors.resizeHandle} cursor-ew-resize`}
           />
 
           {/* Rotate */}
           <div
             onMouseDown={onRotateStart}
+            onTouchStart={onRotateStart}
             className={`absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full ${colors.rotateBtn} flex items-center justify-center cursor-pointer`}
           >
             ⟳
