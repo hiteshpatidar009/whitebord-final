@@ -50,7 +50,7 @@ export const RulerUtils = {
 }
 
 const Ruler: React.FC = () => {
-  const { setShowRuler, setRulerGeometry, setTool } = useWhiteboardStore()
+  const { tool, setShowRuler, setRulerGeometry, setTool } = useWhiteboardStore()
   const rulerRef = useRef<HTMLDivElement>(null)
 
   const [position, setPosition] = useState({ x: 200, y: 200 })
@@ -411,15 +411,17 @@ const Ruler: React.FC = () => {
           
           {/* Line Tool Button */}
           <button
-            onClick={() => setTool('line')}
+            onClick={() => setTool(tool === 'line' ? 'pen' : 'line')}
             className={`absolute left-28 top-1/2 -translate-y-1/2
              w-7 h-7 rounded-full
-             bg-gray-700 backdrop-blur-sm
-             border border-gray-700
-             text-white text-sm font-bold
+             ${tool === 'line' 
+               ? 'bg-blue-500 border-blue-500 text-white' 
+               : 'bg-gray-700 border-gray-700 text-white hover:bg-gray-600'
+             } backdrop-blur-sm
+             border text-sm font-bold
              flex items-center justify-center
-             shadow-lg hover:bg-gray-700`}
-            title='Straight Line Tool'
+             shadow-lg transition-colors`}
+            title={tool === 'line' ? 'Switch to Pen Tool' : 'Straight Line Tool'}
           >
             <Minus size={14} />
           </button>

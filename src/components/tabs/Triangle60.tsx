@@ -6,7 +6,7 @@ import { Minus } from 'lucide-react'
 const CM_IN_PX = 37.8
 
 const Triangle60: React.FC = () => {
-  const { setShowTriangle60, setTool } = useWhiteboardStore()
+  const { tool, setShowTriangle60, setTool } = useWhiteboardStore()
   const triangleRef = useRef<HTMLDivElement>(null)
 
   const [position, setPosition] = useState({ x: 300, y: 250 })
@@ -305,11 +305,14 @@ const Triangle60: React.FC = () => {
           
           {/* Line Tool Button */}
           <button
-            onClick={() => setTool('line')}
+            onClick={() => setTool(tool === 'line' ? 'pen' : 'line')}
             className={`absolute left-20 bottom-14 h-6 w-6 rounded-full
-             ${colors.closeBtn} flex items-center justify-center
-             shadow-md hover:scale-110 active:scale-95`}
-            title='Straight Line Tool'
+             ${tool === 'line' 
+               ? 'bg-blue-500 hover:bg-blue-600 border-blue-500 text-white' 
+               : colors.closeBtn
+             } flex items-center justify-center
+             shadow-md hover:scale-110 active:scale-95 transition-colors`}
+            title={tool === 'line' ? 'Switch to Pen Tool' : 'Straight Line Tool'}
           >
             <Minus size={14} />
           </button>
