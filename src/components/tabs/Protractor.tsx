@@ -28,6 +28,7 @@ const Protractor: React.FC = () => {
     arm1: { startX: number, startY: number, endX: number, endY: number, angle: number } | null
     arm2: { startX: number, startY: number, endX: number, endY: number, angle: number } | null
   }>({ arm1: null, arm2: null })
+  const [armDrawingEnabled, setArmDrawingEnabled] = useState<{ arm1: boolean, arm2: boolean }>({ arm1: false, arm2: false })
   const [isArcDrawingMode, setIsArcDrawingMode] = useState(false)
   const [isDarkTheme, setIsDarkTheme] = useState(false)
 
@@ -111,12 +112,15 @@ const Protractor: React.FC = () => {
   }
 
   const handleArmDoubleClick = (armIndex: 1 | 2) => {
+    // Enable drawing for this arm
+    setArmDrawingEnabled(prev => ({ ...prev, [`arm${armIndex}`]: true }))
+    
     const cx = position.x + size / 2
     const cy = position.y + size / 2
     const currentAngle = armIndex === 1 ? angle1 : angle2
     const rad = (currentAngle * Math.PI) / 180
     const rotRad = (rotation * Math.PI) / 180
-    const armLen = rOuter + 200 // Extended line length
+    const armLen = rOuter - 470 // Extended line length
     
     // Calculate line endpoints behind the arm (opposite direction)
     const localX = -armLen * Math.cos(-rad) // Negative to go behind
@@ -240,13 +244,12 @@ const Protractor: React.FC = () => {
     setDraggingArm(armIndex)
     lastAngleUpdate.current = Date.now()
     
-    // Initialize drawing
-    const id = `protractor-${armIndex}-${Date.now()}`
-    currentStrokeId.current[armIndex] = id
-    drawingPoints.current[armIndex] = []
-    
-    // Get current arm tip position in screen coordinates
-    
+    // Only initialize drawing if arm drawing is enabled for this arm
+    if (armDrawingEnabled[`arm${armIndex}` as keyof typeof armDrawingEnabled]) {
+      const id = `protractor-${armIndex}-${Date.now()}`
+      currentStrokeId.current[armIndex] = id
+      drawingPoints.current[armIndex] = []
+    }
   }
 
   /* ================= CALCULATE ANGLE FOR ARM ================= */
@@ -362,8 +365,7 @@ const Protractor: React.FC = () => {
         } else if (draggingArm) {
           // Throttle angle updates to reduce jitter
           const now = Date.now()
-          if (now - lastAngleUpdate.current < 16) {
-            // ~60fps
+          if (now - lastAngleUpdate.current < 8) { // Reduced from 16ms to 8ms for smoother drawing
             return
           }
           lastAngleUpdate.current = now
@@ -376,39 +378,41 @@ const Protractor: React.FC = () => {
             setAngle2(newAngle)
           }
           
-          // Add drawing point
-          const cx = position.x + size / 2
-          const cy = position.y + size / 2
-          const rad = (newAngle * Math.PI) / 180
-          const rotRad = (rotation * Math.PI) / 180
-          const armLen = rOuter + 20
-          
-          const localX = armLen * Math.cos(-rad)
-          const localY = armLen * Math.sin(-rad)
-          const screenX = cx + localX * Math.cos(rotRad) - localY * Math.sin(rotRad)
-          const screenY = cy + localX * Math.sin(rotRad) + localY * Math.cos(rotRad)
-          
-          drawingPoints.current[draggingArm].push(screenX, screenY)
-          
-          if (currentStrokeId.current[draggingArm] && drawingPoints.current[draggingArm].length >= 4) {
-            const armColor = draggingArm === 1 ? '#2563EB' : '#DC2626'
-            addItem({
-              type: 'stroke',
-              id: currentStrokeId.current[draggingArm]!,
-              tool: 'pen',
-              points: [...drawingPoints.current[draggingArm]],
-              color: armColor,
-              size: 2,
-              isEraser: false,
-              isHighlighter: true
-            })
+          // Only add drawing point if arm drawing is enabled
+          if (armDrawingEnabled[`arm${draggingArm}` as keyof typeof armDrawingEnabled]) {
+            const cx = position.x + size / 2
+            const cy = position.y + size / 2
+            const rad = (newAngle * Math.PI) / 180
+            const rotRad = (rotation * Math.PI) / 180
+            const armLen = rOuter + 20
+            
+            const localX = armLen * Math.cos(-rad)
+            const localY = armLen * Math.sin(-rad)
+            const screenX = cx + localX * Math.cos(rotRad) - localY * Math.sin(rotRad)
+            const screenY = cy + localX * Math.sin(rotRad) + localY * Math.cos(rotRad)
+            
+            drawingPoints.current[draggingArm].push(screenX, screenY)
+            
+            if (currentStrokeId.current[draggingArm] && drawingPoints.current[draggingArm].length >= 2) { // Reduced from 4 to 2 for smoother lines
+              const armColor = draggingArm === 1 ? '#2563EB' : '#DC2626'
+              addItem({
+                type: 'stroke',
+                id: currentStrokeId.current[draggingArm]!,
+                tool: 'pen',
+                points: [...drawingPoints.current[draggingArm]],
+                color: armColor,
+                size: 2,
+                isEraser: false,
+                isHighlighter: true
+              })
+            }
           }
         }
       })
     }
 
     const handleMouseUp = () => {
-      if (draggingArm && currentStrokeId.current[draggingArm] && drawingPoints.current[draggingArm].length >= 4) {
+      if (draggingArm && armDrawingEnabled[`arm${draggingArm}` as keyof typeof armDrawingEnabled] && currentStrokeId.current[draggingArm] && drawingPoints.current[draggingArm].length >= 2) { // Reduced from 4 to 2
         saveHistory()
       }
       setIsDragging(false)
@@ -445,7 +449,6 @@ const Protractor: React.FC = () => {
     position
   ])
 
-  // -- Rendering Helpers --
 
   // Convert degrees to SVG coordinates (0 at right, 180 at left, counter-clockwise)
 
