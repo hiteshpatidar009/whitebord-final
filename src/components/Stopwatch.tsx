@@ -244,6 +244,13 @@ const FloatingStopwatch: React.FC = () => {
             pos.current.startX = e.clientX;
             pos.current.startY = e.clientY;
           }}
+          onTouchStart={(e) => {
+            e.stopPropagation();
+            pos.current.resizing = true;
+            pos.current.startScale = scale;
+            pos.current.startX = e.touches[0].clientX;
+            pos.current.startY = e.touches[0].clientY;
+          }}
           className="absolute bottom-2 right-2 h-4 w-4 cursor-nwse-resize rounded-sm bg-gray-500 opacity-60"
         />
       </div>

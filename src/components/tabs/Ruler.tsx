@@ -195,6 +195,37 @@ const Ruler: React.FC = () => {
     setRulerGeometry(rulerGeometry)
   }, [position.x, position.y, width, rotation, setRulerGeometry])
 
+  // Disable back navigation when ruler is active
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Prevent back navigation
+      if (e.key === 'Escape' || e.key === 'Backspace') {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      }
+    };
+
+    const handlePopState = (e: PopStateEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      // Push current state back to prevent navigation
+      window.history.pushState(null, '', window.location.href);
+      return false;
+    };
+
+    // Add history entry to prevent back navigation
+    window.history.pushState(null, '', window.location.href);
+    
+    document.addEventListener('keydown', handleKeyDown, true);
+    window.addEventListener('popstate', handlePopState, true);
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown, true);
+      window.removeEventListener('popstate', handlePopState, true);
+    };
+  }, []);
+
   /* ---------------- Touch/Mouse Handlers ---------------- */
   const getEventCoords = (e: React.MouseEvent | React.TouchEvent) => {
     if ('touches' in e && e.touches.length > 0) {

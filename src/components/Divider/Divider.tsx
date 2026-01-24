@@ -8,10 +8,12 @@ interface DividerState {
   centerY: number;
   radius: number;
   angle: number;
+  rotation: number;
   isLocked: boolean;
   isDragging: boolean;
   isDrawing: boolean;
-  dragType: 'body' | 'pencil' | null;
+  isRotating: boolean;
+  dragType: 'body' | 'pencil' | 'rotate' | null;
 }
 
 const Divider: React.FC = () => {
@@ -23,9 +25,11 @@ const Divider: React.FC = () => {
     centerY: 200,
     radius: 100, // Horizontal spread when unlocked
     angle: 0,
+    rotation: 0,
     isLocked: false,
     isDragging: false,
     isDrawing: false,
+    isRotating: false,
     dragType: null
   });
 
@@ -62,27 +66,32 @@ const Divider: React.FC = () => {
   }, []);
 
   const handleMouseDown = useCallback(
-    (e: React.MouseEvent | React.TouchEvent, type: 'body' | 'pencil') => {
-      // Check if pan or select tool is active - don't interfere
-      if (tool === 'hand' || tool === 'select') {
-        return; // Let whiteboard handle the event
-      }
-      
+    (e: React.MouseEvent | React.TouchEvent, type: 'body' | 'pencil' | 'rotate') => {
       e.preventDefault();
       e.stopPropagation();
       const state = stateRef.current;
 
-      if (type === 'pencil' && !state.isLocked) {
+      if (type === 'rotate') {
+        state.dragType = 'rotate';
+        state.isRotating = true;
+      } else if (type === 'pencil' && !state.isLocked) {
         state.dragType = 'pencil';
       } else if (type === 'body') {
         state.dragType = 'body';
       } else if (type === 'pencil' && state.isLocked) {
+        // Reset any previous drawing state
+        if (state.isDrawing) {
+          state.isDrawing = false;
+          currentDrawingId.current = null;
+          drawingPoints.current = [];
+        }
+        
         state.isDrawing = true;
         currentDrawingId.current = uuidv4();
         drawingPoints.current = [];
 
         const p = getPencilPosition();
-        // Draw from the pencil tip (15px offset)
+        // Start drawing from exact pencil tip position
         drawingPoints.current.push(p.x, p.y + 15);
 
         addItem({
@@ -119,6 +128,9 @@ const Divider: React.FC = () => {
       if (state.dragType === 'body') {
         state.centerX = mouseX;
         state.centerY = mouseY;
+      } else if (state.dragType === 'rotate') {
+        const angle = Math.atan2(mouseY - state.centerY, mouseX - state.centerX);
+        state.rotation = (angle * 180) / Math.PI;
       } else if (state.dragType === 'pencil' && !state.isLocked) {
         // When unlocked: adjust RADIUS only for right arm
         // Angle remains fixed at 0 (pointing right)
@@ -160,6 +172,7 @@ const Divider: React.FC = () => {
   const handleMouseUp = useCallback(() => {
     const state = stateRef.current;
     state.isDragging = false;
+    state.isRotating = false;
     state.dragType = null;
 
     if (state.isDrawing) {
@@ -208,6 +221,37 @@ const Divider: React.FC = () => {
     setShowDivider(false);
   }, [setShowDivider]);
 
+  // Disable back navigation when divider is active
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Prevent back navigation
+      if (e.key === 'Escape' || e.key === 'Backspace') {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      }
+    };
+
+    const handlePopState = (e: PopStateEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      // Push current state back to prevent navigation
+      window.history.pushState(null, '', window.location.href);
+      return false;
+    };
+
+    // Add history entry to prevent back navigation
+    window.history.pushState(null, '', window.location.href);
+    
+    document.addEventListener('keydown', handleKeyDown, true);
+    window.addEventListener('popstate', handlePopState, true);
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown, true);
+      window.removeEventListener('popstate', handlePopState, true);
+    };
+  }, []);
+
   React.useEffect(() => {
     if (!showDivider) return;
 
@@ -237,7 +281,8 @@ const Divider: React.FC = () => {
 
   return (
     <div className="fixed inset-0 pointer-events-none z-50">
-      <svg ref={svgRef} className="w-full h-full" style={{ pointerEvents: tool === 'hand' || tool === 'select' ? 'none' : 'auto' }}>
+      <svg ref={svgRef} className="w-full h-full" style={{ pointerEvents: 'none' }}>
+        <g transform={`rotate(${state.rotation} ${state.centerX} ${state.centerY})`}>
 
         {/* TOP ADJUSTMENT SCREW */}
         <circle
@@ -266,6 +311,7 @@ const Divider: React.FC = () => {
           stroke="#1F2937"
           strokeWidth="2"
           className="cursor-move"
+          style={{ pointerEvents: 'auto' }}
           onMouseDown={(e) => handleMouseDown(e, 'body')}
           onTouchStart={(e) => handleMouseDown(e, 'body')}
         />
@@ -332,6 +378,7 @@ const Divider: React.FC = () => {
           stroke="url(#metalGradient)"
           strokeWidth="8"
           strokeLinecap="round"
+          style={{ pointerEvents: 'auto' }}
           onMouseDown={(e) => handleMouseDown(e, 'pencil')}
           onTouchStart={(e) => handleMouseDown(e, 'pencil')}
           className={state.isLocked ? 'cursor-crosshair' : 'cursor-ew-resize'}
@@ -345,6 +392,7 @@ const Divider: React.FC = () => {
           fill={state.isLocked ? "#7C3AED" : "#10B981"}
           stroke={state.isLocked ? "#5B21B6" : "#059669"}
           strokeWidth="2"
+          style={{ pointerEvents: 'auto' }}
           onClick={toggleLock}
           onTouchEnd={toggleLock}
           className="cursor-pointer"
@@ -352,7 +400,7 @@ const Divider: React.FC = () => {
         
         {/* LOCK ICON */}
         {state.isLocked ? (
-          <g onClick={toggleLock} onTouchEnd={toggleLock} className="cursor-pointer">
+          <g onClick={toggleLock} onTouchEnd={toggleLock} className="cursor-pointer" style={{ pointerEvents: 'auto' }}>
             <rect
               x={state.centerX - 5}
               y={state.centerY - 28}
@@ -369,7 +417,7 @@ const Divider: React.FC = () => {
             />
           </g>
         ) : (
-          <g onClick={toggleLock} onTouchEnd={toggleLock} className="cursor-pointer">
+          <g onClick={toggleLock} onTouchEnd={toggleLock} className="cursor-pointer" style={{ pointerEvents: 'auto' }}>
             <rect
               x={state.centerX - 5}
               y={state.centerY - 28}
@@ -396,6 +444,7 @@ const Divider: React.FC = () => {
           fill="#6B7280"
           stroke="#4B5563"
           strokeWidth="2"
+          style={{ pointerEvents: 'auto' }}
           onMouseDown={(e) => handleMouseDown(e, 'pencil')}
           onTouchStart={(e) => handleMouseDown(e, 'pencil')}
           className={state.isLocked ? 'cursor-crosshair' : 'cursor-ew-resize'}
@@ -408,6 +457,7 @@ const Divider: React.FC = () => {
           width="6"
           height="25"
           fill="#FBBF24"
+          style={{ pointerEvents: 'auto' }}
           onMouseDown={(e) => handleMouseDown(e, 'pencil')}
           onTouchStart={(e) => handleMouseDown(e, 'pencil')}
           className={state.isLocked ? 'cursor-crosshair' : 'cursor-ew-resize'}
@@ -417,10 +467,54 @@ const Divider: React.FC = () => {
         <polygon
           points={`${pencilPos.x},${pencilPos.y + 15} ${pencilPos.x - 3},${pencilPos.y + 8} ${pencilPos.x + 3},${pencilPos.y + 8}`}
           fill="#1F2937"
+          style={{ pointerEvents: 'auto' }}
           onMouseDown={(e) => handleMouseDown(e, 'pencil')}
           onTouchStart={(e) => handleMouseDown(e, 'pencil')}
           className={state.isLocked ? 'cursor-crosshair' : 'cursor-ew-resize'}
         />
+
+        {/* DRAG HANDLE ICON */}
+        <circle
+          cx={state.centerX - 50}
+          cy={state.centerY - 25}
+          r="10"
+          fill="#10B981"
+          stroke="#059669"
+          strokeWidth="2"
+          className="cursor-move"
+          style={{ pointerEvents: 'auto' }}
+          onMouseDown={(e) => handleMouseDown(e, 'body')}
+          onTouchStart={(e) => handleMouseDown(e, 'body')}
+        />
+        <g fill="white" style={{ pointerEvents: 'auto' }} onMouseDown={(e) => handleMouseDown(e, 'body')} onTouchStart={(e) => handleMouseDown(e, 'body')}>
+          <circle cx={state.centerX - 53} cy={state.centerY - 28} r="1" />
+          <circle cx={state.centerX - 50} cy={state.centerY - 28} r="1" />
+          <circle cx={state.centerX - 47} cy={state.centerY - 28} r="1" />
+          <circle cx={state.centerX - 53} cy={state.centerY - 25} r="1" />
+          <circle cx={state.centerX - 50} cy={state.centerY - 25} r="1" />
+          <circle cx={state.centerX - 47} cy={state.centerY - 25} r="1" />
+          <circle cx={state.centerX - 53} cy={state.centerY - 22} r="1" />
+          <circle cx={state.centerX - 50} cy={state.centerY - 22} r="1" />
+          <circle cx={state.centerX - 47} cy={state.centerY - 22} r="1" />
+        </g>
+
+        {/* ROTATION HANDLE */}
+        <circle
+          cx={state.centerX + 50}
+          cy={state.centerY - 25}
+          r="16"
+          fill="rgba(31, 41, 55, 0.8)"
+          stroke="#374151"
+          strokeWidth="2"
+          className="cursor-move"
+          style={{ pointerEvents: 'auto' }}
+          onMouseDown={(e) => handleMouseDown(e, 'rotate')}
+          onTouchStart={(e) => handleMouseDown(e, 'rotate')}
+        />
+        <g stroke="white" strokeWidth="2.5" fill="none" style={{ pointerEvents: 'auto' }} onMouseDown={(e) => handleMouseDown(e, 'rotate')} onTouchStart={(e) => handleMouseDown(e, 'rotate')}>
+          <path d={`M ${state.centerX + 41} ${state.centerY - 25} a 9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L ${state.centerX + 41} ${state.centerY - 29}`} />
+          <path d={`M ${state.centerX + 41} ${state.centerY - 32} v 5 h 5`} />
+        </g>
 
         {/* CLOSE BUTTON */}
         <circle
@@ -430,6 +524,7 @@ const Divider: React.FC = () => {
           fill="#DC2626"
           stroke="#991B1B"
           strokeWidth="1"
+          style={{ pointerEvents: 'auto' }}
           onClick={closeDivider}
           onTouchStart={closeDivider}
           className="cursor-pointer"
@@ -441,6 +536,7 @@ const Divider: React.FC = () => {
           fontSize="10"
           fill="white"
           className="cursor-pointer select-none"
+          style={{ pointerEvents: 'auto' }}
           onClick={closeDivider}
           onTouchStart={closeDivider}
         >
@@ -457,6 +553,7 @@ const Divider: React.FC = () => {
         {/* RADIUS ADJUSTMENT GUIDE */}
        
 
+        </g>
       </svg>
     </div>
   );

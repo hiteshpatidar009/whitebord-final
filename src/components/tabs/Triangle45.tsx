@@ -65,6 +65,37 @@ const Triangle45: React.FC = () => {
     setTicks(Array.from({ length: totalCm * 10 + 1 }, (_, i) => i))
   }, [size])
 
+  // Disable back navigation when triangle is active
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Prevent back navigation
+      if (e.key === 'Escape' || e.key === 'Backspace') {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      }
+    };
+
+    const handlePopState = (e: PopStateEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      // Push current state back to prevent navigation
+      window.history.pushState(null, '', window.location.href);
+      return false;
+    };
+
+    // Add history entry to prevent back navigation
+    window.history.pushState(null, '', window.location.href);
+    
+    document.addEventListener('keydown', handleKeyDown, true);
+    window.addEventListener('popstate', handlePopState, true);
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown, true);
+      window.removeEventListener('popstate', handlePopState, true);
+    };
+  }, []);
+
   /* --------- Drag --------- */
   const onDragStart = (e: React.MouseEvent | React.TouchEvent) => {
     // Check if pan or select tool is active - don't interfere

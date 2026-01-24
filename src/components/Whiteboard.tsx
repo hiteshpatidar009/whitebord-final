@@ -2215,6 +2215,15 @@ const getCursorStyle = () => {
       // For formatted text, render invisible interaction rectangle
       const hasFormatting = /<(b|strong|i|em|u|span)/.test(item.text);
       if (hasFormatting) {
+        // Calculate dynamic height based on text content and wrapping
+        const plainText = item.text.replace(/<[^>]*>/g, '');
+        const lineCount = Math.max(1, item.text.split('\n').length);
+        const charCount = plainText.length;
+        const avgCharsPerLine = Math.floor((item.width || 200) / (item.fontSize * 0.6));
+        const wrappedLines = Math.ceil(charCount / avgCharsPerLine);
+        const totalLines = Math.max(lineCount, wrappedLines);
+        const textHeight = item.fontSize * 1.4 * totalLines;
+        
         return (
           <Rect
             key={item.id}
@@ -2222,7 +2231,7 @@ const getCursorStyle = () => {
             x={item.x}
             y={item.y}
             width={item.width || 200}
-            height={Math.max(item.fontSize * 1.4 * 4, item.fontSize * 1.4 * (item.text.split('\n').length || 1))}
+            height={textHeight}
             fill="transparent"
             listening={tool === 'select' || tool === 'text'}
             draggable={tool === 'select' || tool === 'text'}
@@ -2586,26 +2595,38 @@ const getCursorStyle = () => {
           const hasFormatting = /<(b|strong|i|em|u|span)/.test(item.text);
           if (!hasFormatting) return null;
           
+          // Calculate dynamic height based on text content and wrapping
+          const plainText = item.text.replace(/<[^>]*>/g, '');
+          const lineCount = Math.max(1, item.text.split('\n').length);
+          const charCount = plainText.length;
+          const avgCharsPerLine = Math.floor((item.width || 200) / (item.fontSize * 0.6));
+          const wrappedLines = Math.ceil(charCount / avgCharsPerLine);
+          const totalLines = Math.max(lineCount, wrappedLines);
+          const textHeight = item.fontSize * 1.4 * totalLines;
+          
+          // Calculate screen position accounting for zoom and pan
+          const screenX = item.x * stageScale + stagePos.x;
+          const screenY = item.y * stageScale + stagePos.y;
+          
           return (
             <div
               key={`overlay-${item.id}`}
               style={{
                 position: 'fixed',
-                left: item.x,
-                top: item.y,
-                width: item.width || 200,
-                fontSize: item.fontSize,
+                left: screenX,
+                top: screenY,
+                width: (item.width || 200) * stageScale,
+                height: textHeight * stageScale,
+                fontSize: item.fontSize * stageScale,
                 fontFamily: item.fontFamily,
                 color: item.fill,
                 lineHeight: 1.4,
                 pointerEvents: 'none',
-                overflow: 'hidden',
+                overflow: 'visible',
                 wordWrap: 'break-word',
                 zIndex: tool === 'hand' ? -1 : 20,
                 userSelect: 'none',
-                touchAction: 'none',
-                transform: `translate(${stagePos.x}px, ${stagePos.y}px) scale(${stageScale})`,
-                transformOrigin: '0 0'
+                touchAction: 'none'
               }}
               dangerouslySetInnerHTML={{ __html: item.text }}
             />
@@ -2628,10 +2649,16 @@ const getCursorStyle = () => {
           const node = stage.findOne('#' + id);
           if (node) {
             const rect = node.getClientRect();
-            minX = Math.min(minX, rect.x);
-            minY = Math.min(minY, rect.y);
-            maxX = Math.max(maxX, rect.x + rect.width);
-            maxY = Math.max(maxY, rect.y + rect.height);
+            // Convert to screen coordinates
+            const screenMinX = rect.x * stageScale + stagePos.x;
+            const screenMinY = rect.y * stageScale + stagePos.y;
+            const screenMaxX = (rect.x + rect.width) * stageScale + stagePos.x;
+            const screenMaxY = (rect.y + rect.height) * stageScale + stagePos.y;
+            
+            minX = Math.min(minX, screenMinX);
+            minY = Math.min(minY, screenMinY);
+            maxX = Math.max(maxX, screenMaxX);
+            maxY = Math.max(maxY, screenMaxY);
           }
         });
         

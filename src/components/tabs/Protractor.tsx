@@ -462,6 +462,37 @@ const Protractor: React.FC = () => {
   ])
 
 
+  // Disable back navigation when protractor is active
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Prevent back navigation
+      if (e.key === 'Escape' || e.key === 'Backspace') {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      }
+    };
+
+    const handlePopState = (e: PopStateEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      // Push current state back to prevent navigation
+      window.history.pushState(null, '', window.location.href);
+      return false;
+    };
+
+    // Add history entry to prevent back navigation
+    window.history.pushState(null, '', window.location.href);
+    
+    document.addEventListener('keydown', handleKeyDown, true);
+    window.addEventListener('popstate', handlePopState, true);
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown, true);
+      window.removeEventListener('popstate', handlePopState, true);
+    };
+  }, []);
+
   // Convert degrees to SVG coordinates (0 at right, 180 at left, counter-clockwise)
 
   const degToSvg = (deg: number, radius: number) => {
