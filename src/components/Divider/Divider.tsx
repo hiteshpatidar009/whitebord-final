@@ -15,14 +15,14 @@ interface DividerState {
 }
 
 const Divider: React.FC = () => {
-  const { addItem, updateItem, saveHistory, color, size, showDivider, setShowDivider } =
+  const { addItem, updateItem, saveHistory, color, size, showDivider, setShowDivider, tool } =
     useWhiteboardStore();
 
   const stateRef = useRef<DividerState>({
     centerX: 300,
     centerY: 200,
-    radius: 60, // Reduced initial radius for right arm
-    angle: 0,    // Always pointing right
+    radius: 100, // Horizontal spread when unlocked
+    angle: 0,
     isLocked: false,
     isDragging: false,
     isDrawing: false,
@@ -38,11 +38,17 @@ const Divider: React.FC = () => {
 
   const getPencilPosition = useCallback(() => {
     const state = stateRef.current;
+    if (!state.isLocked) {
+      return {
+        x: state.centerX + state.radius,
+        y: state.centerY + 125
+      };
+    }
     return polarToCartesian(
       state.centerX,
       state.centerY,
-      state.radius, // Radius changes for right arm
-      state.angle   // Fixed angle (0 = right)
+      state.radius,
+      state.angle
     );
   }, []);
 
@@ -57,6 +63,11 @@ const Divider: React.FC = () => {
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent | React.TouchEvent, type: 'body' | 'pencil') => {
+      // Check if pan or select tool is active - don't interfere
+      if (tool === 'hand' || tool === 'select') {
+        return; // Let whiteboard handle the event
+      }
+      
       e.preventDefault();
       e.stopPropagation();
       const state = stateRef.current;
@@ -71,7 +82,8 @@ const Divider: React.FC = () => {
         drawingPoints.current = [];
 
         const p = getPencilPosition();
-        drawingPoints.current.push(p.x, p.y);
+        // Draw from the pencil tip (15px offset)
+        drawingPoints.current.push(p.x, p.y + 15);
 
         addItem({
           type: 'stroke',
@@ -79,14 +91,16 @@ const Divider: React.FC = () => {
           tool: 'pen',
           points: [...drawingPoints.current],
           color,
-          size
-        });
+          size,
+          isEraser: false,
+          isHighlighter: false
+        } as any);
       }
 
       state.isDragging = true;
       update();
     },
-    [update, addItem, color, size, getPencilPosition]
+    [update, addItem, color, size, getPencilPosition, tool]
   );
 
   const handleMouseMove = useCallback(
@@ -129,7 +143,8 @@ const Divider: React.FC = () => {
             state.radius,
             state.angle
           );
-          drawingPoints.current.push(p.x, p.y);
+          // Draw from the pencil tip (15px offset)
+          drawingPoints.current.push(p.x, p.y + 15);
 
           updateItem(currentDrawingId.current!, {
             points: [...drawingPoints.current]
@@ -163,13 +178,25 @@ const Divider: React.FC = () => {
       e.stopPropagation();
     }
     const state = stateRef.current;
-    state.isLocked = !state.isLocked;
     
-    // When unlocking, reset angle to 0 (pointing right)
     if (!state.isLocked) {
+      // Transitioning from UNLOCKED to LOCKED
+      // Calculate effective radius and angle based on current (x, y)
+      // current x = centerX + radius, current y = centerY + 125
+      const currentX = state.centerX + state.radius;
+      const currentY = state.centerY + 125;
+      
+      state.radius = distance(state.centerX, state.centerY, currentX, currentY);
+      state.angle = angleBetween(state.centerX, state.centerY, currentX, currentY);
+    } else {
+      // Transitioning from LOCKED to UNLOCKED
+      // Calculate horizontal spread (radius) from current polar position
+      const p = polarToCartesian(state.centerX, state.centerY, state.radius, state.angle);
+      state.radius = Math.max(50, p.x - state.centerX);
       state.angle = 0;
     }
     
+    state.isLocked = !state.isLocked;
     update();
   }, [update]);
 
@@ -210,7 +237,7 @@ const Divider: React.FC = () => {
 
   return (
     <div className="fixed inset-0 pointer-events-none z-50">
-      <svg ref={svgRef} className="w-full h-full pointer-events-auto">
+      <svg ref={svgRef} className="w-full h-full" style={{ pointerEvents: tool === 'hand' || tool === 'select' ? 'none' : 'auto' }}>
 
         {/* TOP ADJUSTMENT SCREW */}
         <circle

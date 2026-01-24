@@ -204,6 +204,11 @@ const Ruler: React.FC = () => {
   }
 
   const onDragStart = (e: React.MouseEvent | React.TouchEvent) => {
+    // Check if pan or select tool is active - don't interfere
+    if (tool === 'hand' || tool === 'select') {
+      return; // Let whiteboard handle the event
+    }
+    
     const coords = getEventCoords(e)
     setDragging(true)
     startRef.current.x = coords.clientX - position.x
@@ -300,7 +305,7 @@ const Ruler: React.FC = () => {
           width,
           transform: `rotate(${rotation}deg)`,
           transformOrigin: 'left top',
-          pointerEvents: 'auto'
+          pointerEvents: tool === 'hand' || tool === 'select' ? 'none' : 'auto'
         }}
         className='absolute cursor-grab select-none'
       >

@@ -6,7 +6,7 @@ const UNIT_PX = 35
 const MIN_RANGE = 3
 
 const NumberLine: React.FC = () => {
-  const { setShowNumberLine } = useWhiteboardStore()
+  const { tool, setShowNumberLine } = useWhiteboardStore()
   const ref = useRef<HTMLDivElement>(null)
 
   const [position, setPosition] = useState({ x: 400, y: 300 })
@@ -32,6 +32,11 @@ const NumberLine: React.FC = () => {
 
   /* ---------------- Drag (ONLY via drag button) ---------------- */
   const onDragStart = (e: React.MouseEvent | React.TouchEvent) => {
+    // Check if pan or select tool is active - don't interfere
+    if (tool === 'hand' || tool === 'select') {
+      return; // Let whiteboard handle the event
+    }
+    
     const pointer = getPointerEvent(e)
     setDragging(true)
     start.current.x = pointer.clientX - position.x
@@ -129,7 +134,7 @@ const NumberLine: React.FC = () => {
       <div
         ref={ref}
         className="absolute select-none"
-        style={{ left: position.x, top: position.y, pointerEvents: 'auto' }}
+        style={{ left: position.x, top: position.y, pointerEvents: tool === 'hand' || tool === 'select' ? 'none' : 'auto' }}
       >
         {/* ========== X AXIS ========== */}
         <div

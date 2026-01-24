@@ -3,7 +3,7 @@ import { useWhiteboardStore } from '../../store/useWhiteboardStore'
 import { useTouchAndMouse } from '../../hooks/useTouchAndMouse'
 
 const Protractor: React.FC = () => {
-  const { setShowProtractor, addItem, saveHistory } = useWhiteboardStore()
+  const { setShowProtractor, addItem, saveHistory, tool } = useWhiteboardStore()
   const ref = useRef<HTMLDivElement>(null)
 
   // -- Window/Tool State --
@@ -71,6 +71,12 @@ const Protractor: React.FC = () => {
   /* ================= TOOL TRANSFORM HANDLERS ================= */
 
   const handleMouseDown = (e: React.MouseEvent | React.TouchEvent) => {
+    // Check if pan or select tool is active - don't interfere
+    const { tool } = useWhiteboardStore.getState();
+    if (tool === 'hand' || tool === 'select') {
+      return; // Let whiteboard handle the event
+    }
+    
     if ((e.target as Element).closest('.protractor-control')) return
     const pointer = getPointerEvent(e)
     pointer.preventDefault()
@@ -238,6 +244,12 @@ const Protractor: React.FC = () => {
   }
 
   const handleArmMouseDown = (e: React.MouseEvent | React.TouchEvent, armIndex: 1 | 2) => {
+    // Check if pan or select tool is active - don't interfere
+    const { tool } = useWhiteboardStore.getState();
+    if (tool === 'hand' || tool === 'select') {
+      return; // Let whiteboard handle the event
+    }
+    
     const pointer = getPointerEvent(e)
     pointer.preventDefault()
     pointer.stopPropagation()
@@ -559,7 +571,7 @@ const Protractor: React.FC = () => {
         className='absolute inset-0 cursor-grab active:cursor-grabbing'
         onMouseDown={handleMouseDown}
         onTouchStart={handleMouseDown}
-        style={{ pointerEvents: 'auto' }}
+        style={{ pointerEvents: tool === 'hand' || tool === 'select' ? 'none' : 'auto' }}
       >
         <svg
           width='100%'
