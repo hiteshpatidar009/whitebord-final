@@ -32,11 +32,6 @@ const NumberLine: React.FC = () => {
 
   /* ---------------- Drag (ONLY via drag button) ---------------- */
   const onDragStart = (e: React.MouseEvent | React.TouchEvent) => {
-    // Check if pan or select tool is active - don't interfere
-    if (tool === 'hand' || tool === 'select') {
-      return; // Let whiteboard handle the event
-    }
-    
     const pointer = getPointerEvent(e)
     setDragging(true)
     start.current.x = pointer.clientX - position.x
@@ -129,12 +124,20 @@ const NumberLine: React.FC = () => {
       onMouseLeave={stopAll}
       onTouchMove={onMouseMove}
       onTouchEnd={stopAll}
-      style={{ pointerEvents: dragging || stretchDir ? 'auto' : 'none' }}
+      style={{ 
+        pointerEvents: dragging || stretchDir ? 'auto' : 'none',
+        touchAction: 'none'
+      }}
     >
       <div
         ref={ref}
         className="absolute select-none"
-        style={{ left: position.x, top: position.y, pointerEvents: tool === 'hand' || tool === 'select' ? 'none' : 'auto' }}
+        style={{ 
+          left: position.x, 
+          top: position.y, 
+          pointerEvents: 'auto',
+          touchAction: 'none'
+        }}
       >
         {/* ========== X AXIS ========== */}
         <div

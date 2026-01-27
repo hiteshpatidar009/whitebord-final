@@ -71,12 +71,6 @@ const Protractor: React.FC = () => {
   /* ================= TOOL TRANSFORM HANDLERS ================= */
 
   const handleMouseDown = (e: React.MouseEvent | React.TouchEvent) => {
-    // Check if pan or select tool is active - don't interfere
-    const { tool } = useWhiteboardStore.getState();
-    if (tool === 'hand' || tool === 'select') {
-      return; // Let whiteboard handle the event
-    }
-    
     if ((e.target as Element).closest('.protractor-control')) return
     const pointer = getPointerEvent(e)
     pointer.preventDefault()
@@ -244,12 +238,6 @@ const Protractor: React.FC = () => {
   }
 
   const handleArmMouseDown = (e: React.MouseEvent | React.TouchEvent, armIndex: 1 | 2) => {
-    // Check if pan or select tool is active - don't interfere
-    const { tool } = useWhiteboardStore.getState();
-    if (tool === 'hand' || tool === 'select') {
-      return; // Let whiteboard handle the event
-    }
-    
     const pointer = getPointerEvent(e)
     pointer.preventDefault()
     pointer.stopPropagation()
@@ -594,7 +582,8 @@ const Protractor: React.FC = () => {
         height: size / 2,
         transform: `rotate(${rotation}deg)`,
         transformOrigin: 'bottom center',
-        pointerEvents: 'none'
+        pointerEvents: 'none',
+        touchAction: 'none'
       }}
     >
       {/* Main Body */}
@@ -602,7 +591,10 @@ const Protractor: React.FC = () => {
         className='absolute inset-0 cursor-grab active:cursor-grabbing'
         onMouseDown={handleMouseDown}
         onTouchStart={handleMouseDown}
-        style={{ pointerEvents: tool === 'hand' || tool === 'select' ? 'none' : 'auto' }}
+        style={{ 
+          pointerEvents: 'auto',
+          touchAction: 'none'
+        }}
       >
         <svg
           width='100%'

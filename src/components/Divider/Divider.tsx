@@ -280,8 +280,8 @@ const Divider: React.FC = () => {
   const leftLegPos = getLeftLegPosition();
 
   return (
-    <div className="fixed inset-0 pointer-events-none z-50">
-      <svg ref={svgRef} className="w-full h-full" style={{ pointerEvents: 'none' }}>
+    <div className="fixed inset-0 pointer-events-none z-50" style={{ touchAction: 'none' }}>
+      <svg ref={svgRef} className="w-full h-full" style={{ pointerEvents: 'none', touchAction: 'none' }}>
         <g transform={`rotate(${state.rotation} ${state.centerX} ${state.centerY})`}>
 
         {/* TOP ADJUSTMENT SCREW */}

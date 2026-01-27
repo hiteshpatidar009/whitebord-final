@@ -98,11 +98,6 @@ const Triangle45: React.FC = () => {
 
   /* --------- Drag --------- */
   const onDragStart = (e: React.MouseEvent | React.TouchEvent) => {
-    // Check if pan or select tool is active - don't interfere
-    if (tool === 'hand' || tool === 'select') {
-      return; // Let whiteboard handle the event
-    }
-    
     const pointer = getPointerEvent(e)
     setDragging(true)
     startRef.current.x = pointer.clientX - position.x
@@ -184,7 +179,8 @@ const Triangle45: React.FC = () => {
       onTouchMove={onMouseMove}
       onTouchEnd={stopAll}
       style={{
-        pointerEvents: dragging || resizing || rotating ? 'auto' : 'none'
+        pointerEvents: dragging || resizing || rotating ? 'auto' : 'none',
+        touchAction: 'none'
       }}
     >
       <div
@@ -197,7 +193,8 @@ const Triangle45: React.FC = () => {
           width: size,
           height: size,
           transform: `rotate(${rotation}deg)`,
-          pointerEvents: tool === 'hand' || tool === 'select' ? 'none' : 'auto'
+          pointerEvents: 'auto',
+          touchAction: 'none'
         }}
         className='absolute cursor-grab select-none'
       >
