@@ -857,7 +857,7 @@ export const Whiteboard: React.FC = () => {
         previewLineRef.current.getLayer()?.batchDraw();
     }
 
-    if (tool === 'eraser' || tool === 'highlighter-eraser') {
+    if (tool === 'eraser' ) {
        // Check for text collision
        items.forEach(item => {
          if (item.type === 'text') {
@@ -1076,7 +1076,7 @@ export const Whiteboard: React.FC = () => {
             // }
             
             // Check for text collision during eraser move
-            if (tool === 'eraser' || tool === 'highlighter-eraser') {
+            if (tool === 'eraser' ) {
               items.forEach(item => {
                 if (item.type === 'text') {
                   const textRect = {
