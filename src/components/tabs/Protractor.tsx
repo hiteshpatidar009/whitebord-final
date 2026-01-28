@@ -28,7 +28,7 @@ const Protractor: React.FC = () => {
     arm1: { startX: number, startY: number, endX: number, endY: number, angle: number } | null
     arm2: { startX: number, startY: number, endX: number, endY: number, angle: number } | null
   }>({ arm1: null, arm2: null })
-  const [armDrawingEnabled, setArmDrawingEnabled] = useState<{ arm1: boolean, arm2: boolean }>({ arm1: false, arm2: false })
+  // const [armDrawingEnabled, setArmDrawingEnabled] = useState<{ arm1: boolean, arm2: boolean }>({ arm1: false, arm2: false })
   const [isArcDrawingMode, setIsArcDrawingMode] = useState(false)
   const [isDarkTheme, setIsDarkTheme] = useState(false)
 
@@ -113,7 +113,7 @@ const Protractor: React.FC = () => {
 
   const handleArmDoubleClick = (armIndex: 1 | 2) => {
     // Enable drawing for this arm
-    setArmDrawingEnabled(prev => ({ ...prev, [`arm${armIndex}`]: true }))
+    // setArmDrawingEnabled(prev => ({ ...prev, [`arm${armIndex}`]: true }))
     
     const cx = position.x + size / 2
     const cy = position.y + size / 2
@@ -245,11 +245,11 @@ const Protractor: React.FC = () => {
     lastAngleUpdate.current = Date.now()
     
     // Only initialize drawing if arm drawing is enabled for this arm
-    if (armDrawingEnabled[`arm${armIndex}` as keyof typeof armDrawingEnabled]) {
-      const id = `protractor-${armIndex}-${Date.now()}`
-      currentStrokeId.current[armIndex] = id
-      drawingPoints.current[armIndex] = []
-    }
+    // if (armDrawingEnabled[`arm${armIndex}` as keyof typeof armDrawingEnabled]) {
+    //   const id = `protractor-${armIndex}-${Date.now()}`
+    //   currentStrokeId.current[armIndex] = id
+    //   drawingPoints.current[armIndex] = []
+    // }
   }
 
   /* ================= CALCULATE ANGLE FOR ARM ================= */
@@ -412,9 +412,9 @@ const Protractor: React.FC = () => {
     }
 
     const handleMouseUp = () => {
-      if (draggingArm && armDrawingEnabled[`arm${draggingArm}` as keyof typeof armDrawingEnabled] && currentStrokeId.current[draggingArm] && drawingPoints.current[draggingArm].length >= 2) { // Reduced from 4 to 2
-        saveHistory()
-      }
+      // if (draggingArm && armDrawingEnabled[`arm${draggingArm}` as keyof typeof armDrawingEnabled] && currentStrokeId.current[draggingArm] && drawingPoints.current[draggingArm].length >= 2) { // Reduced from 4 to 2
+      //   saveHistory()
+      // }
       setIsDragging(false)
       setIsResizing(false)
       setIsRotating(false)
