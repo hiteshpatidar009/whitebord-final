@@ -78,7 +78,7 @@ const ExpandableToolbar: React.FC<ExpandableToolbarProps> = ({ visible, onClose,
             <div className="inline-flex items-center gap-3 px-4 py-2 rounded-full bg-[#1000af] text-white text-lg font-semibold">
             Chrome | PC | App
           </div>
-            <Pill icon={<Chrome size={18} />} label="Chrome" onClick={onChromeClick} />
+            <Pill icon={<Chrome size={18} />} label="Chrome"  />
             <Pill icon={<Monitor size={18} />} label="PC" onClick={handlePcButtonClick} />
             <input
               type="file"

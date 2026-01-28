@@ -8,7 +8,7 @@ import { useWhiteboardStore } from '../store/useWhiteboardStore';
 import type { Stroke, WhiteboardItem } from '../types';
 import { getBoundingBox } from '../utils/canvasUtils';
 import { FONT_STACKS, FONTS } from './TextToolbar';
-import ChromeWidget from './ChromeWidget';
+// import ChromeWidget from './ChromeWidget';
 import Protractor from './tabs/Protractor';
 import Divider from './Divider/Divider';
 import { RulerUtils } from './tabs/Ruler';
